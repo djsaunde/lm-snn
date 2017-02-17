@@ -213,7 +213,7 @@ else:
 
 b.set_global_preferences( 
                         defaultclock = b.Clock(dt=0.5*b.ms), # The default clock to use if none is provided or defined in any enclosing scope.
-                        useweave = True, # Defines whether or not functions should use inlined compiled C code where defined.
+                        useweave = False, # Defines whether or not functions should use inlined compiled C code where defined.
                         gcc_options = ['-ffast-math -march=native'],  # Defines the compiler switches passed to the gcc compiler. 
                         #For gcc versions 4.2+ we recommend using -march=native. By default, the -ffast-math optimizations are turned on 
                         usecodegen = True,  # Whether or not to use experimental code generation support.
@@ -411,7 +411,7 @@ for name in population_names:
     print 'create recurrent connections'
     for conn_type in recurrent_conn_names:
         connName = name+conn_type[0]+name+conn_type[1]
-        weightMatrix = get_matrix_from_file(weight_path + '../random/XeAe' + '.npy')
+        weightMatrix = get_matrix_from_file(weight_path + '../random/' + connName + ending + '.npy')
         connections[connName] = b.Connection(neuron_groups[connName[0:2]], neuron_groups[connName[2:4]], structure= conn_structure, 
                                                     state = 'g'+conn_type[0])
         connections[connName].connect(neuron_groups[connName[0:2]], neuron_groups[connName[2:4]], weightMatrix)
@@ -478,7 +478,7 @@ if do_plot_performance:
 for i,name in enumerate(input_population_names):
     input_groups[name+'e'].rate = 0
 b.run(0)
-j = 0
+j = 0x`
 
 one_index = -1
 idx = 0
