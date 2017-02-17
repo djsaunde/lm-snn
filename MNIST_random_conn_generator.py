@@ -37,7 +37,7 @@ def sparsenMatrix(baseMatrix, pConn):
 def create_weights():
     
     nInput = 784
-    nE = 100
+    nE = input('Enter number of excitatory / inhibitory neurons: ')
     nI = nE 
     dataPath = './random/'
     weight = {}
@@ -51,8 +51,8 @@ def create_weights():
     pConn['ee_input'] = 1.0 
     pConn['ei_input'] = 0.1 
     pConn['ee'] = 1.0
-    pConn['ei'] = 0.0025
-    pConn['ie'] = 0.9
+    pConn['ei'] = 1.0
+    pConn['ie'] = 1.0
     pConn['ii'] = 0.1
     
     
@@ -69,18 +69,6 @@ def create_weights():
         np.save(dataPath + name + str(nE), weightList)
     
     
-    
-    print 'create connection matrices from E->I which are purely random'
-    connNameList = ['XeAi']
-    for name in connNameList:
-        weightMatrix = np.random.random((nInput, nI))
-        weightMatrix *= weight['ei_input']
-        weightMatrix, weightList = sparsenMatrix(weightMatrix, pConn['ei_input'])
-        print 'save connection matrix', name + str(nE)
-        np.save(dataPath + name + str(nE), weightList)
-        
-    
-    
     print 'create connection matrices from E->I which are purely random'
     connNameList = ['AeAi']
     for name in connNameList:
@@ -93,8 +81,7 @@ def create_weights():
         print 'save connection matrix', name + str(nE)
         np.save(dataPath + name + str(nE), weightList)
         
-        
-        
+              
     print 'create connection matrices from I->E which are purely random'
     connNameList = ['AiAe']
     for name in connNameList:
