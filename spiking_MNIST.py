@@ -61,22 +61,22 @@ def get_labeled_data(picklename, bTrain = True):
     return data
 
 def get_matrix_from_file(fileName):
-    offset = len(ending) + 4
-    if fileName[-4-offset] == 'X':
+    offset = len(str(n_e)) + 4
+    if fileName[-offset-4] == 'X':
         n_src = n_input                
     else:
-        if fileName[-3-offset]=='e':
+        if fileName[-offset-3]=='e':
             n_src = n_e
         else:
             n_src = n_i
-    if fileName[-1-offset]=='e':
+    if fileName[-offset-1]=='e':
         n_tgt = n_e
     else:
         n_tgt = n_i
     readout = np.load(fileName)
-    print readout.shape, fileName
     value_arr = np.zeros((n_src, n_tgt))
     if not readout.shape == (0,):
+        print readout.shape
         value_arr[np.int32(readout[:,0]), np.int32(readout[:,1])] = readout[:,2]
     return value_arr
 
@@ -92,7 +92,7 @@ def save_connections(ending = ''):
 def save_theta(ending = ''):
     print 'save theta'
     for pop_name in population_names:
-        np.save(data_path + 'weights/theta_' + pop_name + ending, neuron_groups[pop_name + 'e'].theta)
+        np.save(data_path + 'weights/theta_' + pop_name, neuron_groups[pop_name + 'e'].theta)
 
 def normalize_weights():
     for connName in connections:
@@ -123,7 +123,6 @@ def get_2d_input_weights():
 
 
 def plot_2d_input_weights():
-    name = 'XeAe'
     weights = get_2d_input_weights()
     fig = b.figure(fig_num, figsize = (18, 18))
     im2 = b.imshow(weights, interpolation = "nearest", vmin = 0, vmax = wmax_ee, cmap = cmap.get_cmap('hot_r'))
@@ -207,7 +206,10 @@ print 'time needed to load test set:', end - start
 #------------------------------------------------------------------------------ 
 # set parameters and equations
 #------------------------------------------------------------------------------
-test_mode = False
+if raw_input('Enter "test" for testing mode, "train" for training mode: ') == 'test':
+    test_mode = True
+else:
+    test_mode = False
 
 b.set_global_preferences( 
                         defaultclock = b.Clock(dt=0.5*b.ms), # The default clock to use if none is provided or defined in any enclosing scope.
@@ -224,7 +226,9 @@ b.set_global_preferences(
 
 
 np.random.seed(0)
+
 data_path = './'
+
 if test_mode:
     weight_path = data_path + 'weights/'
     num_examples = 10000 * 1
@@ -235,22 +239,25 @@ if test_mode:
     update_interval = num_examples
 else:
     weight_path = data_path + 'random/'  
-    num_examples = 10000 * 1
+    num_examples = 60000 * 1
     use_testing_set = False
     do_plot_performance = True
     record_spikes = True
     ee_STDP_on = True
 
 
-ending = ''
+
+
 # number of inputs to the network
 n_input = 784
 # number of excitatory neurons
-n_e = 400
+n_e = input('Enter number of excitatory / inhibitory neurons: ')
 # number of inhibitory neurons
-n_i = n_e 
+n_i = n_e
+# set ending of filename saves
+ending = str(n_e)
 # time (in seconds) per data example presentation
-single_example_time =   0.35 * b.second
+single_example_time = 0.35 * b.second
 # time (in seconds) per rest period between data examples
 resting_time = 0.15 * b.second
 # total runtime (number of examples times (presentation time plus rest period))
@@ -268,8 +275,6 @@ if num_examples <= 60000:
 else:
     save_connections_interval = 10000
     update_interval = 10000
-    
-update_interval = 500
 
 # rest potential parameters, reset potential parameters, threshold potential parameters, and refractory periods
 v_rest_e = -65. * b.mV 
@@ -281,8 +286,6 @@ v_thresh_i = -40. * b.mV
 refrac_e = 5. * b.ms
 refrac_i = 2. * b.ms
 
-print str(v_thresh_e)
-
 # connection structure
 conn_structure = 'dense'
 # dictionaries for weights and delays
@@ -292,7 +295,7 @@ delay = {}
 input_population_names = ['X']
 population_names = ['A']
 input_connection_names = ['XA']
-save_conns = ['XeAe']
+save_conns = ['XeAe' + str(n_e), 'AeAe' + str(n_e)]
 input_conn_names = ['ee_input'] 
 recurrent_conn_names = ['ei', 'ie']
 weight['ee_input'] = 78.
@@ -302,6 +305,7 @@ input_intensity = 2.
 start_input_intensity = input_intensity
 
 tc_pre_ee = 20*b.ms
+tc_post_ee = 20*b.ms
 tc_post_1_ee = 20*b.ms
 tc_post_2_ee = 40*b.ms
 nu_ee_pre =  0.0001      # learning rate
@@ -345,14 +349,30 @@ neuron_eqs_i = '''
         dge/dt = -ge/(1.0*ms)                                   : 1
         dgi/dt = -gi/(2.0*ms)                                  : 1
         '''
-eqs_stdp_ee = '''
+
+stdp_rule = raw_input('Enter STDP learning rule to use(standard / exp_weight_depend / postpre / triplet): ')
+
+if stdp_rule == 'standard':
+    raise NotImplementedError
+    
+elif stdp_rule == 'exp_weight_depend':
+    raise NotImplementedError
+    
+elif stdp_rule == 'postpre':
+    raise NotImplementedError
+
+elif stdp_rule == 'triplet':
+    eqs_stdp_ee = '''
                 post2before                            : 1.0
                 dpre/dt   =   -pre/(tc_pre_ee)         : 1.0
                 dpost1/dt  = -post1/(tc_post_1_ee)     : 1.0
                 dpost2/dt  = -post2/(tc_post_2_ee)     : 1.0
             '''
-eqs_stdp_pre_ee = 'pre = 1.; w -= nu_ee_pre * post1'
-eqs_stdp_post_ee = 'post2before = post2; w += nu_ee_post * pre * post2before; post1 = 1.; post2 = 1.'
+    
+    eqs_stdp_pre_ee = 'pre = 1.0; w -= nu_ee_pre * post1'
+    eqs_stdp_post_ee = 'post2before = post2; w += nu_ee_post * pre * post2before; post1 = 1.0; post2 = 1.0'
+else:
+    raise NotImplementedError
 
 b.ion()
 fig_num = 1
@@ -378,20 +398,20 @@ neuron_groups['i'] = b.NeuronGroup(n_i * len(population_names), neuron_eqs_i, th
 for name in population_names:
     print 'create neuron group', name
     
-    neuron_groups[name+'e'] = neuron_groups['e'].subgroup(n_e)
-    neuron_groups[name+'i'] = neuron_groups['i'].subgroup(n_i)
+    neuron_groups[name + 'e'] = neuron_groups['e'].subgroup(n_e)
+    neuron_groups[name + 'i'] = neuron_groups['i'].subgroup(n_i)
     
     neuron_groups[name+'e'].v = v_rest_e - 40. * b.mV
     neuron_groups[name+'i'].v = v_rest_i - 40. * b.mV
     if test_mode or weight_path[-8:] == 'weights/':
-        neuron_groups['e'].theta = np.load(weight_path + 'theta_' + name + ending + '.npy')
+        neuron_groups['e'].theta = np.load(weight_path + 'theta_A' + '.npy')
     else:
         neuron_groups['e'].theta = np.ones((n_e)) * 20.0*b.mV
     
     print 'create recurrent connections'
     for conn_type in recurrent_conn_names:
         connName = name+conn_type[0]+name+conn_type[1]
-        weightMatrix = get_matrix_from_file(weight_path + '../random/' + connName + ending + '.npy')
+        weightMatrix = get_matrix_from_file(weight_path + '../random/XeAe' + '.npy')
         connections[connName] = b.Connection(neuron_groups[connName[0:2]], neuron_groups[connName[2:4]], structure= conn_structure, 
                                                     state = 'g'+conn_type[0])
         connections[connName].connect(neuron_groups[connName[0:2]], neuron_groups[connName[2:4]], weightMatrix)
@@ -459,6 +479,19 @@ for i,name in enumerate(input_population_names):
     input_groups[name+'e'].rate = 0
 b.run(0)
 j = 0
+
+one_index = -1
+idx = 0
+while one_index != 1:
+    one_index = testing['y'][idx]
+    print one_index
+    break
+rates = testing['x'][one_index].reshape((n_input)) / 8. * input_intensity
+
+input_groups['Xe'].rate = rates
+b.run(single_example_time)
+
+
 while j < (int(num_examples)):
     if test_mode:
         if use_testing_set:

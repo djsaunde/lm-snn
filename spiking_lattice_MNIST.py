@@ -61,26 +61,22 @@ def get_labeled_data(picklename, bTrain = True):
     return data
 
 def get_matrix_from_file(fileName):
-    offset = len(str(n_e)) + 4
-    print fileName
-    print fileName[0]
-    if fileName[-offset-4] == 'X':
+    offset = len(ending) + 4
+    if fileName[-4-offset] == 'X':
         n_src = n_input                
     else:
-        if fileName[-offset-3]=='e':
+        if fileName[-3-offset]=='e':
             n_src = n_e
         else:
             n_src = n_i
-    if fileName[-offset-1]=='e':
+    if fileName[-1-offset]=='e':
         n_tgt = n_e
     else:
         n_tgt = n_i
     readout = np.load(fileName)
     print readout.shape, fileName
-    print (n_src, n_tgt)
     value_arr = np.zeros((n_src, n_tgt))
     if not readout.shape == (0,):
-        print readout[:,2]
         value_arr[np.int32(readout[:,0]), np.int32(readout[:,1])] = readout[:,2]
     return value_arr
 
@@ -211,7 +207,10 @@ print 'time needed to load test set:', end - start
 #------------------------------------------------------------------------------ 
 # set parameters and equations
 #------------------------------------------------------------------------------
-test_mode = False
+if raw_input('Enter "test" for testing mode, "train" for training mode: ') == 'test':
+    test_mode = True
+else:
+    test_mode = False
 
 b.set_global_preferences( 
                         defaultclock = b.Clock(dt=0.5*b.ms), # The default clock to use if none is provided or defined in any enclosing scope.
@@ -239,7 +238,7 @@ if test_mode:
     update_interval = num_examples
 else:
     weight_path = data_path + 'random/'  
-    num_examples = 60000 * 1
+    num_examples = 10000 * 1
     use_testing_set = False
     do_plot_performance = True
     record_spikes = True
@@ -250,11 +249,11 @@ ending = ''
 # number of inputs to the network
 n_input = 784
 # number of excitatory neurons
-n_e = 100
+n_e = input('Enter number of excitatory / inhibitory neurons: ')
 # number of inhibitory neurons
 n_i = n_e 
 # time (in seconds) per data example presentation
-single_example_time = 0.35 * b.second
+single_example_time =   0.35 * b.second
 # time (in seconds) per rest period between data examples
 resting_time = 0.15 * b.second
 # total runtime (number of examples times (presentation time plus rest period))
@@ -272,6 +271,8 @@ if num_examples <= 60000:
 else:
     save_connections_interval = 10000
     update_interval = 10000
+    
+update_interval = 500
 
 # rest potential parameters, reset potential parameters, threshold potential parameters, and refractory periods
 v_rest_e = -65. * b.mV 
@@ -294,7 +295,7 @@ delay = {}
 input_population_names = ['X']
 population_names = ['A']
 input_connection_names = ['XA']
-save_conns = ['XeAe']
+save_conns = ['XeAe'], ['AeAe']
 input_conn_names = ['ee_input'] 
 recurrent_conn_names = ['ei', 'ie']
 weight['ee_input'] = 78.
@@ -393,7 +394,7 @@ for name in population_names:
     print 'create recurrent connections'
     for conn_type in recurrent_conn_names:
         connName = name+conn_type[0]+name+conn_type[1]
-        weightMatrix = get_matrix_from_file(weight_path + '../random/' + connName + ending + str(n_e) + '.npy')
+        weightMatrix = get_matrix_from_file(weight_path + '../random/' + connName + ending + '.npy')
         connections[connName] = b.Connection(neuron_groups[connName[0:2]], neuron_groups[connName[2:4]], structure= conn_structure, 
                                                     state = 'g'+conn_type[0])
         connections[connName].connect(neuron_groups[connName[0:2]], neuron_groups[connName[2:4]], weightMatrix)
@@ -434,7 +435,7 @@ for name in input_connection_names:
     print 'create connections between', name[0], 'and', name[1]
     for connType in input_conn_names:
         connName = name[0] + connType[0] + name[1] + connType[1]
-        weightMatrix = get_matrix_from_file(weight_path + connName + ending + str(n_e) + '.npy')
+        weightMatrix = get_matrix_from_file(weight_path + connName + ending + '.npy')
         connections[connName] = b.Connection(input_groups[connName[0:2]], neuron_groups[connName[2:4]], structure= conn_structure, 
                                                     state = 'g'+connType[0], delay=True, max_delay=delay[connType][1])
         connections[connName].connect(input_groups[connName[0:2]], neuron_groups[connName[2:4]], weightMatrix, delay=delay[connType])
