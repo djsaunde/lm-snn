@@ -147,7 +147,7 @@ def get_current_performance(performance, current_example_num):
     return performance
 
 def plot_performance(fig_num):
-    num_evaluations = int(num_examples/update_interval)
+    num_evaluations = int(num_examples / update_interval)
     time_steps = range(0, num_evaluations)
     performance = np.zeros(num_evaluations)
     fig = b.figure(fig_num, figsize = (5, 5))
@@ -213,7 +213,7 @@ else:
 
 b.set_global_preferences( 
                         defaultclock = b.Clock(dt=0.5*b.ms), # The default clock to use if none is provided or defined in any enclosing scope.
-                        useweave = False, # Defines whether or not functions should use inlined compiled C code where defined.
+                        useweave = True, # Defines whether or not functions should use inlined compiled C code where defined.
                         gcc_options = ['-ffast-math -march=native'],  # Defines the compiler switches passed to the gcc compiler. 
                         #For gcc versions 4.2+ we recommend using -march=native. By default, the -ffast-math optimizations are turned on 
                         usecodegen = True,  # Whether or not to use experimental code generation support.
@@ -222,7 +222,11 @@ b.set_global_preferences(
                         usecodegenthreshold = False,  # Whether or not to use experimental code generation support on thresholds.
                         usenewpropagate = True,  # Whether or not to use experimental new C propagation functions.
                         usecstdp = True,  # Whether or not to use experimental new C STDP.
-                       ) 
+                        openmp = True, # whether or not to use OpenMP pragmas in generated C code.
+                        magic_useframes = True, # defines whether or not the magic functions should serach for objects defined only in the calling frame,
+                                                # or if they should find all objects defined in any frame. Set to "True" if not in an interactive shell.
+                        useweave_linear_diffeq = True, # Whether to use weave C++ acceleration for the solution of linear differential equations.
+                       )
 
 
 np.random.seed(0)
@@ -265,10 +269,10 @@ runtime = num_examples * (single_example_time + resting_time)
 # set the update interval and weight update interval (for network weights?) 
 if num_examples <= 10000:
     update_interval = num_examples
-    weight_update_interval = 20
+    weight_update_interval = 5
 else:
-    update_interval = 10000
-    weight_update_interval = 100
+    update_interval = 100
+    weight_update_interval = 10
 # setting save connections to file parameters
 if num_examples <= 60000:
     save_connections_interval = 10000
@@ -314,6 +318,7 @@ wmax_ee = 1.0
 exp_ee_pre = 0.2
 exp_ee_post = exp_ee_pre
 STDP_offset = 0.4
+w_mu = 0.25
 
 
 # setting up differential equations (depending on train / test mode)
@@ -325,8 +330,6 @@ else:
     scr_e = 'v = v_reset_e; theta += theta_plus_e; timer = 0*ms'
 offset = 20.0*b.mV
 v_thresh_e = '(v>(theta - offset + ' + str(v_thresh_e) + ')) * (timer>refrac_e)'
-
-print str(v_thresh_e)
 
 # equations for neurons
 neuron_eqs_e = '''
@@ -350,16 +353,42 @@ neuron_eqs_i = '''
         dgi/dt = -gi/(2.0*ms)                                  : 1
         '''
 
-stdp_rule = raw_input('Enter STDP learning rule to use(standard / exp_weight_depend / postpre / triplet): ')
+stdp_rule = raw_input('Enter STDP learning rule to use (standard / exp_time_depend / exp_weight_depend / postpre / triplet): ')
 
 if stdp_rule == 'standard':
-    raise NotImplementedError
+    eqs_stdp_ee = '''
+                dpre/dt = -pre/tc_pre_ee : 1.0
+                dpost/dt = -post/tc_post_ee : 1.0
+            '''
     
+    eqs_stdp_pre_ee = 'pre = 1.0; w += nu_ee_pre * post'
+    eqs_stdp_post_ee = 'post = 1.0; w += nu_ee_post * pre'
+
+elif stdp_rule == 'exp_time_depend':
+    eqs_stdp_ee = '''
+                dpre/dt = -pre/tc_pre_ee : 1.0
+                dpost/dt = -post/tc_post_ee : 1.0
+            '''
+            
+    # TODO
+
 elif stdp_rule == 'exp_weight_depend':
-    raise NotImplementedError
+    eqs_stdp_ee = '''
+                dpre/dt = -pre/tc_pre_ee : 1.0
+                dpost/dt = -post/tc_post_ee : 1.0
+            '''
+    
+    eqs_stdp_pre_ee = 'pre = 1.0; w += (nu_ee_pre * post) * ((wmax_ee - w) ** w_mu)'
+    eqs_stdp_post_ee = 'post = 1.0; w += (nu_ee_post * pre) * ((wmax_ee - w) ** w_mu)'
     
 elif stdp_rule == 'postpre':
-    raise NotImplementedError
+    eqs_stdp_ee = '''
+                dpre/dt = -pre/tc_pre_ee : 1.0
+                dpost/dt = -post/tc_post_ee : 1.0
+            '''
+    
+    eqs_stdp_pre_ee = 'pre = 1.0; w += nu_ee_pre * post'
+    eqs_stdp_post_ee = 'post = 1.0; w -= nu_ee_post * pre'
 
 elif stdp_rule == 'triplet':
     eqs_stdp_ee = '''
@@ -418,7 +447,7 @@ for name in population_names:
                 
     if ee_STDP_on:
         if 'ee' in recurrent_conn_names:
-            stdp_methods[name+'e'+name+'e'] = b.STDP(connections[name+'e'+name+'e'], eqs=eqs_stdp_ee, pre = eqs_stdp_pre_ee, 
+            stdp_methods[name+'e'+name+'e'] = b.STDP(connections[name + 'e' + name + 'e'], eqs=eqs_stdp_ee, pre = eqs_stdp_pre_ee, 
                                                            post = eqs_stdp_post_ee, wmin=0., wmax= wmax_ee)
 
     print 'create monitors for', name
@@ -478,19 +507,7 @@ if do_plot_performance:
 for i,name in enumerate(input_population_names):
     input_groups[name+'e'].rate = 0
 b.run(0)
-j = 0x`
-
-one_index = -1
-idx = 0
-while one_index != 1:
-    one_index = testing['y'][idx]
-    print one_index
-    break
-rates = testing['x'][one_index].reshape((n_input)) / 8. * input_intensity
-
-input_groups['Xe'].rate = rates
-b.run(single_example_time)
-
+j = 0
 
 while j < (int(num_examples)):
     if test_mode:
@@ -532,7 +549,7 @@ while j < (int(num_examples)):
         if j % update_interval == 0 and j > 0:
             if do_plot_performance:
                 perf_plot, performance = update_performance_plot(performance_monitor, performance, j, fig_performance)
-                print 'Classification performance', performance[:(j/float(update_interval))+1]
+                print 'Classification performance', performance[:(j / float(update_interval)) + 1]
         for i,name in enumerate(input_population_names):
             input_groups[name+'e'].rate = 0
         b.run(resting_time)
