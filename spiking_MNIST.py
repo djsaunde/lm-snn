@@ -87,12 +87,12 @@ def save_connections(ending = ''):
         connMatrix = connections[connName][:]
 #         connListSparse = ([(i,j[0],j[1]) for i in xrange(connMatrix.shape[0]) for j in zip(connMatrix.rowj[i],connMatrix.rowdata[i])])
         connListSparse = ([(i,j,connMatrix[i,j]) for i in xrange(connMatrix.shape[0]) for j in xrange(connMatrix.shape[1]) ])
-        np.save(data_path + 'weights/' + connName + ending, connListSparse)
+        np.save(data_path + 'weights/' + connName + '_' +  ending, connListSparse)
 
 def save_theta(ending = ''):
     print 'save theta'
     for pop_name in population_names:
-        np.save(data_path + 'weights/theta_' + pop_name, neuron_groups[pop_name + 'e'].theta)
+        np.save(data_path + 'weights/theta_' + pop_name + ending, neuron_groups[pop_name + 'e'].theta)
 
 def normalize_weights():
     for connName in connections:
@@ -105,7 +105,7 @@ def normalize_weights():
                 connection[:,j] *= colFactors[j]
             
 def get_2d_input_weights():
-    name = 'XeAe'
+    name = 'XeAe' + str(n_e)
     weight_matrix = np.zeros((n_input, n_e))
     n_e_sqrt = int(np.sqrt(n_e))
     n_in_sqrt = int(np.sqrt(n_input))
@@ -275,9 +275,9 @@ else:
     weight_update_interval = 10
 # setting save connections to file parameters
 if num_examples <= 60000:
-    save_connections_interval = 10000
+    save_connections_interval = 500
 else:
-    save_connections_interval = 10000
+    save_connections_interval = 500
     update_interval = 10000
 
 # rest potential parameters, reset potential parameters, threshold potential parameters, and refractory periods
@@ -299,7 +299,7 @@ delay = {}
 input_population_names = ['X']
 population_names = ['A']
 input_connection_names = ['XA']
-save_conns = ['XeAe' + str(n_e), 'AeAe' + str(n_e)]
+save_conns = ['XeAe' + str(n_e)]
 input_conn_names = ['ee_input'] 
 recurrent_conn_names = ['ei', 'ie']
 weight['ee_input'] = 78.
@@ -318,8 +318,8 @@ wmax_ee = 1.0
 exp_ee_pre = 0.2
 exp_ee_post = exp_ee_pre
 STDP_offset = 0.4
-w_mu = 0.25
-
+w_mu_pre = 0.2
+w_mu_post = 0.2
 
 # setting up differential equations (depending on train / test mode)
 if test_mode:
@@ -353,7 +353,7 @@ neuron_eqs_i = '''
         dgi/dt = -gi/(2.0*ms)                                  : 1
         '''
 
-stdp_rule = raw_input('Enter STDP learning rule to use (standard / exp_time_depend / exp_weight_depend / postpre / triplet): ')
+stdp_rule = raw_input('Enter STDP learning rule to use (standard / exp_weight_depend / postpre / triplet): ')
 
 if stdp_rule == 'standard':
     eqs_stdp_ee = '''
@@ -364,22 +364,14 @@ if stdp_rule == 'standard':
     eqs_stdp_pre_ee = 'pre = 1.0; w += nu_ee_pre * post'
     eqs_stdp_post_ee = 'post = 1.0; w += nu_ee_post * pre'
 
-elif stdp_rule == 'exp_time_depend':
-    eqs_stdp_ee = '''
-                dpre/dt = -pre/tc_pre_ee : 1.0
-                dpost/dt = -post/tc_post_ee : 1.0
-            '''
-            
-    # TODO
-
 elif stdp_rule == 'exp_weight_depend':
     eqs_stdp_ee = '''
                 dpre/dt = -pre/tc_pre_ee : 1.0
                 dpost/dt = -post/tc_post_ee : 1.0
             '''
     
-    eqs_stdp_pre_ee = 'pre = 1.0; w += (nu_ee_pre * post) * ((wmax_ee - w) ** w_mu)'
-    eqs_stdp_post_ee = 'post = 1.0; w += (nu_ee_post * pre) * ((wmax_ee - w) ** w_mu)'
+    eqs_stdp_pre_ee = 'pre = 1.0; w += (nu_ee_pre * post) * ((wmax_ee - w) ** w_mu_pre)'
+    eqs_stdp_post_ee = 'post = 1.0; w += (nu_ee_post * pre) * ((wmax_ee - w) ** w_mu_post)'
     
 elif stdp_rule == 'postpre':
     eqs_stdp_ee = '''
@@ -439,15 +431,15 @@ for name in population_names:
     
     print 'create recurrent connections'
     for conn_type in recurrent_conn_names:
-        connName = name+conn_type[0]+name+conn_type[1]
-        weightMatrix = get_matrix_from_file(weight_path + '../random/' + connName + ending + '.npy')
+        connName = name + conn_type[0] + name + conn_type[1] + ending
+        weightMatrix = get_matrix_from_file(weight_path + '../random/' + connName + '.npy')
         connections[connName] = b.Connection(neuron_groups[connName[0:2]], neuron_groups[connName[2:4]], structure= conn_structure, 
                                                     state = 'g'+conn_type[0])
         connections[connName].connect(neuron_groups[connName[0:2]], neuron_groups[connName[2:4]], weightMatrix)
                 
     if ee_STDP_on:
         if 'ee' in recurrent_conn_names:
-            stdp_methods[name+'e'+name+'e'] = b.STDP(connections[name + 'e' + name + 'e'], eqs=eqs_stdp_ee, pre = eqs_stdp_pre_ee, 
+            stdp_methods[name + 'e' + name + 'e'] = b.STDP(connections[name + 'e' + name + 'e' + ending], eqs=eqs_stdp_ee, pre = eqs_stdp_pre_ee, 
                                                            post = eqs_stdp_post_ee, wmin=0., wmax= wmax_ee)
 
     print 'create monitors for', name
@@ -480,15 +472,15 @@ for i,name in enumerate(input_population_names):
 for name in input_connection_names:
     print 'create connections between', name[0], 'and', name[1]
     for connType in input_conn_names:
-        connName = name[0] + connType[0] + name[1] + connType[1]
-        weightMatrix = get_matrix_from_file(weight_path + connName + ending + '.npy')
+        connName = name[0] + connType[0] + name[1] + connType[1] + ending
+        weightMatrix = get_matrix_from_file(weight_path + connName + '.npy')
         connections[connName] = b.Connection(input_groups[connName[0:2]], neuron_groups[connName[2:4]], structure= conn_structure, 
                                                     state = 'g'+connType[0], delay=True, max_delay=delay[connType][1])
         connections[connName].connect(input_groups[connName[0:2]], neuron_groups[connName[2:4]], weightMatrix, delay=delay[connType])
      
     if ee_STDP_on:
         print 'create STDP for connection', name[0]+'e'+name[1]+'e'
-        stdp_methods[name[0]+'e'+name[1]+'e'] = b.STDP(connections[name[0]+'e'+name[1]+'e'], eqs=eqs_stdp_ee, pre = eqs_stdp_pre_ee, 
+        stdp_methods[name[0]+'e'+name[1]+'e'] = b.STDP(connections[name[0] + 'e' + name[1] + 'e' + ending], eqs=eqs_stdp_ee, pre = eqs_stdp_pre_ee, 
                                                        post = eqs_stdp_post_ee, wmin=0., wmax= wmax_ee)
 
 
