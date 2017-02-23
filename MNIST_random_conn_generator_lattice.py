@@ -8,6 +8,8 @@ import scipy.ndimage as sp
 import numpy as np
 import pylab, math
 
+from scipy.sparse import csr_matrix
+
 
 def randomDelay(minDelay, maxDelay):
     return np.random.rand()*(maxDelay-minDelay) + minDelay
@@ -53,7 +55,7 @@ def create_weights():
     '''
     
     nInput = 784
-    nE = 400
+    nE = input('Enter number of excitatory / inhibitory neurons: ')
     nI = nE 
     dataPath = './random/'
     weight = {}
@@ -82,7 +84,7 @@ def create_weights():
         else:
             weightList = [(i, j, weightMatrix[i,j]) for j in xrange(nE) for i in xrange(nInput)]
         print 'save connection matrix', name
-        np.save(dataPath+name, weightList)
+        np.save(dataPath + name + str(nE), weightList)
     
     
     
@@ -93,7 +95,7 @@ def create_weights():
         weightMatrix *= weight['ei_input']
         weightMatrix, weightList = sparsenMatrix(weightMatrix, pConn['ei_input'])
         print 'save connection matrix', name
-        np.save(dataPath+name, weightList)
+        np.save(dataPath + name + str(nE), weightList)
         
     
     
@@ -107,7 +109,7 @@ def create_weights():
             weightMatrix *= weight['ei']
             weightMatrix, weightList = sparsenMatrix(weightMatrix, pConn['ei'])
         print 'save connection matrix', name
-        np.save(dataPath+name, weightList)
+        np.save(dataPath + name + str(nE), weightList)
         
         
         
@@ -125,7 +127,7 @@ def create_weights():
             weightMatrix *= weight['ie']
             weightMatrix, weightList = sparsenMatrix(weightMatrix, pConn['ie'])
         print 'save connection matrix', name
-        np.save(dataPath+name, weightList)
+        np.save(dataPath + name + str(nE), weightList)
     
     
     print '...creating connection matrices from E to E'
@@ -137,7 +139,7 @@ def create_weights():
             
         weightList = [(i, j, weightMatrix[i,j]) for i in xrange(nE) for j in xrange(nE)]
         print 'save connection matrix', name
-        np.save(dataPath + name, weightList)
+        np.save(dataPath + name + str(nE), weightList)
     
          
 if __name__ == "__main__":

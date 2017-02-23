@@ -12,7 +12,7 @@ import os.path
 import scipy 
 import cPickle as pickle
 import brian_no_units  #import it to deactivate unit checking --> This should NOT be done for testing/debugging 
-import brian as b
+import brian2 as b
 from struct import unpack
 from brian import *
 import random
@@ -212,7 +212,7 @@ if raw_input('Enter "test" for testing mode, "train" for training mode: ') == 't
 else:
     test_mode = False
 
-
+'''
 b.set_global_preferences( 
                         defaultclock = b.Clock(dt=0.5*b.ms), # The default clock to use if none is provided or defined in any enclosing scope.
                         useweave = True, # Defines whether or not functions should use inlined compiled C code where defined.
@@ -229,7 +229,7 @@ b.set_global_preferences(
                                                 # or if they should find all objects defined in any frame. Set to "True" if not in an interactive shell.
                         useweave_linear_diffeq = True, # Whether to use weave C++ acceleration for the solution of linear differential equations.
                        )
-
+'''
 
 np.random.seed(0)
 
@@ -305,8 +305,8 @@ save_conns = ['XeAe' + str(n_e)]
 input_conn_names = ['ee_input'] 
 recurrent_conn_names = ['ei', 'ie']
 weight['ee_input'] = 78.
-delay['ee_input'] = (0*b.ms, 10*b.ms)
-delay['ei_input'] = (0*b.ms, 5*b.ms)
+delay['ee_input'] = (0*b.ms,10*b.ms)
+delay['ei_input'] = (0*b.ms,5*b.ms)
 input_intensity = 2.
 start_input_intensity = input_intensity
 
@@ -329,30 +329,30 @@ if test_mode:
 else:
     tc_theta = 1e7 * b.ms
     theta_plus_e = 0.05 * b.mV
-    scr_e = 'v = v_reset_e; theta += theta_plus_e; timer = 0*ms'
+    scr_e = 'v = v_reset_e; theta += theta_plus_e; timer = 0*second'
 offset = 20.0*b.mV
 v_thresh_e = '(v>(theta - offset + ' + str(v_thresh_e) + ')) * (timer>refrac_e)'
 
 # equations for neurons
 neuron_eqs_e = '''
-        dv/dt = ((v_rest_e - v) + (I_synE + I_synI) / nS) / (100 * ms)  : volt
+        dv/dt = ((v_rest_e - v) + (I_synE + I_synI) / nS) / (0.1 * second)  : volt
         I_synE = ge * nS *         -v                           : amp
-        I_synI = gi * nS * (-100. * mV - v)                          : amp
-        dge/dt = -ge / (1.0 * ms)                                   : 1
-        dgi/dt = -gi / (2.0 * ms)                                  : 1
+        I_synI = gi * nS * (-100.*mV-v)                          : amp
+        dge/dt = -ge / (0.001 * second)                                   : 1
+        dgi/dt = -gi / (0.002 * second)                                  : 1
         '''
 if test_mode:
     neuron_eqs_e += '\n  theta      :volt'
 else:
     neuron_eqs_e += '\n  dtheta/dt = -theta / (tc_theta)  : volt'
-neuron_eqs_e += '\n  dtimer/dt = 100.0  : ms'
+neuron_eqs_e += '\n  dtimer/dt = 0.1  : second'
 
 neuron_eqs_i = '''
-        dv/dt = ((v_rest_i - v) + (I_synE + I_synI) / nS) / (10 * ms)  : volt
+        dv/dt = ((v_rest_i - v) + (I_synE + I_synI) / nS) / (0.01 * second)  : volt
         I_synE = ge * nS *         -v                           : amp
-        I_synI = gi * nS * (-85. * mV - v)                          : amp
-        dge/dt = -ge / (1.0*ms)                                   : 1
-        dgi/dt = -gi / (2.0*ms)                                  : 1
+        I_synI = gi * nS * (-85.*mV-v)                          : amp
+        dge/dt = -ge / (0.001 * second)                                   : 1
+        dgi/dt = -gi / (0.002 * second)                                  : 1
         '''
 
 stdp_rule = raw_input('Enter STDP learning rule to use (standard / exp_weight_depend / postpre / triplet): ')
@@ -407,15 +407,12 @@ rate_monitors = {}
 spike_monitors = {}
 spike_counters = {}
 state_monitors = {}
-conductance_monitors = {}
 weight_monitors = {}
 result_monitor = np.zeros((update_interval,n_e))
 
-neuron_groups['e'] = b.NeuronGroup(n_e * len(population_names), neuron_eqs_e, threshold=v_thresh_e, refractory=refrac_e, reset=scr_e, 
-                                   compile = True, freeze = True)
+neuron_groups['e'] = b.NeuronGroup(n_e * len(population_names), neuron_eqs_e, threshold=v_thresh_e, refractory=refrac_e, reset=scr_e)
 
-neuron_groups['i'] = b.NeuronGroup(n_i * len(population_names), neuron_eqs_i, threshold=v_thresh_i, refractory=refrac_i, reset=v_reset_i, 
-                                   compile = True, freeze = True)
+neuron_groups['i'] = b.NeuronGroup(n_i * len(population_names), neuron_eqs_i, threshold=v_thresh_i, refractory=refrac_i, reset=v_reset_i)
 
 
 #------------------------------------------------------------------------------ 
@@ -424,8 +421,8 @@ neuron_groups['i'] = b.NeuronGroup(n_i * len(population_names), neuron_eqs_i, th
 for name in population_names:
     print 'create neuron group', name
     
-    neuron_groups[name + 'e'] = neuron_groups['e'].subgroup(n_e)
-    neuron_groups[name + 'i'] = neuron_groups['i'].subgroup(n_i)
+    neuron_groups[name + 'e'] = neuron_groups['e'][:n_e]
+    neuron_groups[name + 'i'] = neuron_groups['i'][:n_i]
     
     neuron_groups[name + 'e'].v = v_rest_e - 40. * b.mV
     neuron_groups[name + 'i'].v = v_rest_i - 40. * b.mV
@@ -433,19 +430,19 @@ for name in population_names:
     if test_mode or weight_path[-8:] == 'weights/':
         neuron_groups['e'].theta = np.load(weight_path + 'theta_A' + '.npy')
     else:
-        neuron_groups['e'].theta = np.ones((n_e)) * 20.0 * b.mV
+        neuron_groups['e'].theta = np.ones((n_e)) * 20.0*b.mV
     
     print 'create recurrent connections'
     for conn_type in recurrent_conn_names:
         connName = name + conn_type[0] + name + conn_type[1] + ending
         weightMatrix = get_matrix_from_file(weight_path + '../random/' + connName + '.npy')
-        connections[connName] = b.Connection(neuron_groups[connName[0:2]], neuron_groups[connName[2:4]], structure=conn_structure, state='g' + conn_type[0])
+        connections[connName] = b.Synapse(neuron_groups[connName[0:2]], neuron_groups[connName[2:4]], state='g' + conn_type[0])
         connections[connName].connect(neuron_groups[connName[0:2]], neuron_groups[connName[2:4]], weightMatrix)
-        
+                
     if ee_STDP_on:
         if 'ee' in recurrent_conn_names:
-            stdp_methods[name + 'e' + name + 'e'] = b.STDP(connections[name + 'e' + name + 'e' + ending], eqs=eqs_stdp_ee, pre=eqs_stdp_pre_ee, 
-                                                           post=eqs_stdp_post_ee, wmin=0., wmax=wmax_ee)
+            stdp_methods[name + 'e' + name + 'e'] = b.STDP(connections[name + 'e' + name + 'e' + ending], eqs=eqs_stdp_ee, pre = eqs_stdp_pre_ee, 
+                                                           post = eqs_stdp_post_ee, wmin=0., wmax= wmax_ee)
 
     print 'create monitors for', name
     rate_monitors[name + 'e'] = b.PopulationRateMonitor(neuron_groups[name + 'e'], bin = (single_example_time+resting_time) / b.second)
@@ -478,28 +475,18 @@ for i,name in enumerate(input_population_names):
     input_groups[name + 'e'] = b.PoissonGroup(n_input, 0)
     rate_monitors[name + 'e'] = b.PopulationRateMonitor(input_groups[name + 'e'], bin=(single_example_time + resting_time) / b.second)
 
-
-@network_operation 
-def record_weights(): 
-    for i, name in enumerate(weight_monitors):
-        weight_monitors[name].append(np.copy(connections[name[:-1]].W[:, i]))
-
-
 for name in input_connection_names:
     print 'create connections between', name[0], 'and', name[1]
     for connType in input_conn_names:
         connName = name[0] + connType[0] + name[1] + connType[1] + ending
         weightMatrix = get_matrix_from_file(weight_path + connName + '.npy')
-        connections[connName] = b.Connection(input_groups[connName[0:2]], neuron_groups[connName[2:4]], structure=conn_structure, 
+        connections[connName] = b.Connection(input_groups[connName[0:2]], neuron_groups[connName[2:4]], structure= conn_structure, 
                                                     state='g' + connType[0], delay=True, max_delay=delay[connType][1])
         connections[connName].connect(input_groups[connName[0:2]], neuron_groups[connName[2:4]], weightMatrix, delay=delay[connType])
         
-        # create empty weight monitor object for this input connection
-        weight_monitors[connName + str(0)] = []
-        weight_monitors[connName + str(1)] = []
-        weight_monitors[connName + str(2)] = []
-        weight_monitors[connName + str(3)] = []
-        
+        # monitor synaptic weights from input to excitatory layer
+        print connections[connName][:]
+        weight_monitors[connName] = StateMonitor(connections[connName], 'w', record=True)
      
     if ee_STDP_on:
         print 'create STDP for connection', name[0] + 'e' + name[1] + 'e'
@@ -523,7 +510,6 @@ for i,name in enumerate(input_population_names):
     input_groups[name+'e'].rate = 0
 
 
-'''
 zero_examples, zero_idx = [], -1
 while len(zero_examples) < 100:
     zero_idx += 1
@@ -537,9 +523,9 @@ while len(one_examples) < 100:
         one_examples.append(training['x'][one_idx,:,:].reshape((n_input)) / 8. * input_intensity)
 
 examples = concatenate((zero_examples, one_examples))
+
+
 '''
-
-
 zero_example, zero_idx = None, -1
 while zero_example == None:
     zero_idx += 1
@@ -551,6 +537,7 @@ while one_example == None:
     one_idx += 1
     if training['y'][one_idx] == 1:
         one_example = training['x'][one_idx,:,:].reshape((n_input)) / 8. * input_intensity
+'''
 
 
 b.run(0)
@@ -558,10 +545,14 @@ j = 0
 
 while j < 10:
     normalize_weights()
-    rates = zero_example
+    choice = random.choice([0, 1])
+    if choice == 0:
+        rates = random.choice(zero_examples)
+    else:
+        rates = random.choice(one_examples)
     
     input_groups['Xe'].rate = rates
-
+#     print 'run number:', j+1, 'of', int(num_examples)
     b.run(single_example_time)
             
     if j % update_interval == 0 and j > 0:
@@ -611,17 +602,12 @@ else:
     np.save(data_path + 'activity/resultPopVecs' + str(num_examples), result_monitor)
     np.save(data_path + 'activity/inputNumbers' + str(num_examples), input_numbers)
     
+
 #------------------------------------------------------------------------------ 
 # plot results
 #------------------------------------------------------------------------------
-for name in state_monitors:
-    np.savetxt('./time_series/activations/' + name + ending + '.txt', state_monitors[name].values)
-    
-for name in conductance_monitors:
-    np.savetxt('./time_series/conductances/' + name + '.txt', conductance_monitors[name].values)
-    
-for name in weight_monitors:
-    np.savetxt('./time_series/weights/' + name + '.txt', np.asarray(weight_monitors[name]))
+for i, name in enumerate(state_monitors):
+    np.savetxt('./time_series/activations/' + name + '.txt', state_monitors[name].values)
  
 if rate_monitors:
     b.figure(fig_num)

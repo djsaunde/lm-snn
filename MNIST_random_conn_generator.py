@@ -96,7 +96,7 @@ def create_weights():
             weightMatrix *= weight['ie']
             weightMatrix, weightList = sparsenMatrix(weightMatrix, pConn['ie'])
         print 'save connection matrix', name + str(nI)
-        np.save(dataPath + name + str(nI), weightList)
+        np.save(dataPath + name + str(nE), weightList)
     
          
 if __name__ == "__main__":

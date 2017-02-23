@@ -353,7 +353,7 @@ neuron_eqs_i = '''
         dgi/dt = -gi/(2.0*ms)                                  : 1
         '''
 
-stdp_rule = raw_input('Enter STDP learning rule to use (standard / exp_weight_depend / postpre / triplet): ')
+stdp_rule = raw_input('Enter STDP learning rule to use (standard / hebbian / exp_weight_depend / postpre / triplet): ')
 
 if stdp_rule == 'standard':
     eqs_stdp_ee = '''
@@ -361,8 +361,17 @@ if stdp_rule == 'standard':
                 dpost/dt = -post/tc_post_ee : 1.0
             '''
     
-    eqs_stdp_pre_ee = 'pre = 1.0; w += nu_ee_pre * post'
+    eqs_stdp_pre_ee = 'pre = 1.0; w -= nu_ee_pre * post'
     eqs_stdp_post_ee = 'post = 1.0; w += nu_ee_post * pre'
+
+elif stdp_rule == 'hebbian':
+	eqs_stdp_ee = '''
+                dpre/dt = -pre/tc_pre_ee : 1.0
+                dpost/dt = -post/tc_post_ee : 1.0
+				'''
+
+	eqs_stdp_pre_ee = 'pre = 1.0; w += nu_ee_pre * post'
+	eqs_stdp_post_ee = 'post = 1.0; w += nu_ee_post * pre'
 
 elif stdp_rule == 'exp_weight_depend':
     eqs_stdp_ee = '''
