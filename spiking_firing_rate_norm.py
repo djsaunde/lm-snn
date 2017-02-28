@@ -109,6 +109,25 @@ def normalize_weights():
                 connection[:,j] *= colFactors[j]
 
 
+def smooth_rates():
+	'''
+	Updates the firing rates of the input layer by taking a weighted average of each
+	input neuron and its neighbors.
+	'''
+	# copy and reshape it for convenient computation
+	temp_rates = np.copy(rates).reshape((int(np.sqrt(n_input)), int(np.sqrt(n_input))))
+	
+	# for each neuron, smooth its weights according to its neighbors' values in the lattice
+	for i in range(temp_rates.shape[0]):
+		for j in range(temp_rates.shape[1]):
+			# get neighboring weights
+			neighbors = []
+			for x, y in zip([i - 1, i + 1, i, i], [j, j, j - 1, j + 1]):
+				if is_lattice_connection(n_input, i * int(math.sqrt(n_input)) + j, x * int(math.sqrt(n_input)) + y):
+					neighbors.append(temp_rates[i, j])
+			rates[i * temp_rates.shape[0] + j] = 0.5 * temp_rates[i, j] + 0.5 * ( sum(neighbors) / float(len(neighbors)) )
+	
+
 def is_lattice_connection(n, i, j):
     '''
     Boolean method which checks if two indices in a network correspond to neighboring nodes in a lattice.
@@ -120,29 +139,6 @@ def is_lattice_connection(n, i, j):
     '''
     sqrt = int(math.sqrt(n))
     return i + 1 == j and j % sqrt != 0 or i - 1 == j and i % sqrt != 0 or i + sqrt == j or i - sqrt == j
-
-
-def smooth_weights():
-	'''
-	Updates the weights of the input to excitatory layer connections by taking a 
-	weighted average of each cell and its neighbors
-	'''
-	# get input to excitatory weights
-	input_to_exc_conn = connections['XeAe' + str(n_e)][:]
-	
-	# copy and reshape it for convenient computation
-	temp_conn = np.copy(input_to_exc_conn).reshape((int(math.sqrt(n_input)), int(math.sqrt(n_input)), n_e))
-	
-	# for each neuron, smooth its weights according to its neighbors' values in the lattice
-	for exc in range(temp_conn.shape[2]):
-		for i in range(temp_conn.shape[0]):
-			for j in range(temp_conn.shape[1]):
-				# get neighboring weights
-				neighbors = []
-				for x, y in zip([i - 1, i + 1, i, i], [j, j, j - 1, j + 1]):
-					if is_lattice_connection(n_input, i * int(math.sqrt(n_input)) + j, x * int(math.sqrt(n_input)) + y):
-						neighbors.append(temp_conn[i, j, exc])
-				input_to_exc_conn[i * temp_conn.shape[0] + j, exc] = 0.5 * temp_conn[i, j, exc] + 0.5 * ( sum(neighbors) / float(len(neighbors)) )
 
             
 def get_2d_input_weights():
@@ -624,10 +620,10 @@ while j < (int(num_examples)):
     else:
     	# ensure weights don't grow without bound
         normalize_weights()
-        # averages weights from neighbors in lattice
-        smooth_weights()
         # get the firing rates of the next input example
         rates = training['x'][j % 60000, :, :].reshape((n_input)) / 8. * input_intensity
+        # smooth the rates by averaging over neighbors in lattice
+        smooth_rates()
     
     # sets the input firing rates
     input_groups['Xe'].rate = rates
