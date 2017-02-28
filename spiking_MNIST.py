@@ -192,25 +192,27 @@ def get_new_assignments(result_monitor, input_numbers):
 #------------------------------------------------------------------------------ 
 # load MNIST
 #------------------------------------------------------------------------------
-start = time.time()
-training = get_labeled_data(MNIST_data_path + 'training')
-end = time.time()
-print 'time needed to load training set:', end - start
+if raw_input('Enter "test" for testing mode, "train" for training mode (default training mode): ') == 'test':
+    test_mode = True
+else:
+    test_mode = False
 
-start = time.time()
-testing = get_labeled_data(MNIST_data_path + 'testing', bTrain = False)
-end = time.time()
-print 'time needed to load test set:', end - start
+if not test_mode:
+	start = time.time()
+	training = get_labeled_data(MNIST_data_path + 'training')
+	end = time.time()
+	print 'time needed to load training set:', end - start
+
+else:
+	start = time.time()
+	testing = get_labeled_data(MNIST_data_path + 'testing', bTrain = False)
+	end = time.time()
+	print 'time needed to load test set:', end - start
 
 
 #------------------------------------------------------------------------------ 
 # set parameters and equations
 #------------------------------------------------------------------------------
-if raw_input('Enter "test" for testing mode, "train" for training mode: ') == 'test':
-    test_mode = True
-else:
-    test_mode = False
-
 b.set_global_preferences( 
                         defaultclock = b.Clock(dt=0.5*b.ms), # The default clock to use if none is provided or defined in any enclosing scope.
                         useweave = True, # Defines whether or not functions should use inlined compiled C code where defined.
@@ -250,12 +252,41 @@ else:
     ee_STDP_on = True
 
 
-
-
 # number of inputs to the network
 n_input = 784
+# number of classes to learn
+classes_input = raw_input('Enter classes to learn as comma-separated list (e.g, 0,1,2,3,...) (default all 10 classes): ')
+if classes_input == '':
+	classes = range(10)
+else:
+	classes = set([ int(token) for token in classes_input.split(',') ])
+
+# reduce size of dataset if necessary
+if not test_mode and classes_input != 0:
+	new_training = {'x' : [], 'y' : [], 'rows' : training['rows'], 'cols' : training['cols']}
+	for idx in xrange(len(training['x'])):
+		if training['y'][idx][0] in classes:
+			new_training['y'].append(training['y'][idx])
+			new_training['x'].append(training['x'][idx])
+	new_training['x'], new_training['y'] = np.asarray(new_training['x']), np.asarray(new_training['y'])
+	training = new_training
+	
+elif test_mode and clases_input != 0:
+	new_testing = {'x' : [], 'y' : [], 'rows' : testing['rows'], 'cols' : testing['cols']}
+	for idx in xrange(len(testing['x'])):
+		if testing['y'][idx][0] in classes:
+			new_testing['y'].append(testing['y'][idx])
+			new_testing['x'].append(testing['x'][idx])
+	new_testing['x'], new_testing['y'] = np.asarray(new_testing['x']), np.asarray(new_testing['y'])
+	testing = new_testing
+	
 # number of excitatory neurons
-n_e = input('Enter number of excitatory / inhibitory neurons: ')
+n_e_input = raw_input('Enter number of excitatory / inhibitory neurons (default 100): ')
+if n_e_input == '':
+	n_e = 100
+else:
+	n_e = int(n_e_input)
+
 # number of inhibitory neurons
 n_i = n_e
 # set ending of filename saves
@@ -353,57 +384,66 @@ neuron_eqs_i = '''
         dgi/dt = -gi/(2.0*ms)                                  : 1
         '''
 
-stdp_rule = raw_input('Enter STDP learning rule to use (standard / hebbian / exp_weight_depend / postpre / triplet): ')
+stdp_input = raw_input('Enter STDP learning rule to use (standard / hebbian / exp_weight_depend) (default standard): ')
 
-if stdp_rule == 'standard':
-    eqs_stdp_ee = '''
+if raw_input('Enter (yes / no) for post-pre (default yes): ') in [ 'yes', '' ]:
+	post_pre = True
+else:
+	post_pre = False
+
+if stdp_input in [ 'standard', '' ]:
+	if post_pre:
+		eqs_stdp_ee = '''
+		            dpre / dt = -pre / tc_pre_ee : 1.0
+		            dpost / dt = -post / tc_post_ee : 1.0
+		        '''
+		
+		eqs_stdp_pre_ee = 'pre = 1.0; w -= nu_ee_pre * post'
+		eqs_stdp_post_ee = 'post = 1.0; w += nu_ee_post * pre'
+	else:
+		eqs_stdp_ee = '''
+		            dpre / dt = -pre / tc_pre_ee : 1.0
+		        '''
+		
+		eqs_stdp_pre_ee = 'pre = 1.0'
+		eqs_stdp_post_ee = 'w += nu_ee_post * pre'
+
+elif stdp_input == 'hebbian':
+	if post_pre:
+		eqs_stdp_ee = '''
+                dpre / dt = -pre / tc_pre_ee : 1.0
+                dpost / dt = -post / tc_post_ee : 1.0
+            '''
+    
+		eqs_stdp_pre_ee = 'pre = 1.0; w += nu_ee_pre * post'
+		eqs_stdp_post_ee = 'post = 1.0; w += nu_ee_post * pre'
+	else:
+		eqs_stdp_ee = '''
+                dpre / dt = -pre / tc_pre_ee : 1.0
+            '''
+    
+		eqs_stdp_pre_ee = 'pre = 1.0'
+		eqs_stdp_post_ee = 'w += nu_ee_post * pre'
+		
+elif stdp_input == 'exp_weight_depend':
+	if post_pre:
+		eqs_stdp_ee = '''
                 dpre/dt = -pre/tc_pre_ee : 1.0
                 dpost/dt = -post/tc_post_ee : 1.0
             '''
     
-    eqs_stdp_pre_ee = 'pre = 1.0; w -= nu_ee_pre * post'
-    eqs_stdp_post_ee = 'post = 1.0; w += nu_ee_post * pre'
-
-elif stdp_rule == 'hebbian':
-	eqs_stdp_ee = '''
+		eqs_stdp_pre_ee = 'pre = 1.0; w -= (nu_ee_pre * post) * ((wmax_ee - w) ** w_mu_pre)'
+		eqs_stdp_post_ee = 'post = 1.0; w += (nu_ee_post * pre) * ((wmax_ee - w) ** w_mu_post)'
+	else:
+		eqs_stdp_ee = '''
                 dpre/dt = -pre/tc_pre_ee : 1.0
-                dpost/dt = -post/tc_post_ee : 1.0
-				'''
-
-	eqs_stdp_pre_ee = 'pre = 1.0; w += nu_ee_pre * post'
-	eqs_stdp_post_ee = 'post = 1.0; w += nu_ee_post * pre'
-
-elif stdp_rule == 'exp_weight_depend':
-    eqs_stdp_ee = '''
-                dpre/dt = -pre/tc_pre_ee : 1.0
-                dpost/dt = -post/tc_post_ee : 1.0
             '''
     
-    eqs_stdp_pre_ee = 'pre = 1.0; w += (nu_ee_pre * post) * ((wmax_ee - w) ** w_mu_pre)'
-    eqs_stdp_post_ee = 'post = 1.0; w += (nu_ee_post * pre) * ((wmax_ee - w) ** w_mu_post)'
-    
-elif stdp_rule == 'postpre':
-    eqs_stdp_ee = '''
-                dpre/dt = -pre/tc_pre_ee : 1.0
-                dpost/dt = -post/tc_post_ee : 1.0
-            '''
-    
-    eqs_stdp_pre_ee = 'pre = 1.0; w += nu_ee_pre * post'
-    eqs_stdp_post_ee = 'post = 1.0; w -= nu_ee_post * pre'
+		eqs_stdp_pre_ee = 'pre = 1.0'
+		eqs_stdp_post_ee = 'w += (nu_ee_post * pre) * ((wmax_ee - w) ** w_mu_post)'
 
-elif stdp_rule == 'triplet':
-    eqs_stdp_ee = '''
-                post2before                            : 1.0
-                dpre/dt   =   -pre/(tc_pre_ee)         : 1.0
-                dpost1/dt  = -post1/(tc_post_1_ee)     : 1.0
-                dpost2/dt  = -post2/(tc_post_2_ee)     : 1.0
-            '''
-    
-    eqs_stdp_pre_ee = 'pre = 1.0; w -= nu_ee_pre * post1'
-    eqs_stdp_post_ee = 'post2before = post2; w += nu_ee_post * pre * post2before; post1 = 1.0; post2 = 1.0'
 else:
     raise NotImplementedError
-
 b.ion()
 fig_num = 1
 neuron_groups = {}

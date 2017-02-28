@@ -1,7 +1,7 @@
 '''
-Created on 15.12.2014
+Script to generator random connectivity to use in 'spiking_lattice_MNIST.py'.
 
-@author: Peter U. Diehl
+@author: Dan Saunders
 '''
 
 import scipy.ndimage as sp
@@ -36,17 +36,17 @@ def sparsenMatrix(baseMatrix, pConn):
     return weightMatrix, weightList
 
 
-def is_lattice_connection(n, i, k):
-        """
+def is_lattice_connection(n, i, j):
+        '''
         Boolean method which checks if two indices in a network correspond to neighboring neurons in a lattice.
         
         Args:
             n: number of neurons in lattice
             i: First neuron's index
             k: Second neuron's index
-        """
+        '''
         sqrt = math.sqrt(n)
-        return i + 1 == k and k % sqrt != 0 or i - 1 == k and i % sqrt != 0 or i + sqrt == k or i - sqrt == k
+        return i + 1 == j and j % sqrt != 0 or i - 1 == j and i % sqrt != 0 or i + sqrt == j or i - sqrt == j
         
     
 def create_weights():
@@ -61,7 +61,7 @@ def create_weights():
     weight = {}
     weight['ee_input'] = 0.3 
     weight['ei_input'] = 0.2 
-    weight['ee'] = 0.001
+    weight['ee'] = 0.2
     weight['ei'] = 10.4
     weight['ie'] = 17.0
     weight['ii'] = 0.4
@@ -85,18 +85,7 @@ def create_weights():
             weightList = [(i, j, weightMatrix[i,j]) for j in xrange(nE) for i in xrange(nInput)]
         print 'save connection matrix', name
         np.save(dataPath + name + str(nE), weightList)
-    
-    
-    
-    print '...creating connection matrices from input to I'
-    connNameList = ['XeAi']
-    for name in connNameList:
-        weightMatrix = np.random.random((nInput, nI))
-        weightMatrix *= weight['ei_input']
-        weightMatrix, weightList = sparsenMatrix(weightMatrix, pConn['ei_input'])
-        print 'save connection matrix', name
-        np.save(dataPath + name + str(nE), weightList)
-        
+        np.savetxt(dataPath + name + str(nE), weightList)
     
     
     print '...creating connection matrices from E to I'
@@ -110,8 +99,8 @@ def create_weights():
             weightMatrix, weightList = sparsenMatrix(weightMatrix, pConn['ei'])
         print 'save connection matrix', name
         np.save(dataPath + name + str(nE), weightList)
-        
-        
+        np.savetxt(dataPath + name + str(nE), weightList)
+    
         
     print '...creating connection matrices from I to E'
     connNameList = ['AiAe']
@@ -128,18 +117,19 @@ def create_weights():
             weightMatrix, weightList = sparsenMatrix(weightMatrix, pConn['ie'])
         print 'save connection matrix', name
         np.save(dataPath + name + str(nE), weightList)
+        np.savetxt(dataPath + name + str(nE), weightList)
     
     
     print '...creating connection matrices from E to E'
     connNameList = ['AeAe']
     for name in connNameList:
-        weightMatrix = np.array( [ 0.0 if not is_lattice_connection(nE, i, j) else 1.0 for i in xrange(nE) for j in xrange(nE) ] )
+        weightMatrix = np.array( [ 0 if not is_lattice_connection(nE, i, j) else weight['ee'] + np.random.random() * 0.2 for i in xrange(nE) for j in xrange(nE) ] )
         weightMatrix = weightMatrix.reshape((nE, nE))
-        weightMatrix *= weight['ee']
             
         weightList = [(i, j, weightMatrix[i,j]) for i in xrange(nE) for j in xrange(nE)]
         print 'save connection matrix', name
         np.save(dataPath + name + str(nE), weightList)
+        np.savetxt(dataPath + name + str(nE), weightList)
     
          
 if __name__ == "__main__":

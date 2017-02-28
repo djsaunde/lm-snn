@@ -1,15 +1,14 @@
 '''
-Created on 15.12.2014
+Extending the 'spiking_MNIST.py' script written by Peter Diehl to utilize a lattice
+connectivity between neurons in the excitatory layer.
 
-@author: Peter U. Diehl
+@author: Dan Saunders
 '''
 
  
 import numpy as np
 import matplotlib.cm as cmap
-import time
-import os.path
-import scipy 
+import time, sys, os.path, scipy 
 import cPickle as pickle
 import brian_no_units  #import it to deactivate unit checking --> This should NOT be done for testing/debugging 
 import brian as b
@@ -23,9 +22,10 @@ MNIST_data_path = './'
 # functions
 #------------------------------------------------------------------------------     
 def get_labeled_data(picklename, bTrain = True):
-    """Read input-vector (image) and target class (label, 0-9) and return
-       it as list of tuples.
-    """
+    '''
+    Read input-vector (image) and target class (label, 0-9) and return it as 
+    a list of tuples.
+    '''
     if os.path.isfile('%s.pickle' % picklename):
         data = pickle.load(open('%s.pickle' % picklename))
     else:
@@ -106,18 +106,6 @@ def normalize_weights():
 			for j in xrange(n_e):
 				connection[:, j] *= colFactors[j]
 
-		elif connName == 'AeAe' + str(n_e):
-			'''
-			connection = connections[connName].W
-			temp_conn = np.array([connection.get_col(i) for i in range(n_e)])
-			print temp_conn
-			colSums = np.sum(temp_conn, axis = 0)
-			colFactors = weight['ee_input'] / colSums
-			for j in xrange(n_e):
-				connection[:, j] *= colFactors[j]
-            '''
-			pass
-
 def get_2d_input_weights():
     name = 'XeAe' + str(n_e)
     weight_matrix = np.zeros((n_input, n_e))
@@ -157,12 +145,11 @@ def update_2d_input_weights(im, fig):
 
 def get_2d_excitatory_weights():
     name = 'AeAe' + str(n_e)
-    n_e_sqrt = int(np.sqrt(n_e))
-    num_values_col = num_values_row = n_e_sqrt
+    num_values_col = num_values_row = n_e
     rearranged_weights = np.zeros((num_values_col, num_values_row))
     
-    for i in xrange(n_e_sqrt):
-    	for j in xrange(n_e_sqrt):
+    for i in xrange(n_e):
+    	for j in xrange(n_e):
     		rearranged_weights[i, j] = connections[name].W[i, j]
     
     return rearranged_weights
@@ -259,10 +246,22 @@ print 'time needed to load test set:', end - start
 #------------------------------------------------------------------------------ 
 # set parameters and equations
 #------------------------------------------------------------------------------
-if raw_input('Enter "test" for testing mode, "train" for training mode: ') == 'test':
+if raw_input('Enter "test" for testing mode, "train" for training mode (default training mode): ') == 'test':
     test_mode = True
 else:
     test_mode = False
+
+if not test_mode:
+	start = time.time()
+	training = get_labeled_data(MNIST_data_path + 'training')
+	end = time.time()
+	print 'time needed to load training set:', end - start
+
+else:
+	start = time.time()
+	testing = get_labeled_data(MNIST_data_path + 'testing', bTrain = False)
+	end = time.time()
+	print 'time needed to load test set:', end - start
 
 b.set_global_preferences( 
                         defaultclock = b.Clock(dt=0.5*b.ms), # The default clock to use if none is provided or defined in any enclosing scope.
@@ -304,14 +303,46 @@ else:
 
 # number of inputs to the network
 n_input = 784
+
+# number of classes to learn
+classes_input = raw_input('Enter classes to learn as comma-separated list (e.g, 0,1,2,3,...) (default all 10 classes): ')
+if classes_input == '':
+	classes = range(10)
+else:
+	classes = set([ int(token) for token in classes_input.split(',') ])
+
+# reduce size of dataset if necessary
+if not test_mode and classes_input != 0:
+	new_training = {'x' : [], 'y' : [], 'rows' : training['rows'], 'cols' : training['cols']}
+	for idx in xrange(len(training['x'])):
+		if training['y'][idx][0] in classes:
+			new_training['y'].append(training['y'][idx])
+			new_training['x'].append(training['x'][idx])
+	new_training['x'], new_training['y'] = np.asarray(new_training['x']), np.asarray(new_training['y'])
+	training = new_training
+	
+elif test_mode and clases_input != 0:
+	new_testing = {'x' : [], 'y' : [], 'rows' : testing['rows'], 'cols' : testing['cols']}
+	for idx in xrange(len(testing['x'])):
+		if testing['y'][idx][0] in classes:
+			new_testing['y'].append(testing['y'][idx])
+			new_testing['x'].append(testing['x'][idx])
+	new_testing['x'], new_testing['y'] = np.asarray(new_testing['x']), np.asarray(new_testing['y'])
+	testing = new_testing
+	
 # number of excitatory neurons
-n_e = input('Enter number of excitatory / inhibitory neurons: ')
+n_e_input = raw_input('Enter number of excitatory / inhibitory neurons (default 100): ')
+if n_e_input == '':
+	n_e = 100
+else:
+	n_e = int(n_e_input)
+
 # number of inhibitory neurons
 n_i = n_e
 # set ending of filename saves
 ending = str(n_e)
 # time (in seconds) per data example presentation
-single_example_time =   0.35 * b.second
+single_example_time = 0.35 * b.second
 # time (in seconds) per rest period between data examples
 resting_time = 0.15 * b.second
 # total runtime (number of examples times (presentation time plus rest period))
@@ -323,13 +354,13 @@ if num_examples <= 10000:
     weight_update_interval = 20
 else:
     update_interval = 10000
-    weight_update_interval = 100
-# setting save connections to file parameters
+    weight_update_interval = 5
+
+# setting save connections to file parameter and update interval
 if num_examples <= 60000:
     save_connections_interval = 10000
 else:
     save_connections_interval = 10000
-    update_interval = 10000
     
 update_interval = 100
 
@@ -342,9 +373,6 @@ v_thresh_e = -52. * b.mV
 v_thresh_i = -40. * b.mV
 refrac_e = 5. * b.ms
 refrac_i = 2. * b.ms
-
-# connection structure
-conn_structure = 'dense'
 
 # dictionaries for weights and delays
 weight = {}
@@ -368,7 +396,7 @@ tc_pre_ee = 20 * b.ms
 tc_post_ee = 20 * b.ms
 tc_post_1_ee = 20 * b.ms
 tc_post_2_ee = 40 * b.ms
-nu_ee_pre =  0.0001
+nu_ee_pre = 0.0001
 nu_ee_post = 0.01
 wmax_ee = 1.0
 exp_ee_pre = 0.2
@@ -408,54 +436,63 @@ neuron_eqs_i = '''
         dgi/dt = -gi / (2.0*ms)                                  : 1
         '''
 
-stdp_rule = raw_input('Enter STDP learning rule to use (standard / hebbian / exp_weight_depend / postpre / triplet): ')
+stdp_input = raw_input('Enter STDP learning rule to use (standard / hebbian / exp_weight_depend) (default standard): ')
 
-if stdp_rule == 'standard':
-    eqs_stdp_ee = '''
+if raw_input('Enter (yes / no) for post-pre (default yes): ') in [ 'yes', '' ]:
+	post_pre = True
+else:
+	post_pre = False
+
+if stdp_input in [ 'standard', '' ]:
+	if post_pre:
+		eqs_stdp_ee = '''
+		            dpre / dt = -pre / tc_pre_ee : 1.0
+		            dpost / dt = -post / tc_post_ee : 1.0
+		        '''
+		
+		eqs_stdp_pre_ee = 'pre = 1.0; w -= nu_ee_pre * post'
+		eqs_stdp_post_ee = 'post = 1.0; w += nu_ee_post * pre'
+	else:
+		eqs_stdp_ee = '''
+		            dpre / dt = -pre / tc_pre_ee : 1.0
+		        '''
+		
+		eqs_stdp_pre_ee = 'pre = 1.0'
+		eqs_stdp_post_ee = 'w += nu_ee_post * pre'
+
+elif stdp_input == 'hebbian':
+	if post_pre:
+		eqs_stdp_ee = '''
                 dpre / dt = -pre / tc_pre_ee : 1.0
                 dpost / dt = -post / tc_post_ee : 1.0
             '''
     
-    eqs_stdp_pre_ee = 'pre = 1.0; w -= nu_ee_pre * post'
-    eqs_stdp_post_ee = 'post = 1.0; w += nu_ee_post * pre'
-
-elif stdp_rule == 'hebbian':
-	eqs_stdp_ee = '''
-                dpre/dt = -pre/tc_pre_ee : 1.0
-                dpost/dt = -post/tc_post_ee : 1.0
-				'''
-
-	eqs_stdp_pre_ee = 'pre = 1.0; w += nu_ee_pre * post'
-	eqs_stdp_post_ee = 'post = 1.0; w += nu_ee_post * pre'
-
-elif stdp_rule == 'exp_weight_depend':
-    eqs_stdp_ee = '''
-                dpre/dt = -pre/tc_pre_ee : 1.0
-                dpost/dt = -post/tc_post_ee : 1.0
+		eqs_stdp_pre_ee = 'pre = 1.0; w += nu_ee_pre * post'
+		eqs_stdp_post_ee = 'post = 1.0; w += nu_ee_post * pre'
+	else:
+		eqs_stdp_ee = '''
+                dpre / dt = -pre / tc_pre_ee : 1.0
             '''
     
-    eqs_stdp_pre_ee = 'pre = 1.0; w += (nu_ee_pre * post) * ((wmax_ee - w) ** w_mu_pre)'
-    eqs_stdp_post_ee = 'post = 1.0; w += (nu_ee_post * pre) * ((wmax_ee - w) ** w_mu_post)'
-
-elif stdp_rule == 'postpre':
-    eqs_stdp_ee = '''
+		eqs_stdp_pre_ee = 'pre = 1.0'
+		eqs_stdp_post_ee = 'w += nu_ee_post * pre'
+		
+elif stdp_input == 'exp_weight_depend':
+	if post_pre:
+		eqs_stdp_ee = '''
                 dpre/dt = -pre/tc_pre_ee : 1.0
                 dpost/dt = -post/tc_post_ee : 1.0
             '''
     
-    eqs_stdp_pre_ee = 'pre = 1.0; w += nu_ee_pre * post'
-    eqs_stdp_post_ee = 'post = 1.0; w -= nu_ee_post * pre'
-
-elif stdp_rule == 'triplet':
-    eqs_stdp_ee = '''
-                post2before                            : 1.0
-                dpre/dt   =   -pre/(tc_pre_ee)         : 1.0
-                dpost1/dt  = -post1/(tc_post_1_ee)     : 1.0
-                dpost2/dt  = -post2/(tc_post_2_ee)     : 1.0
+		eqs_stdp_pre_ee = 'pre = 1.0; w -= (nu_ee_pre * post) * ((wmax_ee - w) ** w_mu_pre)'
+		eqs_stdp_post_ee = 'post = 1.0; w += (nu_ee_post * pre) * ((wmax_ee - w) ** w_mu_post)'
+	else:
+		eqs_stdp_ee = '''
+                dpre/dt = -pre/tc_pre_ee : 1.0
             '''
     
-    eqs_stdp_pre_ee = 'pre = 1.0; w -= nu_ee_pre * post1'
-    eqs_stdp_post_ee = 'post2before = post2; w += nu_ee_post * pre * post2before; post1 = 1.0; post2 = 1.0'
+		eqs_stdp_pre_ee = 'pre = 1.0'
+		eqs_stdp_post_ee = 'w += (nu_ee_post * pre) * ((wmax_ee - w) ** w_mu_post)'
 
 else:
     raise NotImplementedError
@@ -500,18 +537,21 @@ for name in population_names:
     for conn_type in recurrent_conn_names:
         connName = name + conn_type[0] + name + conn_type[1] + ending
         weightMatrix = get_matrix_from_file(weight_path + '../random/' + connName + '.npy')
-        connections[connName] = b.Connection(neuron_groups[connName[0:2]], neuron_groups[connName[2:4]], structure='sparse', state='g' + conn_type[0])
-        if connName[0:2] == 'Ae':
-        	for i in range(n_e):
-        		connections[connName].connect(neuron_groups[connName[0:2]][i], neuron_groups[connName[2:4]])
+        
+        if connName == 'AeAe' + str(n_e):
+        	connections[connName] = b.Connection(neuron_groups[connName[0:2]], neuron_groups[connName[2:4]], structure='sparse', state='g' + conn_type[0])
+        	for i in xrange(n_e):
+        		for j in xrange(n_e):
+        			if weightMatrix[i, j] != 0:
+        				connections[connName][i, j] = weightMatrix[i, j]
         else:
-        	connections[connName].connect(neuron_groups[connName[0:2]], neuron_groups[connName[2:4]], weightMatrix)
+        	connections[connName] = b.Connection(neuron_groups[connName[0:2]], neuron_groups[connName[2:4]], structure='dense', state='g' + conn_type[0])
+    		connections[connName].connect(neuron_groups[connName[0:2]], neuron_groups[connName[2:4]], weightMatrix)
                 
     if ee_STDP_on:
         if 'ee' in recurrent_conn_names:
             print 'create STDP for connection' + name + 'e' + name + 'e'
-            stdp_methods[name + 'e' + name + 'e'] = b.STDP(connections[name + 'e' + name + 'e' + ending], eqs=eqs_stdp_ee, pre=eqs_stdp_pre_ee, 
-                                                           post=eqs_stdp_post_ee, wmin=0., wmax=wmax_ee)
+            stdp_methods[name + 'e' + name + 'e'] = b.STDP(connections[name + 'e' + name + 'e' + ending], eqs=eqs_stdp_ee, pre='pre = 1.0; w -= 0.001 * post', post='post = 1.0; w += 0.01 * pre', wmin=0., wmax=wmax_ee)
 
     print 'create monitors for', name
     
@@ -549,7 +589,7 @@ for name in input_connection_names:
     for connType in input_conn_names:
         connName = name[0] + connType[0] + name[1] + connType[1] + ending
         weightMatrix = get_matrix_from_file(weight_path + connName + '.npy')
-        connections[connName] = b.Connection(input_groups[connName[0:2]], neuron_groups[connName[2:4]], structure=conn_structure, 
+        connections[connName] = b.Connection(input_groups[connName[0:2]], neuron_groups[connName[2:4]], structure='dense', 
                                                     state='g' + connType[0], delay=True, max_delay=delay[connType][1])
         connections[connName].connect(input_groups[connName[0:2]], neuron_groups[connName[2:4]], weightMatrix, delay=delay[connType])
      

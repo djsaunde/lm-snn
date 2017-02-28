@@ -622,6 +622,9 @@ for name in conductance_monitors:
     
 for name in weight_monitors:
     np.savetxt('./time_series/weights/' + name + '.txt', np.asarray(weight_monitors[name]))
+    
+for name in spike_monitors:
+	np.savetxt('./time_series/spikes/' + name + '.txt', np.asarray(spike_monitors[name].spikes))
  
 if rate_monitors:
     b.figure(fig_num)
