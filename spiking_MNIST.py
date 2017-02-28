@@ -1,7 +1,7 @@
 '''
-Created on 15.12.2014
+Extending Peter U. Diehl's work.
 
-@author: Peter U. Diehl
+@author: Dan Saunders
 '''
 
  
@@ -9,10 +9,12 @@ import numpy as np
 import matplotlib.cm as cmap
 import time
 import os.path
-import scipy 
+import scipy
+import math
 import cPickle as pickle
-import brian_no_units  #import it to deactivate unit checking --> This should NOT be done for testing/debugging 
+import brian_no_units
 import brian as b
+import cPickle as p
 from struct import unpack
 from brian import *
 
@@ -23,9 +25,10 @@ MNIST_data_path = './'
 # functions
 #------------------------------------------------------------------------------     
 def get_labeled_data(picklename, bTrain = True):
-    """Read input-vector (image) and target class (label, 0-9) and return
-       it as list of tuples.
-    """
+    '''
+    Read input-vector (image) and target class (label, 0-9) and return it as 
+    a list of tuples.
+    '''
     if os.path.isfile('%s.pickle' % picklename):
         data = pickle.load(open('%s.pickle' % picklename))
     else:
@@ -36,17 +39,20 @@ def get_labeled_data(picklename, bTrain = True):
         else:
             images = open(MNIST_data_path + 't10k-images-idx3-ubyte','rb')
             labels = open(MNIST_data_path + 't10k-labels-idx1-ubyte','rb')
+        
         # Get metadata for images
         images.read(4)  # skip the magic_number
         number_of_images = unpack('>I', images.read(4))[0]
         rows = unpack('>I', images.read(4))[0]
         cols = unpack('>I', images.read(4))[0]
+        
         # Get metadata for labels
         labels.read(4)  # skip the magic_number
         N = unpack('>I', labels.read(4))[0]
     
         if number_of_images != N:
             raise Exception('number of labels did not match the number of images')
+        
         # Get the data
         x = np.zeros((N, rows, cols), dtype=np.uint8)  # Initialize numpy array
         y = np.zeros((N, 1), dtype=np.uint8)  # Initialize numpy array
@@ -59,6 +65,7 @@ def get_labeled_data(picklename, bTrain = True):
         data = {'x': x, 'y': y, 'rows': rows, 'cols': cols}
         pickle.dump(data, open("%s.pickle" % picklename, "wb"))
     return data
+
 
 def get_matrix_from_file(fileName):
     offset = len(str(n_e)) + 4
@@ -85,14 +92,15 @@ def save_connections(ending = ''):
     print 'save connections'
     for connName in save_conns:
         connMatrix = connections[connName][:]
-#         connListSparse = ([(i,j[0],j[1]) for i in xrange(connMatrix.shape[0]) for j in zip(connMatrix.rowj[i],connMatrix.rowdata[i])])
         connListSparse = ([(i,j,connMatrix[i,j]) for i in xrange(connMatrix.shape[0]) for j in xrange(connMatrix.shape[1]) ])
-        np.save(data_path + 'weights/' + connName + '_' +  ending, connListSparse)
+        np.save(data_path + 'weights/' + connName + '_' + stdp_input + '_' + ending, connListSparse)
+
 
 def save_theta(ending = ''):
     print 'save theta'
     for pop_name in population_names:
-        np.save(data_path + 'weights/theta_' + pop_name + ending, neuron_groups[pop_name + 'e'].theta)
+        np.save(data_path + 'weights/theta_' + pop_name + '_' + stdp_input + '_' + ending, neuron_groups[pop_name + 'e'].theta)
+
 
 def normalize_weights():
     for connName in connections:
@@ -101,8 +109,22 @@ def normalize_weights():
             temp_conn = np.copy(connection)
             colSums = np.sum(temp_conn, axis = 0)
             colFactors = weight['ee_input']/colSums
-            for j in xrange(n_e):#
+            for j in xrange(n_e):
                 connection[:,j] *= colFactors[j]
+	
+
+def is_lattice_connection(n, i, j):
+    '''
+    Boolean method which checks if two indices in a network correspond to neighboring nodes in a lattice.
+    
+    Args:
+        n: number of nodes in lattice
+        i: First neuron's index
+        k: Second neuron's index
+    '''
+    sqrt = int(math.sqrt(n))
+    return i + 1 == j and j % sqrt != 0 or i - 1 == j and i % sqrt != 0 or i + sqrt == j or i - sqrt == j
+
             
 def get_2d_input_weights():
     name = 'XeAe' + str(n_e)
@@ -122,6 +144,22 @@ def get_2d_input_weights():
     return rearranged_weights
 
 
+def plot_input():
+	fig = b.figure(fig_num, figsize = (5, 5))
+	im3 = b.imshow(rates.reshape((28, 28)), interpolation = 'nearest', vmin=0, vmax=64, cmap=cmap.get_cmap('gray'))
+	b.colorbar(im3)
+	b.title('Current input example')
+	fig.canvas.draw()
+	return im3, fig
+
+
+def update_input(im3, fig):
+	im3.set_array(rates.reshape((28, 28)))
+	b.title('Current input example')
+	fig.canvas.draw()
+	return im3
+
+
 def plot_2d_input_weights():
     weights = get_2d_input_weights()
     fig = b.figure(fig_num, figsize = (18, 18))
@@ -131,14 +169,20 @@ def plot_2d_input_weights():
     fig.canvas.draw()
     return im2, fig
     
+
 def update_2d_input_weights(im, fig):
     weights = get_2d_input_weights()
     im.set_array(weights)
     fig.canvas.draw()
     return im
 
+
 def get_current_performance(performance, current_example_num):
-    current_evaluation = int(current_example_num/update_interval)
+	'''
+	Evaluate the performance of the network on the past 'update_interval' training
+	examples.
+	'''
+    current_evaluation = int(current_example_num / update_interval)
     start_num = current_example_num - update_interval
     end_num = current_example_num
     difference = outputNumbers[start_num:end_num, 0] - input_numbers[start_num:end_num]
@@ -146,7 +190,11 @@ def get_current_performance(performance, current_example_num):
     performance[current_evaluation] = correct / float(update_interval) * 100
     return performance
 
+
 def plot_performance(fig_num):
+	'''
+	Set up the performance plot for the beginning of the simulation.
+	'''
     num_evaluations = int(num_examples / update_interval)
     time_steps = range(0, num_evaluations)
     performance = np.zeros(num_evaluations)
@@ -159,13 +207,22 @@ def plot_performance(fig_num):
     fig.canvas.draw()
     return im2, performance, fig_num, fig
 
+
 def update_performance_plot(im, performance, current_example_num, fig):
+	'''
+	Update the plot of the performance based on results thus far.
+	'''
     performance = get_current_performance(performance, current_example_num)
     im.set_ydata(performance)
     fig.canvas.draw()
     return im, performance
     
+
 def get_recognized_number_ranking(assignments, spike_rates):
+	'''
+	Given the label assignments of the excitatory layer and their spike rates over
+	the past 'update_interval', get the ranking of each of the categories of input.
+	'''
     summed_rates = [0] * 10
     num_assignments = [0] * 10
     for i in xrange(10):
@@ -174,7 +231,12 @@ def get_recognized_number_ranking(assignments, spike_rates):
             summed_rates[i] = np.sum(spike_rates[assignments == i]) / num_assignments[i]
     return np.argsort(summed_rates)[::-1]
 
+
 def get_new_assignments(result_monitor, input_numbers):
+	'''
+	Based on the results from the previous 'update_interval', assign labels to the
+	excitatory neurons.
+	'''
     assignments = np.zeros(n_e)
     input_nums = np.asarray(input_numbers)
     maximum_rate = [0] * n_e    
@@ -187,11 +249,12 @@ def get_new_assignments(result_monitor, input_numbers):
                     maximum_rate[i] = rate[i]
                     assignments[i] = j
     return assignments
+
     
-    
-#------------------------------------------------------------------------------ 
-# load MNIST
-#------------------------------------------------------------------------------
+##############
+# LOAD MNIST #
+##############
+
 if raw_input('Enter "test" for testing mode, "train" for training mode (default training mode): ') == 'test':
     test_mode = True
 else:
@@ -213,6 +276,7 @@ else:
 #------------------------------------------------------------------------------ 
 # set parameters and equations
 #------------------------------------------------------------------------------
+
 b.set_global_preferences( 
                         defaultclock = b.Clock(dt=0.5*b.ms), # The default clock to use if none is provided or defined in any enclosing scope.
                         useweave = True, # Defines whether or not functions should use inlined compiled C code where defined.
@@ -224,7 +288,7 @@ b.set_global_preferences(
                         usecodegenthreshold = False,  # Whether or not to use experimental code generation support on thresholds.
                         usenewpropagate = True,  # Whether or not to use experimental new C propagation functions.
                         usecstdp = True,  # Whether or not to use experimental new C STDP.
-                        openmp = True, # whether or not to use OpenMP pragmas in generated C code.
+                        openmp = False, # whether or not to use OpenMP pragmas in generated C code.
                         magic_useframes = True, # defines whether or not the magic functions should serach for objects defined only in the calling frame,
                                                 # or if they should find all objects defined in any frame. Set to "True" if not in an interactive shell.
                         useweave_linear_diffeq = True, # Whether to use weave C++ acceleration for the solution of linear differential equations.
@@ -254,6 +318,7 @@ else:
 
 # number of inputs to the network
 n_input = 784
+
 # number of classes to learn
 classes_input = raw_input('Enter classes to learn as comma-separated list (e.g, 0,1,2,3,...) (default all 10 classes): ')
 if classes_input == '':
@@ -289,21 +354,26 @@ else:
 
 # number of inhibitory neurons
 n_i = n_e
+
 # set ending of filename saves
 ending = str(n_e)
+
 # time (in seconds) per data example presentation
 single_example_time = 0.35 * b.second
+
 # time (in seconds) per rest period between data examples
 resting_time = 0.15 * b.second
+
 # total runtime (number of examples times (presentation time plus rest period))
 runtime = num_examples * (single_example_time + resting_time)
+
 # set the update interval and weight update interval (for network weights?) 
 if num_examples <= 10000:
     update_interval = num_examples
     weight_update_interval = 5
 else:
     update_interval = 100
-    weight_update_interval = 10
+    weight_update_interval = 5
 # setting save connections to file parameters
 if num_examples <= 60000:
     save_connections_interval = 500
@@ -323,9 +393,11 @@ refrac_i = 2. * b.ms
 
 # connection structure
 conn_structure = 'dense'
+
 # dictionaries for weights and delays
 weight = {}
 delay = {}
+
 # naming neuron populations (X for input, A for population, XA for input -> connection, etc...
 input_population_names = ['X']
 population_names = ['A']
@@ -334,17 +406,18 @@ save_conns = ['XeAe' + str(n_e)]
 input_conn_names = ['ee_input'] 
 recurrent_conn_names = ['ei', 'ie']
 weight['ee_input'] = 78.
-delay['ee_input'] = (0*b.ms,10*b.ms)
-delay['ei_input'] = (0*b.ms,5*b.ms)
+delay['ee_input'] = (0 * b.ms,10 * b.ms)
+delay['ei_input'] = (0 * b.ms,5 * b.ms)
 input_intensity = 2.
 start_input_intensity = input_intensity
 
-tc_pre_ee = 20*b.ms
-tc_post_ee = 20*b.ms
-tc_post_1_ee = 20*b.ms
-tc_post_2_ee = 40*b.ms
-nu_ee_pre =  0.0001      # learning rate
-nu_ee_post = 0.01       # learning rate
+# time constants, learning rates, max weights, weight dependence, etc.
+tc_pre_ee = 20 * b.ms
+tc_post_ee = 20 * b.ms
+tc_post_1_ee = 20 * b.ms
+tc_post_2_ee = 40 * b.ms
+nu_ee_pre =  0.0001
+nu_ee_post = 0.01
 wmax_ee = 1.0
 exp_ee_pre = 0.2
 exp_ee_post = exp_ee_pre
@@ -359,7 +432,8 @@ else:
     tc_theta = 1e7 * b.ms
     theta_plus_e = 0.05 * b.mV
     scr_e = 'v = v_reset_e; theta += theta_plus_e; timer = 0*ms'
-offset = 20.0*b.mV
+
+offset = 20.0 * b.mV
 v_thresh_e = '(v>(theta - offset + ' + str(v_thresh_e) + ')) * (timer>refrac_e)'
 
 # equations for neurons
@@ -384,66 +458,85 @@ neuron_eqs_i = '''
         dgi/dt = -gi/(2.0*ms)                                  : 1
         '''
 
-stdp_input = raw_input('Enter STDP learning rule to use (standard / hebbian / exp_weight_depend) (default standard): ')
+# determine STDP rule to use
+stdp_input = ''
+
+if raw_input('Use classic STDP (default yes)?: ') in [ 'yes', '' ]:
+	use_classic_STDP = True
+	stdp_input += 'classic_'
+else:
+	use_classic_STDP = False
+	stdp_input += 'notclassic_'
+
+if raw_input('Use weight dependence (default yes)?: ') in [ 'yes', '' ]:
+	use_weight_dependence = True
+	stdp_input += 'weight_dependence_'
+else:
+	use_weight_dependence = False
+	stdp_input += 'no_weight_dependence_'
 
 if raw_input('Enter (yes / no) for post-pre (default yes): ') in [ 'yes', '' ]:
 	post_pre = True
+	stdp_input += 'postpre'
 else:
 	post_pre = False
+	stdp_input += 'no_postpre'
 
-if stdp_input in [ 'standard', '' ]:
-	if post_pre:
-		eqs_stdp_ee = '''
-		            dpre / dt = -pre / tc_pre_ee : 1.0
-		            dpost / dt = -post / tc_post_ee : 1.0
-		        '''
-		
-		eqs_stdp_pre_ee = 'pre = 1.0; w -= nu_ee_pre * post'
-		eqs_stdp_post_ee = 'post = 1.0; w += nu_ee_post * pre'
-	else:
-		eqs_stdp_ee = '''
-		            dpre / dt = -pre / tc_pre_ee : 1.0
-		        '''
-		
-		eqs_stdp_pre_ee = 'pre = 1.0'
-		eqs_stdp_post_ee = 'w += nu_ee_post * pre'
-
-elif stdp_input == 'hebbian':
-	if post_pre:
-		eqs_stdp_ee = '''
-                dpre / dt = -pre / tc_pre_ee : 1.0
-                dpost / dt = -post / tc_post_ee : 1.0
-            '''
+if use_classic_STDP:
+    eqs_stdp_ee = '''
+                post2before                            : 1.0
+                dpre/dt   =   -pre/(tc_pre_ee)         : 1.0
+                dpost1/dt  = -post1/(tc_post_1_ee)     : 1.0
+                dpost2/dt  = -post1/(tc_post_2_ee)     : 1.0
+                '''
     
-		eqs_stdp_pre_ee = 'pre = 1.0; w += nu_ee_pre * post'
-		eqs_stdp_post_ee = 'post = 1.0; w += nu_ee_post * pre'
-	else:
-		eqs_stdp_ee = '''
-                dpre / dt = -pre / tc_pre_ee : 1.0
-            '''
+    if use_weight_dependence:
+    	
+    	if post_pre:
+		    eqs_stdp_pre_ee = 'pre = 1.; w -= nu_ee_pre * post1 * w**exp_ee_pre'
+		    eqs_stdp_post_ee = 'post2before = post2; w += nu_ee_post * pre * post2before * (wmax_ee - w)**exp_ee_post; post1 = 1.; post2 = 1.'      
+    	
+    	else:
+            eqs_stdp_pre_ee = 'pre = 1.'
+            eqs_stdp_post_ee = 'post2before = post2; w += nu_ee_post * pre * post2before * (wmax_ee - w)**exp_ee_post; post1 = 1.; post2 = 1.'
     
-		eqs_stdp_pre_ee = 'pre = 1.0'
-		eqs_stdp_post_ee = 'w += nu_ee_post * pre'
-		
-elif stdp_input == 'exp_weight_depend':
-	if post_pre:
-		eqs_stdp_ee = '''
-                dpre/dt = -pre/tc_pre_ee : 1.0
-                dpost/dt = -post/tc_post_ee : 1.0
-            '''
+    else:
+        
+        if post_pre:
+            eqs_stdp_pre_ee = 'pre = 1.; w -= nu_ee_pre * post1'
+            eqs_stdp_post_ee = 'post2before = post2; w += nu_ee_post * pre * post2before; post1 = 1.; post2 = 1.'
+		    
+        else:
+            eqs_stdp_pre_ee = 'pre = 1.'
+            eqs_stdp_post_ee = 'post2before = post2; w += nu_ee_post * pre * post2before; post1 = 1.; post2 = 1.'
     
-		eqs_stdp_pre_ee = 'pre = 1.0; w -= (nu_ee_pre * post) * ((wmax_ee - w) ** w_mu_pre)'
-		eqs_stdp_post_ee = 'post = 1.0; w += (nu_ee_post * pre) * ((wmax_ee - w) ** w_mu_post)'
-	else:
-		eqs_stdp_ee = '''
-                dpre/dt = -pre/tc_pre_ee : 1.0
-            '''
-    
-		eqs_stdp_pre_ee = 'pre = 1.0'
-		eqs_stdp_post_ee = 'w += (nu_ee_post * pre) * ((wmax_ee - w) ** w_mu_post)'
-
 else:
-    raise NotImplementedError
+    eqs_stdp_ee = '''
+                post2before                          : 1.0
+                dpre/dt   =   -pre/(tc_pre_ee)       : 1.0
+                dpost1/dt = -post1/(tc_post_1_ee)     : 1.0
+                dpost2/dt = -post2/(tc_post_2_ee)     : 1.0
+                '''
+    
+    if use_weight_dependence:
+    
+        if post_pre:
+            eqs_stdp_pre_ee = 'pre = 1.; w -= nu_ee_pre * post1 * w**exp_ee_pre'
+            eqs_stdp_post_ee = 'post2before = post2; w += nu_ee_post * pre * post2 * (wmax_ee - w)**exp_ee_post; post1 = 1.; post2 = 1.'
+		    
+        else:
+            eqs_stdp_pre_ee = 'pre = 1.'
+            eqs_stdp_post_ee = 'post2before = post2; w += nu_ee_post * pre * post2 * (wmax_ee - w)**exp_ee_post; post1 = 1.; post2 = 1.'
+    else:
+    
+        if post_pre:
+            eqs_stdp_pre_ee = 'pre = 1.; w -= nu_ee_pre * post1'
+            eqs_stdp_post_ee = 'post2before = post2; w += nu_ee_post * pre * post2; post1 = 1.; post2 = 1.'
+        else:
+            eqs_stdp_pre_ee = 'pre = 1.'
+            eqs_stdp_post_ee = 'post2before = post2; w += nu_ee_post * pre * post2; post1 = 1.; post2 = 1.'
+
+
 b.ion()
 fig_num = 1
 neuron_groups = {}
@@ -481,7 +574,7 @@ for name in population_names:
     print 'create recurrent connections'
     for conn_type in recurrent_conn_names:
         connName = name + conn_type[0] + name + conn_type[1] + ending
-        weightMatrix = get_matrix_from_file(weight_path + '../random/' + connName + '.npy')
+        weightMatrix = get_matrix_from_file('random/' + connName + '.npy')
         connections[connName] = b.Connection(neuron_groups[connName[0:2]], neuron_groups[connName[2:4]], structure= conn_structure, 
                                                     state = 'g'+conn_type[0])
         connections[connName].connect(neuron_groups[connName[0:2]], neuron_groups[connName[2:4]], weightMatrix)
@@ -536,65 +629,121 @@ for name in input_connection_names:
 #------------------------------------------------------------------------------ 
 # run the simulation and set inputs
 #------------------------------------------------------------------------------ 
+
+# bookkeeping variables
 previous_spike_count = np.zeros(n_e)
 assignments = np.zeros(n_e)
 input_numbers = [0] * num_examples
 outputNumbers = np.zeros((num_examples, 10))
+
+# plot input weights
 if not test_mode:
     input_weight_monitor, fig_weights = plot_2d_input_weights()
     fig_num += 1
+
+# plot input intensities
+rates = np.zeros((int(np.sqrt(n_input)), int(np.sqrt(n_input))))
+input_image_monitor, input_image = plot_input()
+fig_num += 1
+
+# plot performance
 if do_plot_performance:
     performance_monitor, performance, fig_num, fig_performance = plot_performance(fig_num)
-for i,name in enumerate(input_population_names):
-    input_groups[name+'e'].rate = 0
-b.run(0)
+
+# set firing rates to zero initially
+for name in input_population_names:
+    input_groups[name + 'e'].rate = 0
+
+# initialize network
 j = 0
+b.run(0)
 
 while j < (int(num_examples)):
+
     if test_mode:
         if use_testing_set:
-            rates = testing['x'][j%10000,:,:].reshape((n_input)) / 8. *  input_intensity
+            rates = testing['x'][j % 10000, :, :].reshape((n_input)) / 8. * input_intensity
         else:
-            rates = training['x'][j%60000,:,:].reshape((n_input)) / 8. *  input_intensity
+            rates = training['x'][j % 60000, :, :].reshape((n_input)) / 8. * input_intensity
+    
     else:
+    	# ensure weights don't grow without bound
         normalize_weights()
-        rates = training['x'][j%60000,:,:].reshape((n_input)) / 8. *  input_intensity
+        # get the firing rates of the next input example
+        rates = training['x'][j % 60000, :, :].reshape((n_input)) / 8. * input_intensity
+    
+    # plot the input at this step
+    input_image_monitor = update_input(input_image_monitor, input_image)
+    
+    # sets the input firing rates
     input_groups['Xe'].rate = rates
-#     print 'run number:', j+1, 'of', int(num_examples)
+    
+    # run the network for a single example time
     b.run(single_example_time)
-            
+    
+    # get new neuron label assignments every 'update_interval'
     if j % update_interval == 0 and j > 0:
         assignments = get_new_assignments(result_monitor[:], input_numbers[j-update_interval : j])
+    
+    # update weights every 'weight_update_interval'
     if j % weight_update_interval == 0 and not test_mode:
         update_2d_input_weights(input_weight_monitor, fig_weights)
+    
+    # save the weights to file every 'save_connection_interval'
     if j % save_connections_interval == 0 and j > 0 and not test_mode:
         save_connections(str(j))
         save_theta(str(j))
     
+    # get count of spikes over the past iteration
     current_spike_count = np.asarray(spike_counters['Ae'].count[:]) - previous_spike_count
     previous_spike_count = np.copy(spike_counters['Ae'].count[:])
+    
+    # if there weren't a certain number of spikes
     if np.sum(current_spike_count) < 5:
+        # increase the intesity of input
         input_intensity += 1
-        for i,name in enumerate(input_population_names):
-            input_groups[name+'e'].rate = 0
+        
+        # set the input firing rates back to zero
+        for name in input_population_names:
+            input_groups[name + 'e'].rate = 0
+        
+        # run the simulation for 'resting_time' to relax back to rest potentials
         b.run(resting_time)
+    # if there were enough spikes
     else:
-        result_monitor[j%update_interval,:] = current_spike_count
+    	# record the current number of spikes
+        result_monitor[j % update_interval, :] = current_spike_count
+        
+        # decide whether to evaluate on test or training set
         if test_mode and use_testing_set:
-            input_numbers[j] = testing['y'][j%10000][0]
+            input_numbers[j] = testing['y'][j % 10000][0]
         else:
-            input_numbers[j] = training['y'][j%60000][0]
+            input_numbers[j] = training['y'][j % 60000][0]
+        
+        # get the output classifications of the network
         outputNumbers[j,:] = get_recognized_number_ranking(assignments, result_monitor[j%update_interval,:])
+        
+        # print progress
         if j % 100 == 0 and j > 0:
             print 'runs done:', j, 'of', int(num_examples)
+        
+        # plot performance if appropriate
         if j % update_interval == 0 and j > 0:
             if do_plot_performance:
+                # updating the performance plot
                 perf_plot, performance = update_performance_plot(performance_monitor, performance, j, fig_performance)
+                # printing out classification performance results so far
                 print 'Classification performance', performance[:(j / float(update_interval)) + 1]
-        for i,name in enumerate(input_population_names):
-            input_groups[name+'e'].rate = 0
+                
+        # set input firing rates back to zero
+        for name in input_population_names:
+            input_groups[name + 'e'].rate = 0
+        
+        # run the network for 'resting_time' to relax back to rest potentials
         b.run(resting_time)
+        # reset the input firing intensity
         input_intensity = start_input_intensity
+        # increment the example counter
         j += 1
 
 
@@ -621,6 +770,7 @@ if rate_monitors:
         b.subplot(len(rate_monitors), 1, i + 1)
         b.plot(rate_monitors[name].times/b.second, rate_monitors[name].rate, '.')
         b.title('Rates of population ' + name)
+    b.savefig('plots/rate_monitors_' + str(n_e) + '_' + stdp_input + '.png')
     
 if spike_monitors:
     b.figure(fig_num)
@@ -629,6 +779,7 @@ if spike_monitors:
         b.subplot(len(spike_monitors), 1, i + 1)
         b.raster_plot(spike_monitors[name])
         b.title('Spikes of population ' + name)
+    b.savefig('plots/spike_monitors_' + str(n_e) + '_' + stdp_input + '.png')
         
 if spike_counters:
     b.figure(fig_num)
@@ -637,8 +788,12 @@ if spike_counters:
         b.subplot(len(spike_counters), 1, i + 1)
         b.plot(spike_counters['Ae'].count[:])
         b.title('Spike count of population ' + name)
+    b.savefig('plots/rate_monitors_' + str(n_e) + '_' + stdp_input + '.png')
 
 plot_2d_input_weights()
+
+b.savefig('plots/input_to_exc_weights_' + str(n_e) + '_' + stdp_input + '.png')
+
 b.ioff()
 b.show()
 

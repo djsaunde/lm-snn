@@ -14,6 +14,7 @@ import math
 import cPickle as pickle
 import brian_no_units  #import it to deactivate unit checking --> This should NOT be done for testing/debugging 
 import brian as b
+import cPickle as p
 from struct import unpack
 from brian import *
 
@@ -89,13 +90,13 @@ def save_connections(ending = ''):
     for connName in save_conns:
         connMatrix = connections[connName][:]
         connListSparse = ([(i,j,connMatrix[i,j]) for i in xrange(connMatrix.shape[0]) for j in xrange(connMatrix.shape[1]) ])
-        np.save(data_path + 'weights/' + connName + '_' +  ending, connListSparse)
+        np.save(data_path + 'weights/' + connName + '_' + stdp_input + '_' + ending, connListSparse)
 
 
 def save_theta(ending = ''):
     print 'save theta'
     for pop_name in population_names:
-        np.save(data_path + 'weights/theta_' + pop_name + ending, neuron_groups[pop_name + 'e'].theta)
+        np.save(data_path + 'weights/theta_' + pop_name + '_' + stdp_input + '_' + ending, neuron_groups[pop_name + 'e'].theta)
 
 
 def normalize_weights():
@@ -157,6 +158,22 @@ def get_2d_input_weights():
                 rearranged_weights[i*n_in_sqrt : (i+1)*n_in_sqrt, j*n_in_sqrt : (j+1)*n_in_sqrt] = \
                     weight_matrix[:, i + j*n_e_sqrt].reshape((n_in_sqrt, n_in_sqrt))
     return rearranged_weights
+
+
+def plot_input():
+	fig = b.figure(fig_num, figsize = (5, 5))
+	im3 = b.imshow(rates.reshape((28, 28)), interpolation = 'nearest', vmin=0, vmax=64, cmap=cmap.get_cmap('gray'))
+	b.colorbar(im3)
+	b.title('Current input example')
+	fig.canvas.draw()
+	return im3, fig
+
+
+def update_input(im3, fig):
+	im3.set_array(rates.reshape((28, 28)))
+	b.title('Current input example')
+	fig.canvas.draw()
+	return im3
 
 
 def plot_2d_input_weights():
@@ -268,7 +285,7 @@ b.set_global_preferences(
                         usecodegenthreshold = False,  # Whether or not to use experimental code generation support on thresholds.
                         usenewpropagate = True,  # Whether or not to use experimental new C propagation functions.
                         usecstdp = True,  # Whether or not to use experimental new C STDP.
-                        openmp = True, # whether or not to use OpenMP pragmas in generated C code.
+                        openmp = False, # whether or not to use OpenMP pragmas in generated C code.
                         magic_useframes = True, # defines whether or not the magic functions should serach for objects defined only in the calling frame,
                                                 # or if they should find all objects defined in any frame. Set to "True" if not in an interactive shell.
                         useweave_linear_diffeq = True, # Whether to use weave C++ acceleration for the solution of linear differential equations.
@@ -440,6 +457,7 @@ else:
 	post_pre = False
 
 if stdp_input in [ 'standard', '' ]:
+	stdp_input = 'standard'
 	if post_pre:
 		eqs_stdp_ee = '''
 		            dpre / dt = -pre / tc_pre_ee : 1.0
@@ -597,6 +615,11 @@ if not test_mode:
     input_weight_monitor, fig_weights = plot_2d_input_weights()
     fig_num += 1
 
+# plot input intensities
+rates = np.zeros((int(np.sqrt(n_input)), int(np.sqrt(n_input))))
+input_image_monitor, input_image = plot_input()
+fig_num += 1
+
 # plot performance
 if do_plot_performance:
     performance_monitor, performance, fig_num, fig_performance = plot_performance(fig_num)
@@ -605,9 +628,9 @@ if do_plot_performance:
 for name in input_population_names:
     input_groups[name + 'e'].rate = 0
 
-# initialize network and set current example to zero
-b.run(0)
+# initialize network
 j = 0
+b.run(0)
 
 while j < (int(num_examples)):
 
@@ -622,8 +645,12 @@ while j < (int(num_examples)):
         normalize_weights()
         # get the firing rates of the next input example
         rates = training['x'][j % 60000, :, :].reshape((n_input)) / 8. * input_intensity
-        # smooth the rates by averaging over neighbors in lattice
-        smooth_rates()
+    
+    # smooth the rates by averaging over neighbors in lattice
+    smooth_rates()
+    
+    # plot the input at this step
+    input_image_monitor = update_input(input_image_monitor, input_image)
     
     # sets the input firing rates
     input_groups['Xe'].rate = rates
@@ -720,6 +747,7 @@ if rate_monitors:
         b.subplot(len(rate_monitors), 1, i + 1)
         b.plot(rate_monitors[name].times/b.second, rate_monitors[name].rate, '.')
         b.title('Rates of population ' + name)
+    b.savefig('../plots/rate_monitors_' + str(n_e) + '_' + stdp_input + '.png')
     
 if spike_monitors:
     b.figure(fig_num)
@@ -728,6 +756,7 @@ if spike_monitors:
         b.subplot(len(spike_monitors), 1, i + 1)
         b.raster_plot(spike_monitors[name])
         b.title('Spikes of population ' + name)
+    b.savefig('../plots/spike_monitors_' + str(n_e) + '_' + stdp_input + '.png')
         
 if spike_counters:
     b.figure(fig_num)
@@ -736,10 +765,17 @@ if spike_counters:
         b.subplot(len(spike_counters), 1, i + 1)
         b.plot(spike_counters['Ae'].count[:])
         b.title('Spike count of population ' + name)
+    b.savefig('../plots/rate_monitors_' + str(n_e) + '_' + stdp_input + '.png')
 
 plot_2d_input_weights()
+
+b.savefig('../plots/input_to_exc_weights' + str(n_e) + '_' + stdp_input + '.png')
+
 b.ioff()
 b.show()
+
+# save the model
+p.dump()
 
 
 
