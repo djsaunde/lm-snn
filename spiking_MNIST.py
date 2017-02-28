@@ -178,10 +178,10 @@ def update_2d_input_weights(im, fig):
 
 
 def get_current_performance(performance, current_example_num):
-	'''
-	Evaluate the performance of the network on the past 'update_interval' training
-	examples.
-	'''
+    '''
+    Evaluate the performance of the network on the past 'update_interval' training
+    examples.
+    '''
     current_evaluation = int(current_example_num / update_interval)
     start_num = current_example_num - update_interval
     end_num = current_example_num
@@ -192,9 +192,9 @@ def get_current_performance(performance, current_example_num):
 
 
 def plot_performance(fig_num):
-	'''
-	Set up the performance plot for the beginning of the simulation.
-	'''
+    '''
+    Set up the performance plot for the beginning of the simulation.
+    '''
     num_evaluations = int(num_examples / update_interval)
     time_steps = range(0, num_evaluations)
     performance = np.zeros(num_evaluations)
@@ -209,9 +209,9 @@ def plot_performance(fig_num):
 
 
 def update_performance_plot(im, performance, current_example_num, fig):
-	'''
-	Update the plot of the performance based on results thus far.
-	'''
+    '''
+    Update the plot of the performance based on results thus far.
+    '''
     performance = get_current_performance(performance, current_example_num)
     im.set_ydata(performance)
     fig.canvas.draw()
@@ -219,10 +219,10 @@ def update_performance_plot(im, performance, current_example_num, fig):
     
 
 def get_recognized_number_ranking(assignments, spike_rates):
-	'''
-	Given the label assignments of the excitatory layer and their spike rates over
-	the past 'update_interval', get the ranking of each of the categories of input.
-	'''
+    '''
+    Given the label assignments of the excitatory layer and their spike rates over
+    the past 'update_interval', get the ranking of each of the categories of input.
+    '''
     summed_rates = [0] * 10
     num_assignments = [0] * 10
     for i in xrange(10):
@@ -233,10 +233,10 @@ def get_recognized_number_ranking(assignments, spike_rates):
 
 
 def get_new_assignments(result_monitor, input_numbers):
-	'''
-	Based on the results from the previous 'update_interval', assign labels to the
-	excitatory neurons.
-	'''
+    '''
+    Based on the results from the previous 'update_interval', assign labels to the
+    excitatory neurons.
+    '''
     assignments = np.zeros(n_e)
     input_nums = np.asarray(input_numbers)
     maximum_rate = [0] * n_e    
@@ -250,7 +250,7 @@ def get_new_assignments(result_monitor, input_numbers):
                     assignments[i] = j
     return assignments
 
-    
+
 ##############
 # LOAD MNIST #
 ##############
