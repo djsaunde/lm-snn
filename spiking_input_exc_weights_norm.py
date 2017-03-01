@@ -360,7 +360,7 @@ else:
     save_connections_interval = 500
     update_interval = 10000
 
-weight_smoothing_interval = 20
+weight_smoothing_interval = 25
 
 
 # rest potential parameters, reset potential parameters, threshold potential parameters, and refractory periods
@@ -710,7 +710,7 @@ if rate_monitors:
         b.subplot(len(rate_monitors), 1, i + 1)
         b.plot(rate_monitors[name].times/b.second, rate_monitors[name].rate, '.')
         b.title('Rates of population ' + name)
-    b.savefig('../plots/rate_monitors_' + str(n_e) + '_' + stdp_input + '_input_exc_weights_norm.png')
+    b.savefig('plots/rate_monitors_' + str(n_e) + '_' + stdp_input + '_input_exc_weights_norm.png')
     
 if spike_monitors:
     b.figure(fig_num)
@@ -719,7 +719,7 @@ if spike_monitors:
         b.subplot(len(spike_monitors), 1, i + 1)
         b.raster_plot(spike_monitors[name])
         b.title('Spikes of population ' + name)
-    b.savefig('../plots/spike_monitors_' + str(n_e) + '_' + stdp_input + '_input_exc_weights_norm.png')
+    b.savefig('plots/spike_monitors_' + str(n_e) + '_' + stdp_input + '_input_exc_weights_norm.png')
         
 if spike_counters:
     b.figure(fig_num)
@@ -728,11 +728,11 @@ if spike_counters:
         b.subplot(len(spike_counters), 1, i + 1)
         b.plot(spike_counters['Ae'].count[:])
         b.title('Spike count of population ' + name)
-    b.savefig('../plots/rate_monitors_' + str(n_e) + '_' + stdp_input + '_input_exc_weights_norm.png')
+    b.savefig('plots/rate_monitors_' + str(n_e) + '_' + stdp_input + '_input_exc_weights_norm.png')
 
 plot_2d_input_weights()
 
-b.savefig('../plots/input_to_exc_weights' + str(n_e) + '_' + stdp_input + '_input_exc_weights_norm.png')
+b.savefig('plots/input_to_exc_weights' + str(n_e) + '_' + stdp_input + '_input_exc_weights_norm.png')
 
 b.ioff()
 b.show()
