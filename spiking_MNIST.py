@@ -15,6 +15,7 @@ import cPickle as pickle
 import brian_no_units
 import brian as b
 import cPickle as p
+import sys
 from struct import unpack
 from brian import *
 
@@ -34,11 +35,11 @@ def get_labeled_data(picklename, bTrain = True):
     else:
         # Open the images with gzip in read binary mode
         if bTrain:
-            images = open(MNIST_data_path + 'train-images-idx3-ubyte','rb')
-            labels = open(MNIST_data_path + 'train-labels-idx1-ubyte','rb')
+            images = open(MNIST_data_path + 'train-images-idx3-ubyte', 'rb')
+            labels = open(MNIST_data_path + 'train-labels-idx1-ubyte', 'rb')
         else:
-            images = open(MNIST_data_path + 't10k-images-idx3-ubyte','rb')
-            labels = open(MNIST_data_path + 't10k-labels-idx1-ubyte','rb')
+            images = open(MNIST_data_path + 't10k-images-idx3-ubyte', 'rb')
+            labels = open(MNIST_data_path + 't10k-labels-idx1-ubyte', 'rb')
         
         # Get metadata for images
         images.read(4)  # skip the magic_number
@@ -461,18 +462,11 @@ neuron_eqs_i = '''
 # determine STDP rule to use
 stdp_input = ''
 
-if raw_input('Use classic STDP (default yes)?: ') in [ 'yes', '' ]:
-	use_classic_STDP = True
-	stdp_input += 'classic_'
-else:
-	use_classic_STDP = False
-	stdp_input += 'notclassic_'
-
-if raw_input('Use weight dependence (default yes)?: ') in [ 'yes', '' ]:
-	use_weight_dependence = True
+if raw_input('Use weight dependence (default no)?: ') in [ 'no', '' ]:
+	use_weight_dependence = False
 	stdp_input += 'weight_dependence_'
 else:
-	use_weight_dependence = False
+	use_weight_dependence = True
 	stdp_input += 'no_weight_dependence_'
 
 if raw_input('Enter (yes / no) for post-pre (default yes): ') in [ 'yes', '' ]:
@@ -482,59 +476,30 @@ else:
 	post_pre = False
 	stdp_input += 'no_postpre'
 
-if use_classic_STDP:
-    eqs_stdp_ee = '''
-                post2before                            : 1.0
-                dpre/dt   =   -pre/(tc_pre_ee)         : 1.0
-                dpost1/dt  = -post1/(tc_post_1_ee)     : 1.0
-                dpost2/dt  = -post1/(tc_post_2_ee)     : 1.0
-                '''
-    
-    if use_weight_dependence:
-    	
-    	if post_pre:
-		    eqs_stdp_pre_ee = 'pre = 1.; w -= nu_ee_pre * post1 * w**exp_ee_pre'
-		    eqs_stdp_post_ee = 'post2before = post2; w += nu_ee_post * pre * post2before * (wmax_ee - w)**exp_ee_post; post1 = 1.; post2 = 1.'      
-    	
-    	else:
-            eqs_stdp_pre_ee = 'pre = 1.'
-            eqs_stdp_post_ee = 'post2before = post2; w += nu_ee_post * pre * post2before * (wmax_ee - w)**exp_ee_post; post1 = 1.; post2 = 1.'
+# STDP synaptic traces
+eqs_stdp_ee = '''
+            dpre/dt = -pre / tc_pre_ee : 1.0
+            dpost/dt = -post / tc_post_1_ee : 1.0
+            '''
+
+# setting STDP update rule
+if use_weight_dependence:
+    if post_pre:
+        eqs_stdp_pre_ee = 'pre = 1.; w -= nu_ee_pre * post * w ** exp_ee_pre'
+        eqs_stdp_post_ee = 'w += nu_ee_post * pre * (wmax_ee - w) ** exp_ee_post; post = 1.'      
     
     else:
-        
-        if post_pre:
-            eqs_stdp_pre_ee = 'pre = 1.; w -= nu_ee_pre * post1'
-            eqs_stdp_post_ee = 'post2before = post2; w += nu_ee_post * pre * post2before; post1 = 1.; post2 = 1.'
-		    
-        else:
-            eqs_stdp_pre_ee = 'pre = 1.'
-            eqs_stdp_post_ee = 'post2before = post2; w += nu_ee_post * pre * post2before; post1 = 1.; post2 = 1.'
-    
+        eqs_stdp_pre_ee = 'pre = 1.'
+        eqs_stdp_post_ee = 'w += nu_ee_post * pre * (wmax_ee - w) ** exp_ee_post; post = 1.'
+
 else:
-    eqs_stdp_ee = '''
-                post2before                          : 1.0
-                dpre/dt   =   -pre/(tc_pre_ee)       : 1.0
-                dpost1/dt = -post1/(tc_post_1_ee)     : 1.0
-                dpost2/dt = -post2/(tc_post_2_ee)     : 1.0
-                '''
-    
-    if use_weight_dependence:
-    
-        if post_pre:
-            eqs_stdp_pre_ee = 'pre = 1.; w -= nu_ee_pre * post1 * w**exp_ee_pre'
-            eqs_stdp_post_ee = 'post2before = post2; w += nu_ee_post * pre * post2 * (wmax_ee - w)**exp_ee_post; post1 = 1.; post2 = 1.'
-		    
-        else:
-            eqs_stdp_pre_ee = 'pre = 1.'
-            eqs_stdp_post_ee = 'post2before = post2; w += nu_ee_post * pre * post2 * (wmax_ee - w)**exp_ee_post; post1 = 1.; post2 = 1.'
+    if post_pre:
+        eqs_stdp_pre_ee = 'pre = 1.; w -= nu_ee_pre * post'
+        eqs_stdp_post_ee = 'w += nu_ee_post * pre; post = 1.'
+        
     else:
-    
-        if post_pre:
-            eqs_stdp_pre_ee = 'pre = 1.; w -= nu_ee_pre * post1'
-            eqs_stdp_post_ee = 'post2before = post2; w += nu_ee_post * pre * post2; post1 = 1.; post2 = 1.'
-        else:
-            eqs_stdp_pre_ee = 'pre = 1.'
-            eqs_stdp_post_ee = 'post2before = post2; w += nu_ee_post * pre * post2; post1 = 1.; post2 = 1.'
+        eqs_stdp_pre_ee = 'pre = 1.'
+        eqs_stdp_post_ee = 'w += nu_ee_post * pre; post = 1.'
 
 
 b.ion()
