@@ -90,13 +90,13 @@ def save_connections(ending = ''):
     for connName in save_conns:
         connMatrix = connections[connName][:]
         connListSparse = ([(i,j,connMatrix[i,j]) for i in xrange(connMatrix.shape[0]) for j in xrange(connMatrix.shape[1]) ])
-        np.save(data_path + 'weights/' + connName + '_' + stdp_input + '_' + ending, connListSparse)
+        np.save(data_path + 'weights/' + connName + '_' + stdp_input + '_' + ending + '_firing_rate_norm', connListSparse)
 
 
 def save_theta(ending = ''):
     print 'save theta'
     for pop_name in population_names:
-        np.save(data_path + 'weights/theta_' + pop_name + '_' + stdp_input + '_' + ending, neuron_groups[pop_name + 'e'].theta)
+        np.save(data_path + 'weights/theta_' + pop_name + '_' + stdp_input + '_' + ending + '_firing_rate_norm', neuron_groups[pop_name + 'e'].theta)
 
 
 def normalize_weights():
@@ -449,67 +449,47 @@ neuron_eqs_i = '''
         dgi/dt = -gi/(2.0*ms)                                  : 1
         '''
 
-stdp_input = raw_input('Enter STDP learning rule to use (standard / hebbian / exp_weight_depend) (default standard): ')
+# determine STDP rule to use
+stdp_input = ''
+
+if raw_input('Use weight dependence (default no)?: ') in [ 'no', '' ]:
+	use_weight_dependence = False
+	stdp_input += 'weight_dependence_'
+else:
+	use_weight_dependence = True
+	stdp_input += 'no_weight_dependence_'
 
 if raw_input('Enter (yes / no) for post-pre (default yes): ') in [ 'yes', '' ]:
 	post_pre = True
+	stdp_input += 'postpre'
 else:
 	post_pre = False
+	stdp_input += 'no_postpre'
 
-if stdp_input in [ 'standard', '' ]:
-	stdp_input = 'standard'
-	if post_pre:
-		eqs_stdp_ee = '''
-		            dpre / dt = -pre / tc_pre_ee : 1.0
-		            dpost / dt = -post / tc_post_ee : 1.0
-		        '''
-		
-		eqs_stdp_pre_ee = 'pre = 1.0; w -= nu_ee_pre * post'
-		eqs_stdp_post_ee = 'post = 1.0; w += nu_ee_post * pre'
-	else:
-		eqs_stdp_ee = '''
-		            dpre / dt = -pre / tc_pre_ee : 1.0
-		        '''
-		
-		eqs_stdp_pre_ee = 'pre = 1.0'
-		eqs_stdp_post_ee = 'w += nu_ee_post * pre'
+# STDP synaptic traces
+eqs_stdp_ee = '''
+            dpre/dt = -pre / tc_pre_ee : 1.0
+            dpost/dt = -post / tc_post_1_ee : 1.0
+            '''
 
-elif stdp_input == 'hebbian':
-	if post_pre:
-		eqs_stdp_ee = '''
-                dpre / dt = -pre / tc_pre_ee : 1.0
-                dpost / dt = -post / tc_post_ee : 1.0
-            '''
+# setting STDP update rule
+if use_weight_dependence:
+    if post_pre:
+        eqs_stdp_pre_ee = 'pre = 1.; w -= nu_ee_pre * post * w ** exp_ee_pre'
+        eqs_stdp_post_ee = 'w += nu_ee_post * pre * (wmax_ee - w) ** exp_ee_post; post = 1.'      
     
-		eqs_stdp_pre_ee = 'pre = 1.0; w += nu_ee_pre * post'
-		eqs_stdp_post_ee = 'post = 1.0; w += nu_ee_post * pre'
-	else:
-		eqs_stdp_ee = '''
-                dpre / dt = -pre / tc_pre_ee : 1.0
-            '''
-    
-		eqs_stdp_pre_ee = 'pre = 1.0'
-		eqs_stdp_post_ee = 'w += nu_ee_post * pre'
-		
-elif stdp_input == 'exp_weight_depend':
-	if post_pre:
-		eqs_stdp_ee = '''
-                dpre/dt = -pre/tc_pre_ee : 1.0
-                dpost/dt = -post/tc_post_ee : 1.0
-            '''
-    
-		eqs_stdp_pre_ee = 'pre = 1.0; w -= (nu_ee_pre * post) * ((wmax_ee - w) ** w_mu_pre)'
-		eqs_stdp_post_ee = 'post = 1.0; w += (nu_ee_post * pre) * ((wmax_ee - w) ** w_mu_post)'
-	else:
-		eqs_stdp_ee = '''
-                dpre/dt = -pre/tc_pre_ee : 1.0
-            '''
-    
-		eqs_stdp_pre_ee = 'pre = 1.0'
-		eqs_stdp_post_ee = 'w += (nu_ee_post * pre) * ((wmax_ee - w) ** w_mu_post)'
+    else:
+        eqs_stdp_pre_ee = 'pre = 1.'
+        eqs_stdp_post_ee = 'w += nu_ee_post * pre * (wmax_ee - w) ** exp_ee_post; post = 1.'
 
 else:
-    raise NotImplementedError
+    if post_pre:
+        eqs_stdp_pre_ee = 'pre = 1.; w -= nu_ee_pre * post'
+        eqs_stdp_post_ee = 'w += nu_ee_post * pre; post = 1.'
+        
+    else:
+        eqs_stdp_pre_ee = 'pre = 1.'
+        eqs_stdp_post_ee = 'w += nu_ee_post * pre; post = 1.'
 
 b.ion()
 fig_num = 1
@@ -548,7 +528,7 @@ for name in population_names:
     print 'create recurrent connections'
     for conn_type in recurrent_conn_names:
         connName = name + conn_type[0] + name + conn_type[1] + ending
-        weightMatrix = get_matrix_from_file(weight_path + '../random/' + connName + '.npy')
+        weightMatrix = get_matrix_from_file(weight_path + connName + '.npy')
         connections[connName] = b.Connection(neuron_groups[connName[0:2]], neuron_groups[connName[2:4]], structure= conn_structure, 
                                                     state = 'g'+conn_type[0])
         connections[connName].connect(neuron_groups[connName[0:2]], neuron_groups[connName[2:4]], weightMatrix)
@@ -747,7 +727,7 @@ if rate_monitors:
         b.subplot(len(rate_monitors), 1, i + 1)
         b.plot(rate_monitors[name].times/b.second, rate_monitors[name].rate, '.')
         b.title('Rates of population ' + name)
-    b.savefig('../plots/rate_monitors_' + str(n_e) + '_' + stdp_input + '_smoothed_firing_rates.png')
+    b.savefig('../plots/rate_monitors_' + str(n_e) + '_' + stdp_input + '_firing_rate_norm.png')
     
 if spike_monitors:
     b.figure(fig_num)
@@ -756,7 +736,7 @@ if spike_monitors:
         b.subplot(len(spike_monitors), 1, i + 1)
         b.raster_plot(spike_monitors[name])
         b.title('Spikes of population ' + name)
-    b.savefig('../plots/spike_monitors_' + str(n_e) + '_' + stdp_input + '_smoothed_firing_rates.png')
+    b.savefig('../plots/spike_monitors_' + str(n_e) + '_' + stdp_input + '_firing_rate_norm.png')
         
 if spike_counters:
     b.figure(fig_num)
@@ -765,11 +745,11 @@ if spike_counters:
         b.subplot(len(spike_counters), 1, i + 1)
         b.plot(spike_counters['Ae'].count[:])
         b.title('Spike count of population ' + name)
-    b.savefig('../plots/rate_monitors_' + str(n_e) + '_' + stdp_input + '_smoothed_firing_rates.png')
+    b.savefig('../plots/rate_monitors_' + str(n_e) + '_' + stdp_input + '_firing_rate_norm.png')
 
 plot_2d_input_weights()
 
-b.savefig('../plots/input_to_exc_weights' + str(n_e) + '_' + stdp_input + '_smoothed_firing_rates.png')
+b.savefig('../plots/input_to_exc_weights' + str(n_e) + '_' + stdp_input + '_firing_rate_norm.png')
 
 b.ioff()
 b.show()

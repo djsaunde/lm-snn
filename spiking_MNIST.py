@@ -73,11 +73,11 @@ def get_matrix_from_file(fileName):
     if fileName[-offset-4] == 'X':
         n_src = n_input                
     else:
-        if fileName[-offset-3]=='e':
+        if fileName[-offset-3] == 'e':
             n_src = n_e
         else:
             n_src = n_i
-    if fileName[-offset-1]=='e':
+    if fileName[-offset-1] == 'e':
         n_tgt = n_e
     else:
         n_tgt = n_i
