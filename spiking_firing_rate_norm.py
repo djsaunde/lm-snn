@@ -698,7 +698,7 @@ while j < (int(num_examples)):
             input_numbers[j] = training['y'][j % 60000][0]
         
         # get the output classifications of the network
-        outputNumbers[j,:] = get_recognized_number_ranking(assignments, result_monitor[j%update_interval,:])
+        outputNumbers[j,:] = get_recognized_number_ranking(assignments, result_monitor[j % update_interval, :])
         
         # print progress
         if j % 100 == 0 and j > 0:
@@ -747,7 +747,7 @@ if rate_monitors:
         b.subplot(len(rate_monitors), 1, i + 1)
         b.plot(rate_monitors[name].times/b.second, rate_monitors[name].rate, '.')
         b.title('Rates of population ' + name)
-    b.savefig('../plots/rate_monitors_' + str(n_e) + '_' + stdp_input + '.png')
+    b.savefig('../plots/rate_monitors_' + str(n_e) + '_' + stdp_input + '_smoothed_firing_rates.png')
     
 if spike_monitors:
     b.figure(fig_num)
@@ -756,7 +756,7 @@ if spike_monitors:
         b.subplot(len(spike_monitors), 1, i + 1)
         b.raster_plot(spike_monitors[name])
         b.title('Spikes of population ' + name)
-    b.savefig('../plots/spike_monitors_' + str(n_e) + '_' + stdp_input + '.png')
+    b.savefig('../plots/spike_monitors_' + str(n_e) + '_' + stdp_input + '_smoothed_firing_rates.png')
         
 if spike_counters:
     b.figure(fig_num)
@@ -765,17 +765,13 @@ if spike_counters:
         b.subplot(len(spike_counters), 1, i + 1)
         b.plot(spike_counters['Ae'].count[:])
         b.title('Spike count of population ' + name)
-    b.savefig('../plots/rate_monitors_' + str(n_e) + '_' + stdp_input + '.png')
+    b.savefig('../plots/rate_monitors_' + str(n_e) + '_' + stdp_input + '_smoothed_firing_rates.png')
 
 plot_2d_input_weights()
 
-b.savefig('../plots/input_to_exc_weights' + str(n_e) + '_' + stdp_input + '.png')
+b.savefig('../plots/input_to_exc_weights' + str(n_e) + '_' + stdp_input + '_smoothed_firing_rates.png')
 
 b.ioff()
 b.show()
-
-# save the model
-p.dump()
-
 
 
