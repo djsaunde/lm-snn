@@ -91,7 +91,7 @@ end_time_testing = int(testing_ending)
 
 n_e = 400
 n_input = 784
-ending = ''
+ending = raw_input('Enter filename ending (after resultPopVecs/): ')
 
 print 'load MNIST'
 training = get_labeled_data(MNIST_data_path + 'training')
@@ -99,9 +99,9 @@ testing = get_labeled_data(MNIST_data_path + 'testing', bTrain = False)
 
 print 'load results'
 training_result_monitor = np.load(data_path + 'resultPopVecs' + training_ending + ending + '.npy')
-training_input_numbers = np.load(data_path + 'inputNumbers' + training_ending + '.npy')
-testing_result_monitor = np.load(data_path + 'resultPopVecs' + testing_ending + '.npy')
-testing_input_numbers = np.load(data_path + 'inputNumbers' + testing_ending + '.npy')
+training_input_numbers = np.load(data_path + 'inputNumbers' + training_ending + ending + '.npy')
+testing_result_monitor = np.load(data_path + 'resultPopVecs' + testing_ending + ending + '.npy')
+testing_input_numbers = np.load(data_path + 'inputNumbers' + testing_ending + ending + '.npy')
 print training_result_monitor.shape
 
 print 'get assignments'

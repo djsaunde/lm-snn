@@ -69,23 +69,26 @@ def get_labeled_data(picklename, bTrain = True):
 
 
 def get_matrix_from_file(fileName):
-    offset = len(str(n_e)) + 4
-    if fileName[-offset-4] == 'X':
+    offset = len(weight_path)
+    if fileName[offset] == 'X':
         n_src = n_input                
     else:
-        if fileName[-offset-3] == 'e':
+        if fileName[offset + 1] == 'e':
             n_src = n_e
         else:
             n_src = n_i
-    if fileName[-offset-1] == 'e':
+    if fileName[offset + 3] == 'e':
         n_tgt = n_e
     else:
         n_tgt = n_i
+    
     readout = np.load(fileName)
     value_arr = np.zeros((n_src, n_tgt))
+    
     if not readout.shape == (0,):
-        print readout.shape
+        print readout.shape, value_arr.shape
         value_arr[np.int32(readout[:,0]), np.int32(readout[:,1])] = readout[:,2]
+    
     return value_arr
 
 
@@ -328,7 +331,7 @@ else:
 	classes = set([ int(token) for token in classes_input.split(',') ])
 
 # reduce size of dataset if necessary
-if not test_mode and classes_input != 0:
+if not test_mode and classes_input != '':
 	new_training = {'x' : [], 'y' : [], 'rows' : training['rows'], 'cols' : training['cols']}
 	for idx in xrange(len(training['x'])):
 		if training['y'][idx][0] in classes:
@@ -337,7 +340,7 @@ if not test_mode and classes_input != 0:
 	new_training['x'], new_training['y'] = np.asarray(new_training['x']), np.asarray(new_training['y'])
 	training = new_training
 	
-elif test_mode and clases_input != 0:
+elif test_mode and classes_input != '':
 	new_testing = {'x' : [], 'y' : [], 'rows' : testing['rows'], 'cols' : testing['cols']}
 	for idx in xrange(len(testing['x'])):
 		if testing['y'][idx][0] in classes:
@@ -529,10 +532,10 @@ for name in population_names:
     neuron_groups[name + 'e'] = neuron_groups['e'].subgroup(n_e)
     neuron_groups[name + 'i'] = neuron_groups['i'].subgroup(n_i)
     
-    neuron_groups[name+'e'].v = v_rest_e - 40. * b.mV
-    neuron_groups[name+'i'].v = v_rest_i - 40. * b.mV
+    neuron_groups[name + 'e'].v = v_rest_e - 40. * b.mV
+    neuron_groups[name + 'i'].v = v_rest_i - 40. * b.mV
     if test_mode or weight_path[-8:] == 'weights/':
-        neuron_groups['e'].theta = np.load(weight_path + 'theta_A' + '.npy')
+        neuron_groups['e'].theta = np.load(weight_path + 'theta_A_' + stdp_input + '_54000.npy')
     else:
         neuron_groups['e'].theta = np.ones((n_e)) * 20.0*b.mV
     
@@ -574,15 +577,23 @@ if record_spikes:
 pop_values = [0,0,0]
 for i,name in enumerate(input_population_names):
     input_groups[name+'e'] = b.PoissonGroup(n_input, 0)
-    rate_monitors[name+'e'] = b.PopulationRateMonitor(input_groups[name+'e'], bin = (single_example_time+resting_time)/b.second)
+    rate_monitors[name+'e'] = b.PopulationRateMonitor(input_groups[name+'e'], bin = (single_example_time + resting_time) / b.second)
 
 for name in input_connection_names:
     print 'create connections between', name[0], 'and', name[1]
     for connType in input_conn_names:
         connName = name[0] + connType[0] + name[1] + connType[1] + ending
-        weightMatrix = get_matrix_from_file(weight_path + connName + '.npy')
+        
+        if test_mode:
+            if stdp_input == 'no_weight_dependence_postpre':
+                weightMatrix = get_matrix_from_file(weight_path + connName + '_' + stdp_input + '_54000.npy')
+            else:
+                weightMatrix = get_matrix_from_file(weight_path + connName + '_' + stdp_input + '_.npy')
+        else:
+            weightMatrix = get_matrix_from_file(weight_path + connName + '.npy')
+        
         connections[connName] = b.Connection(input_groups[connName[0:2]], neuron_groups[connName[2:4]], structure= conn_structure, 
-                                                    state = 'g'+connType[0], delay=True, max_delay=delay[connType][1])
+                                                    state = 'g' + connType[0], delay=True, max_delay=delay[connType][1])
         connections[connName].connect(input_groups[connName[0:2]], neuron_groups[connName[2:4]], weightMatrix, delay=delay[connType])
      
     if ee_STDP_on:
@@ -721,9 +732,8 @@ if not test_mode:
 if not test_mode:
     save_connections()
 else:
-    np.save(data_path + 'activity/resultPopVecs' + str(num_examples), result_monitor)
-    np.save(data_path + 'activity/inputNumbers' + str(num_examples), input_numbers)
-    
+    np.save(data_path + 'activity/resultPopVecs' + str(num_examples) + '_' + stdp_input, result_monitor)
+    np.save(data_path + 'activity/inputNumbers' + str(num_examples) + '_' + stdp_input, input_numbers)
 
 #------------------------------------------------------------------------------ 
 # plot results
