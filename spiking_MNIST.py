@@ -68,35 +68,60 @@ def get_labeled_data(picklename, bTrain = True):
     return data
 
 
-def get_matrix_from_file(fileName):
+def get_matrix_from_file(file_name):
+	'''
+	Given the name of a file pointing to a .npy ndarray object, load it into
+	'weight_matrix' and return it
+	'''
+	
     offset = len(weight_path)
-    if fileName[offset] == 'X':
-        n_src = n_input                
+    
+    # connection comes from input
+    if file_name[offset] == 'X':
+        n_src = n_input      
     else:
-        if fileName[offset + 1] == 'e':
+        # connection comes from excitatory layer
+        if file_name[offset + 1] == 'e':
             n_src = n_e
+        # connection comes from inhibitory layer
         else:
             n_src = n_i
-    if fileName[offset + 3] == 'e':
+    
+    # connection goes to excitatory layer
+    if file_name[offset + 3] == 'e':
         n_tgt = n_e
+    # connection goes to inhibitory layer
     else:
         n_tgt = n_i
     
-    readout = np.load(fileName)
-    value_arr = np.zeros((n_src, n_tgt))
+    # load the stored ndarray into 'readout', instantiate 'weight_matrix' as 
+    # correctly-shaped zeros matrix
+    readout = np.load(file_name)
+    weight_matrix = np.zeros((n_src, n_tgt))
     
-    if not readout.shape == (0,):
-        print readout.shape, value_arr.shape
-        value_arr[np.int32(readout[:,0]), np.int32(readout[:,1])] = readout[:,2]
+    # read the 'readout' ndarray values into weight_matrix by (row, column) indices
+    weight_matrix[np.int32(readout[:,0]), np.int32(readout[:,1])] = readout[:,2]
     
-    return value_arr
+    # return the weight matrix read from file
+    return weight_matrix
 
 
 def save_connections(ending = ''):
-    print 'save connections'
+	'''
+	Save all connections in 'save_conns'; ending may be set to the index of the last
+	example run through the network
+	'''
+	
+	# print out saved connections
+    print '...saving connections: ' + ', '.join(save_conns)
+    
+    # iterate over all connections to save
     for connName in save_conns:
+        # get the connection matrix for this connection
         connMatrix = connections[connName][:]
+        # sparsify it into (row, column, entry) tuples
         connListSparse = ([(i,j,connMatrix[i,j]) for i in xrange(connMatrix.shape[0]) for j in xrange(connMatrix.shape[1]) ])
+        # save it out to disk
         np.save(data_path + 'weights/' + connName + '_' + stdp_input + '_' + ending, connListSparse)
 
 
