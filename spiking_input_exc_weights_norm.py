@@ -122,10 +122,10 @@ def is_lattice_connection(n, i, j):
     return i + 1 == j and j % sqrt != 0 or i - 1 == j and i % sqrt != 0 or i + sqrt == j or i - sqrt == j
 
 
-def smooth_weights():
+def smooth_random_weights():
 	'''
-	Updates the weights of the input to excitatory layer connections by taking a 
-	weighted average of each cell and its neighbors
+	Updates the weights of the input to a single neuron in the excitatory layer 
+	by taking a weighted average of each cell and its neighbors.
 	'''
 	# get input to excitatory weights
 	input_to_exc_conn = connections['XeAe' + str(n_e)][:]
@@ -133,18 +133,36 @@ def smooth_weights():
 	# copy and reshape it for convenient computation
 	temp_conn = np.copy(input_to_exc_conn).reshape((int(math.sqrt(n_input)), int(math.sqrt(n_input)), n_e))
 	
-	# for each neuron, smooth its weights according to its neighbors' values in the lattice
-	for exc in range(temp_conn.shape[2]):
-		for i in range(temp_conn.shape[0]):
-			for j in range(temp_conn.shape[1]):
-				# get neighboring weights
-				neighbors = []
-				for x, y in zip([i - 1, i + 1, i, i], [j, j, j - 1, j + 1]):
-					if is_lattice_connection(n_input, i * int(math.sqrt(n_input)) + j, x * int(math.sqrt(n_input)) + y):
-						neighbors.append(temp_conn[i, j, exc])
-				input_to_exc_conn[i * temp_conn.shape[0] + j, exc] = 0.5 * temp_conn[i, j, exc] + 0.5 * ( sum(neighbors) / float(len(neighbors)) )
+	# for a randomly chosen neuron, smooth its weights according to its neighbors' values in the lattice
+	exc = np.random.randint(temp_conn.shape[2])
+	
+	for i in range(temp_conn.shape[0]):
+		for j in range(temp_conn.shape[1]):
+			# get neighboring weights
+			neighbors = []
+			for x, y in zip([i - 1, i + 1, i, i], [j, j, j - 1, j + 1]):
+				if is_lattice_connection(n_input, i * int(math.sqrt(n_input)) + j, x * int(math.sqrt(n_input)) + y):
+					neighbors.append(temp_conn[i, j, exc])
+
+			input_to_exc_conn[i * temp_conn.shape[0] + j, exc] = 0.5 * temp_conn[i, j, exc] + 0.5 * ( sum(neighbors) / float(len(neighbors)) )
 
             
+def plot_input():
+	fig = b.figure(fig_num, figsize = (5, 5))
+	im3 = b.imshow(rates.reshape((28, 28)), interpolation = 'nearest', vmin=0, vmax=64, cmap=cmap.get_cmap('gray'))
+	b.colorbar(im3)
+	b.title('Current input example')
+	fig.canvas.draw()
+	return im3, fig
+
+
+def update_input(im3, fig):
+	im3.set_array(rates.reshape((28, 28)))
+	b.title('Current input example')
+	fig.canvas.draw()
+	return im3
+
+
 def get_2d_input_weights():
     name = 'XeAe' + str(n_e)
     weight_matrix = np.zeros((n_input, n_e))
@@ -353,15 +371,6 @@ if num_examples <= 10000:
 else:
     update_interval = 100
     weight_update_interval = 50
-# setting save connections to file parameters
-if num_examples <= 60000:
-    save_connections_interval = 500
-else:
-    save_connections_interval = 500
-    update_interval = 10000
-
-weight_smoothing_interval = 25
-
 
 # rest potential parameters, reset potential parameters, threshold potential parameters, and refractory periods
 v_rest_e = -65. * b.mV 
@@ -586,6 +595,11 @@ if not test_mode:
     input_weight_monitor, fig_weights = plot_2d_input_weights()
     fig_num += 1
 
+# plot input intensities
+rates = np.zeros((int(np.sqrt(n_input)), int(np.sqrt(n_input))))
+input_image_monitor, input_image = plot_input()
+fig_num += 1
+
 # plot performance
 if do_plot_performance:
     performance_monitor, performance, fig_num, fig_performance = plot_performance(fig_num)
@@ -594,9 +608,9 @@ if do_plot_performance:
 for name in input_population_names:
     input_groups[name + 'e'].rate = 0
 
-# initialize network and set current example to zero
-b.run(0)
+# initialize network
 j = 0
+b.run(0)
 
 while j < (int(num_examples)):
 
@@ -610,10 +624,12 @@ while j < (int(num_examples)):
     	# ensure weights don't grow without bound
         normalize_weights()
         # averages weights from neighbors in lattice
-        if j > 0 and j % weight_smoothing_interval == 0:
-        	smooth_weights()
+        smooth_random_weights()
         # get the firing rates of the next input example
         rates = training['x'][j % 60000, :, :].reshape((n_input)) / 8. * input_intensity
+    
+    # plot the input at this step
+    input_image_monitor = update_input(input_image_monitor, input_image)
     
     # sets the input firing rates
     input_groups['Xe'].rate = rates
@@ -628,11 +644,6 @@ while j < (int(num_examples)):
     # update weights every 'weight_update_interval'
     if j % weight_update_interval == 0 and not test_mode:
         update_2d_input_weights(input_weight_monitor, fig_weights)
-    
-    # save the weights to file every 'save_connection_interval'
-    if j % save_connections_interval == 0 and j > 0 and not test_mode:
-        save_connections(str(j))
-        save_theta(str(j))
     
     # get count of spikes over the past iteration
     current_spike_count = np.asarray(spike_counters['Ae'].count[:]) - previous_spike_count
@@ -673,7 +684,7 @@ while j < (int(num_examples)):
                 # updating the performance plot
                 perf_plot, performance = update_performance_plot(performance_monitor, performance, j, fig_performance)
                 # printing out classification performance results so far
-                print 'Classification performance', performance[:(j / float(update_interval)) + 1]
+                print 'Classification performance', performance[: int(j / float(update_interval)) + 1]
                 
         # set input firing rates back to zero
         for name in input_population_names:
@@ -696,8 +707,8 @@ if not test_mode:
 if not test_mode:
     save_connections()
 else:
-    np.save(data_path + 'activity/resultPopVecs' + str(num_examples), result_monitor)
-    np.save(data_path + 'activity/inputNumbers' + str(num_examples), input_numbers)
+    np.save(data_path + 'activity/resultPopVecs' + str(num_examples) + '_' + stdp_input, result_monitor)
+    np.save(data_path + 'activity/inputNumbers' + str(num_examples) + '_' + stdp_input, input_numbers)
     
 
 #------------------------------------------------------------------------------ 

@@ -403,12 +403,6 @@ if num_examples <= 10000:
 else:
     update_interval = 100
     weight_update_interval = 5
-# setting save connections to file parameters
-if num_examples <= 60000:
-    save_connections_interval = 500
-else:
-    save_connections_interval = 500
-    update_interval = 10000
 
 # rest potential parameters, reset potential parameters, threshold potential parameters, and refractory periods
 v_rest_e = -65. * b.mV 
@@ -689,11 +683,6 @@ while j < (int(num_examples)):
     # update weights every 'weight_update_interval'
     if j % weight_update_interval == 0 and not test_mode:
         update_2d_input_weights(input_weight_monitor, fig_weights)
-    
-    # save the weights to file every 'save_connection_interval'
-    if j % save_connections_interval == 0 and j > 0 and not test_mode:
-        save_connections(str(j))
-        save_theta(str(j))
     
     # get count of spikes over the past iteration
     current_spike_count = np.asarray(spike_counters['Ae'].count[:]) - previous_spike_count
