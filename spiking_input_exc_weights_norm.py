@@ -4,7 +4,7 @@ Created on 15.12.2014
 @author: Peter U. Diehl
 '''
 
- 
+
 import numpy as np
 import matplotlib.cm as cmap
 import time
@@ -20,12 +20,12 @@ from brian import *
 # specify the location of the MNIST data
 MNIST_data_path = './'
 
-#------------------------------------------------------------------------------ 
+#------------------------------------------------------------------------------
 # functions
-#------------------------------------------------------------------------------     
+#------------------------------------------------------------------------------
 def get_labeled_data(picklename, bTrain = True):
     '''
-    Read input-vector (image) and target class (label, 0-9) and return it as 
+    Read input-vector (image) and target class (label, 0-9) and return it as
     a list of tuples.
     '''
     if os.path.isfile('%s.pickle' % picklename):
@@ -46,7 +46,7 @@ def get_labeled_data(picklename, bTrain = True):
         # Get metadata for labels
         labels.read(4)  # skip the magic_number
         N = unpack('>I', labels.read(4))[0]
-    
+
         if number_of_images != N:
             raise Exception('number of labels did not match the number of images')
         # Get the data
@@ -57,7 +57,7 @@ def get_labeled_data(picklename, bTrain = True):
                 print("i: %i" % i)
             x[i] = [[unpack('>B', images.read(1))[0] for unused_col in xrange(cols)]  for unused_row in xrange(rows) ]
             y[i] = unpack('>B', labels.read(1))[0]
-            
+
         data = {'x': x, 'y': y, 'rows': rows, 'cols': cols}
         pickle.dump(data, open("%s.pickle" % picklename, "wb"))
     return data
@@ -66,7 +66,7 @@ def get_labeled_data(picklename, bTrain = True):
 def get_matrix_from_file(fileName):
     offset = len(str(n_e)) + 4
     if fileName[-offset-4] == 'X':
-        n_src = n_input                
+        n_src = n_input
     else:
         if fileName[-offset-3]=='e':
             n_src = n_e
@@ -118,8 +118,21 @@ def is_lattice_connection(n, i, j):
         i: First neuron's index
         k: Second neuron's index
     '''
-    sqrt = int(math.sqrt(n))
-    return i + 1 == j and j % sqrt != 0 or i - 1 == j and i % sqrt != 0 or i + sqrt == j or i - sqrt == j
+    
+    return i + 1 == j and j % input_sqrt != 0 or i - 1 == j and i % input_sqrt != 0 or i + input_sqrt == j or i - input_sqrt == j and not i < 0 and not j < 0 and not i >= input_sqrt and not j >= input_sqrt
+
+
+def get_average_matrix(weights, exc):
+    '''
+    Subroutine for 'smooth_random_weights'.
+    
+    exc: excitatory neuron whose weights we want to average / smooth over neighbors
+    in lattice.
+    '''
+    
+    neighbors_matrix = [ [ weights[x * input_sqrt + y] for (x, y) in lattice_connections[(i, j)] ] for i in xrange(input_sqrt) for j in xrange(input_sqrt) ]
+    
+    return np.array( [ sum(neighbors) / float(len(neighbors)) for neighbors in neighbors_matrix ] )
 
 
 def smooth_random_weights():
@@ -131,20 +144,13 @@ def smooth_random_weights():
 	input_to_exc_conn = connections['XeAe' + str(n_e)][:]
 	
 	# copy and reshape it for convenient computation
-	temp_conn = np.copy(input_to_exc_conn).reshape((int(math.sqrt(n_input)), int(math.sqrt(n_input)), n_e))
+	temp_conn = np.copy(input_to_exc_conn)
 	
 	# for a randomly chosen neuron, smooth its weights according to its neighbors' values in the lattice
-	exc = np.random.randint(temp_conn.shape[2])
+	exc = np.random.randint(temp_conn.shape[1])
 	
-	for i in range(temp_conn.shape[0]):
-		for j in range(temp_conn.shape[1]):
-			# get neighboring weights
-			neighbors = []
-			for x, y in zip([i - 1, i + 1, i, i], [j, j, j - 1, j + 1]):
-				if is_lattice_connection(n_input, i * int(math.sqrt(n_input)) + j, x * int(math.sqrt(n_input)) + y):
-					neighbors.append(temp_conn[i, j, exc])
-
-			input_to_exc_conn[i * temp_conn.shape[0] + j, exc] = 0.5 * temp_conn[i, j, exc] + 0.5 * ( sum(neighbors) / float(len(neighbors)) )
+	# let's vectorize this computation using numpy
+	input_to_exc_conn[:, exc] = np.array(0.5 * temp_conn[:, exc] + 0.5 * get_average_matrix(temp_conn[:, exc], exc))
 
             
 def plot_input():
@@ -168,7 +174,7 @@ def get_2d_input_weights():
     weight_matrix = np.zeros((n_input, n_e))
     n_e_sqrt = int(np.sqrt(n_e))
     n_in_sqrt = int(np.sqrt(n_input))
-    num_values_col = n_e_sqrt*n_in_sqrt
+    num_values_col = n_e_sqrt * n_in_sqrt
     num_values_row = num_values_col
     rearranged_weights = np.zeros((num_values_col, num_values_row))
     connMatrix = connections[name][:]
@@ -310,7 +316,7 @@ if test_mode:
     ee_STDP_on = False
     update_interval = num_examples
 else:
-    weight_path = data_path + 'random/'  
+    weight_path = data_path + 'random/'
     num_examples = 60000 * 1
     use_testing_set = False
     do_plot_performance = True
@@ -320,6 +326,7 @@ else:
 
 # number of inputs to the network
 n_input = 784
+input_sqrt = int(math.sqrt(n_input))
 # number of classes to learn
 classes_input = raw_input('Enter classes to learn as comma-separated list (e.g, 0,1,2,3,...) (default all 10 classes): ')
 if classes_input == '':
@@ -363,6 +370,17 @@ single_example_time = 0.35 * b.second
 resting_time = 0.15 * b.second
 # total runtime (number of examples times (presentation time plus rest period))
 runtime = num_examples * (single_example_time + resting_time)
+
+# set up dictionary of lattice connections for lookup later
+lattice_connections = {}
+lattice_indices = zip((-1, 1, 0, 0), (0, 0, -1, 1))
+
+for i in range(input_sqrt):
+	for j in range(input_sqrt):
+		lattice_connections[(i, j)] = []
+		for x, y in lattice_indices:
+			if is_lattice_connection(n_input, (i + x) * int(input_sqrt) + j, i * int(input_sqrt) + j + y):
+				lattice_connections[(i, j)].append((i + x, j + y))
 
 # set the update interval and weight update interval (for network weights?) 
 if num_examples <= 10000:
@@ -596,7 +614,7 @@ if not test_mode:
     fig_num += 1
 
 # plot input intensities
-rates = np.zeros((int(np.sqrt(n_input)), int(np.sqrt(n_input))))
+rates = np.zeros((input_sqrt, input_sqrt))
 input_image_monitor, input_image = plot_input()
 fig_num += 1
 
