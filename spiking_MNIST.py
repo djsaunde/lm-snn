@@ -22,9 +22,7 @@ from brian import *
 # specify the location of the MNIST data
 MNIST_data_path = './'
 
-#------------------------------------------------------------------------------ 
-# functions
-#------------------------------------------------------------------------------     
+
 def get_labeled_data(picklename, bTrain = True):
     '''
     Read input-vector (image) and target class (label, 0-9) and return it as 
@@ -107,12 +105,12 @@ def get_matrix_from_file(file_name):
 
 
 def save_connections(ending = ''):
-	'''
-	Save all connections in 'save_conns'; ending may be set to the index of the last
-	example run through the network
-	'''
+    '''
+    Save all connections in 'save_conns'; ending may be set to the index of the last
+    example run through the network
+    '''
 	
-	# print out saved connections
+    # print out saved connections
     print '...saving connections: ' + ', '.join(save_conns)
     
     # iterate over all connections to save
@@ -126,18 +124,29 @@ def save_connections(ending = ''):
 
 
 def save_theta(ending = ''):
-    print 'save theta'
+    '''
+    Save the adaptive threshold parameters to a file.
+    '''
+	
+	# print out saved theta populations
+    print '...saving theta:  ' + ', '.join(population_names)
+    
+    # iterate over population for which to save theta parameters
     for pop_name in population_names:
+    	# save out the theta parameters to file
         np.save(data_path + 'weights/theta_' + pop_name + '_' + stdp_input + '_' + ending, neuron_groups[pop_name + 'e'].theta)
 
 
 def normalize_weights():
+    '''
+    Squash the weights to sum to a prespecified number.
+    '''
     for connName in connections:
         if connName[1] == 'e' and connName[3] == 'e':
             connection = connections[connName][:]
             temp_conn = np.copy(connection)
             colSums = np.sum(temp_conn, axis = 0)
-            colFactors = weight['ee_input']/colSums
+            colFactors = weight['ee_input'] / colSums
             for j in xrange(n_e):
                 connection[:,j] *= colFactors[j]
 	
@@ -146,20 +155,25 @@ def is_lattice_connection(n, i, j):
     '''
     Boolean method which checks if two indices in a network correspond to neighboring nodes in a lattice.
     
-    Args:
-        n: number of nodes in lattice
-        i: First neuron's index
-        k: Second neuron's index
+    n: number of nodes in lattice
+    i: First neuron's index
+    k: Second neuron's index
     '''
     sqrt = int(math.sqrt(n))
     return i + 1 == j and j % sqrt != 0 or i - 1 == j and i % sqrt != 0 or i + sqrt == j or i - sqrt == j
 
             
 def get_2d_input_weights():
+    '''
+    Get the weights from the input to excitatory layer and reshape it to be two
+    dimensional and square.
+    '''
     name = 'XeAe' + str(n_e)
     weight_matrix = np.zeros((n_input, n_e))
+    
     n_e_sqrt = int(np.sqrt(n_e))
     n_in_sqrt = int(np.sqrt(n_input))
+    
     num_values_col = n_e_sqrt*n_in_sqrt
     num_values_row = num_values_col
     rearranged_weights = np.zeros((num_values_col, num_values_row))
@@ -170,10 +184,14 @@ def get_2d_input_weights():
         for j in xrange(n_e_sqrt):
                 rearranged_weights[i*n_in_sqrt : (i+1)*n_in_sqrt, j*n_in_sqrt : (j+1)*n_in_sqrt] = \
                     weight_matrix[:, i + j*n_e_sqrt].reshape((n_in_sqrt, n_in_sqrt))
+    
     return rearranged_weights
 
 
 def plot_input():
+    '''
+    Plot the current input example during the training procedure.
+    '''
 	fig = b.figure(fig_num, figsize = (5, 5))
 	im3 = b.imshow(rates.reshape((28, 28)), interpolation = 'nearest', vmin=0, vmax=64, cmap=cmap.get_cmap('gray'))
 	b.colorbar(im3)
@@ -183,6 +201,9 @@ def plot_input():
 
 
 def update_input(im3, fig):
+    '''
+    Update the input image to use for input plotting.
+    '''
 	im3.set_array(rates.reshape((28, 28)))
 	b.title('Current input example')
 	fig.canvas.draw()
@@ -190,6 +211,9 @@ def update_input(im3, fig):
 
 
 def plot_2d_input_weights():
+    '''
+    Plot the weights from input to excitatory layer to view during training.
+    '''
     weights = get_2d_input_weights()
     fig = b.figure(fig_num, figsize = (18, 18))
     im2 = b.imshow(weights, interpolation = "nearest", vmin = 0, vmax = wmax_ee, cmap = cmap.get_cmap('hot_r'))
@@ -200,6 +224,7 @@ def plot_2d_input_weights():
     
 
 def update_2d_input_weights(im, fig):
+    
     weights = get_2d_input_weights()
     im.set_array(weights)
     fig.canvas.draw()
