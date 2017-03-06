@@ -73,7 +73,7 @@ def create_weights():
     
     connNameList = [ 'A' + str(i) + 'eA' + str(i) + 'i' for i in xrange(conv_features) ]
     for name in connNameList:
-        weight_list = [(i, i, weight['ei']) for i in xrange(n_e)]
+        weight_list = [(i, 0, weight['ei']) for i in xrange(n_e)]
         
         print '...saving connection matrix:', name + '_' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e)
         
@@ -84,9 +84,9 @@ def create_weights():
     
     connNameList = [ 'A' + str(i) + 'iA' + str(j) + 'e' for i in xrange(conv_features) for j in xrange(conv_features) if i != j ]
     for name in connNameList:
-        weight_matrix = np.ones((n_i, n_e)) * weight['ie']
+        weight_matrix = np.ones((1, n_e)) * weight['ie']
         np.fill_diagonal(weight_matrix, 0)
-        weight_list = [(i, j, weight_matrix[i,j]) for i in xrange(n_i) for j in xrange(n_e)]
+        weight_list = [(0, j, weight_matrix[0, j]) for j in xrange(n_e)]
         
         print '...saving connection matrix:', name + '_' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e)
 

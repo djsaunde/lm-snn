@@ -368,7 +368,7 @@ else:
     num_examples = 60000 * 1
     use_testing_set = False
     do_plot_performance = True
-    record_spikes = False
+    record_spikes = True
     ee_STDP_on = True
 
 
@@ -631,6 +631,7 @@ if record_spikes:
 ################################################################# 
 # CREATE INPUT POPULATION AND CONNECTIONS FROM INPUT POPULATION #
 #################################################################
+
 pop_values = [0,0,0]
 for i,name in enumerate(input_population_names):
     input_groups[name + 'e'] = b.PoissonGroup(n_input, 0)
@@ -655,8 +656,7 @@ for name in input_connection_names:
      
     if ee_STDP_on:
         print 'create STDP for connection', name[0] + 'e' + name[1] + 'e'
-        stdp_methods[name[0]+'e'+name[1]+'e'] = b.STDP(connections[name[0] + 'e' + name[1] + 'e' + ending], eqs=eqs_stdp_ee, pre = eqs_stdp_pre_ee, 
-                                                       post = eqs_stdp_post_ee, wmin=0., wmax= wmax_ee)
+        stdp_methods[name[0] + 'e' + name[1] + 'e'] = b.STDP(connections[name[0] + 'e' + name[1] + 'e' + ending], eqs=eqs_stdp_ee, pre=eqs_stdp_pre_ee, post=eqs_stdp_post_ee, wmin=0., wmax=wmax_ee)
 
 
 #------------------------------------------------------------------------------ 

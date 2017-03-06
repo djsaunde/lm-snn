@@ -6,10 +6,9 @@ windows to map the input to a reduced space.
 import numpy as np
 import matplotlib.cm as cmap
 import time, os.path, scipy, math, sys
-import cPickle as pickle
+import cPickle as p
 import brian_no_units
 import brian as b
-import cPickle as p
 
 from struct import unpack
 from brian import *
@@ -24,7 +23,7 @@ def get_labeled_data(picklename, bTrain = True):
     a list of tuples.
     '''
     if os.path.isfile('%s.pickle' % picklename):
-        data = pickle.load(open('%s.pickle' % picklename))
+        data = p.load(open('%s.pickle' % picklename))
     else:
         # Open the images with gzip in read binary mode
         if bTrain:
@@ -61,31 +60,11 @@ def get_labeled_data(picklename, bTrain = True):
     return data
 
 
-def get_matrix_from_file(file_name):
+def get_matrix_from_file(file_name, n_src, n_tgt):
     '''
     Given the name of a file pointing to a .npy ndarray object, load it into
     'weight_matrix' and return it
     '''
-
-    offset = len(weight_path)
-
-    # connection comes from input
-    if file_name[offset] == 'X':
-        n_src = n_input
-    else:
-        # connection comes from excitatory layer
-        if file_name[offset + 1] == 'e':
-            n_src = n_e
-        # connection comes from inhibitory layer
-        else:
-            n_src = n_i
-
-    # connection goes to excitatory layer
-    if file_name[offset + 3] == 'e':
-        n_tgt = n_e
-    # connection goes to inhibitory layer
-    else:
-        n_tgt = n_i
 
     # load the stored ndarray into 'readout', instantiate 'weight_matrix' as 
     # correctly-shaped zeros matrix
@@ -419,13 +398,11 @@ else:
     conv_features = int(conv_features)
 
 # number of excitatory neurons (number output from convolutional layer)
-n_e = ((sqrt - conv_stride) / conv_stride + 1) ** 2
+n_e = ((sqrt - conv_size) / conv_stride + 1) ** 2
+n_e_total = n_e * conv_features
 
 # number of inhibitory neurons (number of convolutational features (for now))
 n_i = conv_features
-
-# number of excitatory neurons per convolution map
-n_e_conv = n_e / conv_features
 
 # set ending of filename saves
 ending = '_' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e)
@@ -574,7 +551,7 @@ spike_counters = {}
 
 result_monitor = np.zeros((update_interval,n_e))
 
-neuron_groups['e'] = b.NeuronGroup(n_e, neuron_eqs_e, threshold=v_thresh_e, refractory=refrac_e, reset=scr_e, compile=True, freeze=True)
+neuron_groups['e'] = b.NeuronGroup(n_e_total, neuron_eqs_e, threshold=v_thresh_e, refractory=refrac_e, reset=scr_e, compile=True, freeze=True)
 neuron_groups['i'] = b.NeuronGroup(n_i, neuron_eqs_i, threshold=v_thresh_i, refractory=refrac_i, reset=v_reset_i, compile=True, freeze=True)
 
 ########################################################
@@ -585,7 +562,7 @@ for name in population_names:
     print '...creating neuron group:', name
 
     # get a subgroup of size 'n_e' from all exc
-    neuron_groups[name + 'e'] = neuron_groups['e'].subgroup(n_e_conv)
+    neuron_groups[name + 'e'] = neuron_groups['e'].subgroup(n_e)
     # get a subgroup of size 'n_i' from the inhibitory layer
     neuron_groups[name + 'i'] = neuron_groups['i'].subgroup(1)
 
@@ -593,28 +570,40 @@ for name in population_names:
     neuron_groups[name + 'e'].v = v_rest_e - 40. * b.mV
     neuron_groups[name + 'i'].v = v_rest_i - 40. * b.mV
 
+print '...creating recurrent connections'
+
+for name in population_names:
     # if we're in test mode / using some stored weights
     if test_mode or weight_path[-8:] == 'weights/':
         # load up adaptive threshold parameters
         neuron_groups['e'].theta = np.load(weight_path + 'theta_A_' + stdp_input + '.npy')
     else:
         # otherwise, set the adaptive additive threshold parameter at 20mV
-        neuron_groups['e'].theta = np.ones((n_e)) * 20.0 * b.mV
-
-    print '...creating recurrent connections'
+        neuron_groups['e'].theta = np.ones((n_e_total)) * 20.0 * b.mV
 
     for conn_type in recurrent_conn_names:
-        # create connection name (composed of population and connections types)
-        conn_name = name + conn_type[0] + name + conn_type[1] + ending
-        # get the corresponding stored weights from file
-        weight_matrix = get_matrix_from_file('random/' + conn_name + '.npy')
-        # create a connection from the first group in conn_name with the second group
-        connections[conn_name] = b.Connection(neuron_groups[conn_name[0:3]], neuron_groups[conn_name[3:6]], structure='dense', state='g' + conn_type[0])
-        # instantiate the created connection with the 'weightMatrix' loaded from file
-        print weight_matrix
-        connections[conn_name].connect(neuron_groups[conn_name[0:3]], neuron_groups[conn_name[3:6]], weight_matrix)
+        if conn_type == 'ei':
+            # create connection name (composed of population and connections types)
+            conn_name = name + conn_type[0] + name + conn_type[1] + ending
+            # get the corresponding stored weights from file
+            weight_matrix = get_matrix_from_file('random/' + conn_name + '.npy', n_src=n_e, n_tgt=1)
+            # create a connection from the first group in conn_name with the second group
+            connections[conn_name] = b.Connection(neuron_groups[conn_name[0:3]], neuron_groups[conn_name[3:6]], structure='dense', state='g' + conn_type[0])
+            # instantiate the created connection with the 'weightMatrix' loaded from file
+            connections[conn_name].connect(neuron_groups[conn_name[0:3]], neuron_groups[conn_name[3:6]], weight_matrix)
+        elif conn_type == 'ie':
+            for other_name in population_names:
+                if other_name != name:
+                    # create connection name (composed of population and connections types)
+                    conn_name = name + conn_type[0] + other_name + conn_type[1] + ending
+                    # get the corresponding stored weights from file
+                    weight_matrix = get_matrix_from_file('random/' + conn_name + '.npy', n_src=1, n_tgt=n_e)
+                    # create a connection from the first group in conn_name with the second group
+                    connections[conn_name] = b.Connection(neuron_groups[conn_name[0:3]], neuron_groups[conn_name[3:6]], structure='dense', state='g' + conn_type[0])
+                    # instantiate the created connection with the 'weightMatrix' loaded from file
+                    connections[conn_name].connect(neuron_groups[conn_name[0:3]], neuron_groups[conn_name[3:6]], weight_matrix)
 
-    # if STDP from excitatory neurons to exctatory neurons is on and this connection is excitatory -> excitatory
+    # if STDP from excitatory -> excitatory is on and this connection is excitatory -> excitatory
     if ee_STDP_on and 'ee' in recurrent_conn_names:
         stdp_methods[name + 'e' + name + 'e'] = b.STDP(connections[name + 'e' + name + 'e' + ending], eqs=eqs_stdp_ee, pre=eqs_stdp_pre_ee, post=eqs_stdp_post_ee, wmin=0., wmax=wmax_ee)
 
@@ -638,6 +627,8 @@ if record_spikes:
     b.raster_plot(spike_monitors['Ae'], refresh=1000 * b.ms, showlast=1000 * b.ms)
     b.subplot(212)
     b.raster_plot(spike_monitors['Ai'], refresh=1000 * b.ms, showlast=1000 * b.ms)
+    
+
 
 
 
