@@ -35,14 +35,15 @@ def create_weights():
         conv_stride = int(conv_stride)
 
     # number of convolution features
-    conv_features = raw_input('Enter number of convolution features to learn (default 10): ')
+    conv_features = raw_input('Enter number of convolution features to learn (default 9): ')
     if conv_features == '':
-        conv_features = 10
+        conv_features = 9
     else:
         conv_features = int(conv_features)
 
     # number of excitatory neurons (number output from convolutional layer)
     n_e = ((sqrt - conv_size) / conv_stride + 1) ** 2
+    print n_e
 
     # number of inhibitory neurons (number of convolutational features (for now))
     n_i = conv_features
@@ -61,8 +62,8 @@ def create_weights():
     
     connNameList = [ 'XeA' + str(i) + 'e' for i in xrange(conv_features) ]
     for name in connNameList:
-        weight_matrix = (np.random.random((n_input, n_e)) + 0.01) * weight['ee_input']
-        weight_list = [(i, j, weight_matrix[i, j]) for j in xrange(n_e) for i in xrange(n_input)]
+        weight_matrix = (np.random.random((conv_size ** 2, 1)) + 0.01) * weight['ee_input']
+        weight_list = [(i, 0, weight_matrix[i, 0]) for i in xrange(conv_size ** 2)]
         
         print '...saving connection matrix:', name + '_' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e)
         

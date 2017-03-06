@@ -632,7 +632,6 @@ if record_spikes:
 # CREATE INPUT POPULATION AND CONNECTIONS FROM INPUT POPULATION #
 #################################################################
 
-pop_values = [0,0,0]
 for i,name in enumerate(input_population_names):
     input_groups[name + 'e'] = b.PoissonGroup(n_input, 0)
     rate_monitors[name + 'e'] = b.PopulationRateMonitor(input_groups[name + 'e'], bin=(single_example_time + resting_time) / b.second)
@@ -659,9 +658,9 @@ for name in input_connection_names:
         stdp_methods[name[0] + 'e' + name[1] + 'e'] = b.STDP(connections[name[0] + 'e' + name[1] + 'e' + ending], eqs=eqs_stdp_ee, pre=eqs_stdp_pre_ee, post=eqs_stdp_post_ee, wmin=0., wmax=wmax_ee)
 
 
-#------------------------------------------------------------------------------ 
-# run the simulation and set inputs
-#------------------------------------------------------------------------------ 
+#################################
+# RUN SIMULATION AND SET INPUTS #
+#################################
 
 # bookkeeping variables
 previous_spike_count = np.zeros(n_e)
