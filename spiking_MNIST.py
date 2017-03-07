@@ -760,7 +760,7 @@ while j < (int(num_examples)):
                 # updating the performance plot
                 perf_plot, performance = update_performance_plot(performance_monitor, performance, j, fig_performance)
                 # printing out classification performance results so far
-                print 'Classification performance', performance[:(j / float(update_interval)) + 1]
+                print 'Classification performance', performance[:int(j / float(update_interval)) + 1]
                 
         # set input firing rates back to zero
         for name in input_population_names:

@@ -624,9 +624,11 @@ if record_spikes:
     fig_num += 1
     b.ion()
     b.subplot(211)
-    b.raster_plot(spike_monitors['A0e'], refresh=1000 * b.ms, showlast=1000 * b.ms)
+    exc_monitors = [ spike_monitors['A' + str(i) + 'e'] for i in xrange(conv_features) ]
+    b.raster_plot(*exc_monitors, refresh=1000 * b.ms, showlast=1000 * b.ms)
     b.subplot(212)
-    b.raster_plot(spike_monitors['A0i'], refresh=1000 * b.ms, showlast=1000 * b.ms)
+    inhib_monitors = [ spike_monitors['A' + str(i) + 'i'] for i in xrange(conv_features) ]
+    b.raster_plot(*inhib_monitors, refresh=1000 * b.ms, showlast=1000 * b.ms)
     
 ################################################################# 
 # CREATE INPUT POPULATION AND CONNECTIONS FROM INPUT POPULATION #
