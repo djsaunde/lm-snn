@@ -35,7 +35,7 @@ def create_weights():
         conv_stride = int(conv_stride)
 
     # number of convolution features
-    conv_features = raw_input('Enter number of convolution features to learn (default 9 ): ')
+    conv_features = raw_input('Enter number of convolution features to learn (default 9): ')
     if conv_features == '':
         conv_features = 9
     else:
@@ -43,6 +43,8 @@ def create_weights():
 
     # number of excitatory neurons (number output from convolutional layer)
     n_e = ((sqrt - conv_size) / conv_stride + 1) ** 2
+    
+    print n_e
 
     # number of inhibitory neurons (number of convolutational features (for now))
     n_i = conv_features
@@ -52,7 +54,7 @@ def create_weights():
     
     # creating weights
     weight = {}
-    weight['ee_input'] = 0.25
+    weight['ee_input'] = 0.30
     weight['ei'] = 10.4
     weight['ie'] = 17.4
     

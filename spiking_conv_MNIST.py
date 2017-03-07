@@ -119,9 +119,9 @@ def normalize_weights():
     Squash the weights to sum to a prespecified number.
     '''
     for connName in connections:
-        if connName[1] == 'e' and connName[3] == 'e':
+        if connName[2] == 'e' and connName[5] == 'e':
             connection = connections[connName][:]
-            temp_conn = np.copy(connection)
+            temp_conn = np.copy(connection.todense())
             colSums = np.sum(temp_conn, axis = 0)
             colFactors = weight['ee_input'] / colSums
             for j in xrange(n_e):
@@ -136,7 +136,7 @@ def is_lattice_connection(i, j):
     k: Second neuron's index
     '''
     
-    return i + 1 == j and j % sqrt != 0 or i - 1 == j and i % sqrt != 0 or i + sqrt == j or i - sqrt == j
+    return i + 1 == j and j % n_input_sqrt != 0 or i - 1 == j and i % n_input_sqrt != 0 or i + n_input_sqrt == j or i - n_input_sqrt == j
 
 
 def get_2d_input_weights():
@@ -144,15 +144,15 @@ def get_2d_input_weights():
     Get the weights from the input to excitatory layer and reshape it to be two
     dimensional and square.
     '''
-    rearranged_weights = np.zeros(( conv_size * int(math.sqrt(conv_features)), conv_size * int(math.sqrt(conv_features)) ))
+    rearranged_weights = np.zeros(( n_e * conv_size, conv_features * conv_size ))
     
     i = j = 0
-    for name in connections:
-        if 'X0' in name:
-            weight_matrix = np.copy(connections[name][:, 0]).reshape((conv_size, conv_size))
+    for name in sorted(connections.keys()):
+        if 'X' in name:
+            weight_matrix = np.copy(connections[name][:, int(name[name.index('X') + 1 : name.index('e')])]).reshape((conv_size, conv_size))
             rearranged_weights[i * conv_size : (i + 1) * conv_size, j * conv_size : (j + 1) * conv_size ] = weight_matrix
             
-            if i == int(math.sqrt(conv_features)) - 1:
+            if i == n_e - 1:
                 i = 0
                 j = j + 1
             else:
@@ -178,7 +178,6 @@ def update_input(im3, fig):
     Update the input image to use for input plotting.
     '''
     im3.set_array(rates.reshape((28, 28)))
-    b.title('Current input example')
     fig.canvas.draw()
     return im3
 
@@ -188,8 +187,8 @@ def plot_2d_input_weights():
     Plot the weights from input to excitatory layer to view during training.
     '''
     weights = get_2d_input_weights()
-    fig = b.figure(fig_num, figsize = (18, 18))
-    im2 = b.imshow(weights, interpolation = "nearest", vmin = 0, vmax = wmax_ee, cmap = cmap.get_cmap('hot_r'))
+    fig = b.figure(fig_num, figsize=(18, 18))
+    im2 = b.imshow(weights, interpolation='nearest', vmin=0, vmax=wmax_ee, cmap=cmap.get_cmap('hot_r'))
     b.colorbar(im2)
     b.title('Convolutional Connection Weights')
     fig.canvas.draw()
@@ -348,7 +347,7 @@ else:
 
 # number of inputs to the network
 n_input = 784
-sqrt = int(math.sqrt(n_input))
+n_input_sqrt = int(math.sqrt(n_input))
 
 # number of classes to learn
 classes_input = raw_input('Enter classes to learn as comma-separated list (e.g, 0,1,2,3,...) (default all 10 classes): ')
@@ -398,7 +397,7 @@ else:
     conv_features = int(conv_features)
 
 # number of excitatory neurons (number output from convolutional layer)
-n_e = ((sqrt - conv_size) / conv_stride + 1) ** 2
+n_e = ((n_input_sqrt - conv_size) / conv_stride + 1) ** 2
 n_e_total = n_e * conv_features
 
 # number of inhibitory neurons (number of convolutational features (for now))
@@ -446,7 +445,7 @@ input_connection_names = [ 'X' + str(i) + 'A' + str(j) for i in xrange(n_e) for 
 save_conns = [ 'XeAe' + ending ]
 input_conn_names = [ 'ee_input' ]
 recurrent_conn_names = [ 'ei', 'ie' ]
-weight['ee_input'] = 78.0
+weight['ee_input'] = 50.0
 delay['ee_input'] = (0 * b.ms, 10 * b.ms)
 delay['ei_input'] = (0 * b.ms, 5 * b.ms)
 input_intensity = start_input_intensity = 2.0
@@ -588,9 +587,10 @@ for name in population_names:
             # get the corresponding stored weights from file
             weight_matrix = get_matrix_from_file('random/' + conn_name + '.npy', n_src=n_e, n_tgt=1)
             # create a connection from the first group in conn_name with the second group
-            connections[conn_name] = b.Connection(neuron_groups[conn_name[0:3]], neuron_groups[conn_name[3:6]], structure='dense', state='g' + conn_type[0])
+            connections[conn_name] = b.Connection(neuron_groups[conn_name[0 : conn_name.index('e') + 1]], neuron_groups[conn_name[conn_name.index('e') + 1 : conn_name.index('_')]], structure='dense', state='g' + conn_type[0])
             # instantiate the created connection with the 'weightMatrix' loaded from file
-            connections[conn_name].connect(neuron_groups[conn_name[0:3]], neuron_groups[conn_name[3:6]], weight_matrix)
+            connections[conn_name].connect(neuron_groups[conn_name[0 : conn_name.index('e') + 1]], neuron_groups[conn_name[conn_name.index('e') + 1 : conn_name.index('_')]], weight_matrix)
+
         elif conn_type == 'ie':
             for other_name in population_names:
                 if other_name != name:
@@ -599,9 +599,9 @@ for name in population_names:
                     # get the corresponding stored weights from file
                     weight_matrix = get_matrix_from_file('random/' + conn_name + '.npy', n_src=1, n_tgt=n_e)
                     # create a connection from the first group in conn_name with the second group
-                    connections[conn_name] = b.Connection(neuron_groups[conn_name[0:3]], neuron_groups[conn_name[3:6]], structure='dense', state='g' + conn_type[0])
+                    connections[conn_name] = b.Connection(neuron_groups[conn_name[0 : conn_name.index('i') + 1]], neuron_groups[conn_name[conn_name.index('i') + 1 : conn_name.index('_')]], structure='dense', state='g' + conn_type[0])
                     # instantiate the created connection with the 'weightMatrix' loaded from file
-                    connections[conn_name].connect(neuron_groups[conn_name[0:3]], neuron_groups[conn_name[3:6]], weight_matrix)
+                    connections[conn_name].connect(neuron_groups[conn_name[0 : conn_name.index('i') + 1]], neuron_groups[conn_name[conn_name.index('i') + 1 : conn_name.index('_')]], weight_matrix)
 
     # if STDP from excitatory -> excitatory is on and this connection is excitatory -> excitatory
     if ee_STDP_on and 'ee' in recurrent_conn_names:
@@ -641,12 +641,12 @@ for name in input_population_names:
 
 # creating connections from input Poisson spike train to convolution patch populations
 for name in input_connection_names:
-    print '\n...creating connections between', name[0:2], 'and', name[2:5]
-
+    print '\n...creating connections between', name[0:name.index('A')], 'and', name[name.index('A'):]
+    
     # for each of the input connection types (in this case, excitatory -> excitatory)
     for conn_type in input_conn_names:
         # saved connection name
-        conn_name = name[0:1] + conn_type[0] + name[2:5] + conn_type[1] + ending
+        conn_name = name[0:1] + conn_type[0] + name[name.index('A'):] + conn_type[1] + ending
         
         # get weight matrix depending on training or test phase
         if test_mode:
@@ -656,17 +656,17 @@ for name in input_connection_names:
         
         for idx in xrange(n_e):
             # create connections from the windows of the input group to the neuron population
-            connections[name[0:1] + str(idx) + conn_type[0] + name[2:5] + conn_type[1] + ending] = b.Connection(input_groups[conn_name[0:1] + str(idx) + 'e'], neuron_groups[conn_name[2:5]], structure='dense', state='g' + conn_type[0], delay=True, max_delay=delay[conn_type][1])
+            connections[name[0:1] + str(idx) + conn_type[0] + name[name.index('A'):] + conn_type[1] + ending] = b.Connection(input_groups[conn_name[0:1] + str(idx) + 'e'], neuron_groups[conn_name[2:5]], structure='sparse', state='g' + conn_type[0], delay=True, max_delay=delay[conn_type][1])
             
             # instantiate the connection with the stored weight matrix and delay used for this connection type
-            connections[name[0:1] + str(idx) + conn_type[0] + name[2:5] + conn_type[1] + ending].connect(input_groups[conn_name[0:1] + str(idx) + 'e'], neuron_groups[conn_name[2:5]][idx], weight_matrix, delay=delay[conn_type])
+            connections[name[0:1] + str(idx) + conn_type[0] + name[name.index('A'):] + conn_type[1] + ending].connect(input_groups[conn_name[0:1] + str(idx) + 'e'], neuron_groups[conn_name[2:5]][idx], np.copy(weight_matrix), delay=delay[conn_type])
 
     # if excitatory -> excitatory STDP is specified, add it here (input to excitatory populations)
     if ee_STDP_on:
         print '...creating STDP for connection', name
         
         for idx in xrange(n_e):
-            stdp_methods[name] = b.STDP(connections[name[0:1] + str(idx) + conn_type[0] + name[2:5] + conn_type[1] + ending], eqs=eqs_stdp_ee, pre=eqs_stdp_pre_ee, post=eqs_stdp_post_ee, wmin=0., wmax=wmax_ee)
+            stdp_methods[name[0:1] + str(idx) + conn_type[0] + name[name.index('A'):] + conn_type[1] + ending] = b.STDP(connections[name[0:1] + str(idx) + conn_type[0] + name[name.index('A'):] + conn_type[1] + ending], eqs=eqs_stdp_ee, pre=eqs_stdp_pre_ee, post=eqs_stdp_post_ee, wmin=0., wmax=wmax_ee)
 
 #################################
 # RUN SIMULATION AND SET INPUTS #
@@ -684,7 +684,7 @@ if not test_mode:
     fig_num += 1
 
 # plot input intensities
-rates = np.zeros((sqrt, sqrt))
+rates = np.zeros((n_input_sqrt, n_input_sqrt))
 input_image_monitor, input_image = plot_input()
 fig_num += 1
 
