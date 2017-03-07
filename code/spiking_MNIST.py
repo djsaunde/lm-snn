@@ -20,7 +20,7 @@ from struct import unpack
 from brian import *
 
 # specify the location of the MNIST data
-MNIST_data_path = './'
+MNIST_data_path = '../data/'
 
 
 def get_labeled_data(picklename, bTrain = True):
@@ -352,7 +352,7 @@ b.set_global_preferences(
 np.random.seed(0)
 
 # where the MNIST data files are stored
-data_path = './'
+data_path = '../'
 
 # set parameters for simulation based on train / test mode
 if test_mode:
@@ -595,7 +595,7 @@ for name in population_names:
         # create connection name (composed of population and connections types)
         conn_name = name + conn_type[0] + name + conn_type[1] + ending
         # get the corresponding stored weights from file
-        weight_matrix = get_matrix_from_file('random/' + conn_name + '.npy')
+        weight_matrix = get_matrix_from_file(data_path + 'random/' + conn_name + '.npy')
         # create a connection from the first group in conn_name with the second group
         connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure=conn_structure, state='g' + conn_type[0])
         # instantiate the created connection with the 'weightMatrix' loaded from file
@@ -774,10 +774,12 @@ while j < (int(num_examples)):
         j += 1
 
 
-#------------------------------------------------------------------------------ 
-# save results
-#------------------------------------------------------------------------------ 
-print 'save results'
+################ 
+# SAVE RESULTS #
+################ 
+
+print '...saving results'
+
 if not test_mode:
     save_theta()
 if not test_mode:
@@ -786,9 +788,10 @@ else:
     np.save(data_path + 'activity/resultPopVecs' + str(num_examples) + '_' + stdp_input, result_monitor)
     np.save(data_path + 'activity/inputNumbers' + str(num_examples) + '_' + stdp_input, input_numbers)
 
-#------------------------------------------------------------------------------ 
-# plot results
-#------------------------------------------------------------------------------ 
+################ 
+# PLOT RESULTS #
+################
+
 if rate_monitors:
     b.figure(fig_num)
     fig_num += 1
@@ -796,7 +799,6 @@ if rate_monitors:
         b.subplot(len(rate_monitors), 1, i + 1)
         b.plot(rate_monitors[name].times/b.second, rate_monitors[name].rate, '.')
         b.title('Rates of population ' + name)
-    b.savefig('plots/rate_monitors_' + str(n_e) + '_' + stdp_input + '.png')
     
 if spike_monitors:
     b.figure(fig_num)
@@ -805,7 +807,6 @@ if spike_monitors:
         b.subplot(len(spike_monitors), 1, i + 1)
         b.raster_plot(spike_monitors[name])
         b.title('Spikes of population ' + name)
-    b.savefig('plots/spike_monitors_' + str(n_e) + '_' + stdp_input + '.png')
         
 if spike_counters:
     b.figure(fig_num)
@@ -814,11 +815,8 @@ if spike_counters:
         b.subplot(len(spike_counters), 1, i + 1)
         b.plot(spike_counters['Ae'].count[:])
         b.title('Spike count of population ' + name)
-    b.savefig('plots/rate_monitors_' + str(n_e) + '_' + stdp_input + '.png')
 
 plot_2d_input_weights()
-
-b.savefig('plots/input_to_exc_weights_' + str(n_e) + '_' + stdp_input + '.png')
 
 b.ioff()
 b.show()

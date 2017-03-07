@@ -1,3 +1,5 @@
+# Unsupervised Handwritten Digit Classification using Spiking Neural Networks and Spike Timing-Dependent Plasticity
+
 This repository contains the code for the plasticity and learning project in the BINDS
 laboratory at UMass Amherst. It is meant to extend Peter Diehl's code and his work
 with Matthew Cook at ETH Zurich, from the paper "Unsupervised learning of digit

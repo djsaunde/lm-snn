@@ -5,19 +5,19 @@ windows to map the input to a reduced space.
 
 import numpy as np
 import matplotlib.cm as cmap
-import time, os.path, scipy, math, sys
+import time, os.path, scipy, math, sys, gc
 import cPickle as p
-import brian_no_units
-import brian as b
+# import brian_no_units
+import brian2 as b
 
 from struct import unpack
 from brian import *
 
 # only show log messages of level ERROR or higher
-b.log_level_error()
+b.BrianLogger.log_level_error()
 
 # specify the location of the MNIST data
-MNIST_data_path = './'
+MNIST_data_path = '../data/'
 
 
 def get_labeled_data(picklename, bTrain = True):
@@ -304,6 +304,7 @@ else:
 # SET PARAMETERS AND EQUATIONS #
 ################################
 
+'''
 b.set_global_preferences(
                         defaultclock = b.Clock(dt=0.5*b.ms), # The default clock to use if none is provided or defined in any enclosing scope.
                         useweave = True, # Defines whether or not functions should use inlined compiled C code where defined.
@@ -320,12 +321,13 @@ b.set_global_preferences(
                                                 # or if they should find all objects defined in any frame. Set to "True" if not in an interactive shell.
                         useweave_linear_diffeq = True, # Whether to use weave C++ acceleration for the solution of linear differential equations.
                        )
+'''
 
 # for reproducibility's sake
 np.random.seed(0)
 
 # where the MNIST data files are stored
-data_path = './'
+data_path = '../'
 
 # set parameters for simulation based on train / test mode
 if test_mode:
@@ -451,6 +453,10 @@ delay['ei_input'] = (0 * b.ms, 5 * b.ms)
 input_intensity = start_input_intensity = 2.0
 
 # time constants, learning rates, max weights, weight dependence, etc.
+tc_v_e = 100 * b.ms
+tc_v_i = 10 * b.ms
+tc_ge = 1 * b.ms
+tc_gi = 2 * b.ms
 tc_pre_ee = 20 * b.ms
 tc_post_ee = 20 * b.ms
 nu_ee_pre =  0.0001
@@ -459,39 +465,43 @@ wmax_ee = 1.0
 exp_ee_post = exp_ee_pre = 0.2
 w_mu_pre = 0.2
 w_mu_post = 0.2
+i_syn_v_e = -100.0 * b.mV
+i_syn_v_i = -85.0 * b.mV
+timer_reset = 0 * b.ms
+timer_step = 100.0 * b.ms
 
 # setting up differential equations (depending on train / test mode)
 if test_mode:
-    scr_e = 'v = v_reset_e; timer = 0*ms'
+    scr_e = 'v = v_reset_e; timer = timer_reset'
 else:
     tc_theta = 1e7 * b.ms
     theta_plus_e = 0.05 * b.mV
-    scr_e = 'v = v_reset_e; theta += theta_plus_e; timer = 0*ms'
+    scr_e = 'v = v_reset_e; theta += theta_plus_e; timer = timer_reset'
 
 offset = 20.0 * b.mV
 v_thresh_e = '(v>(theta - offset + ' + str(v_thresh_e) + ')) * (timer>refrac_e)'
 
 # equations for neurons
 neuron_eqs_e = '''
-        dv/dt = ((v_rest_e - v) + (I_synE + I_synI) / nS) / (100 * ms)  : volt
+        dv/dt = ((v_rest_e - v) + (I_synE + I_synI) / nS) / (tc_v_e)  : volt
         I_synE = ge * nS *         -v                           : amp
-        I_synI = gi * nS * (-100.*mV-v)                          : amp
-        dge/dt = -ge/(1.0*ms)                                   : 1
-        dgi/dt = -gi/(2.0*ms)                                  : 1
+        I_synI = gi * nS * (i_syn_v_e - v)                          : amp
+        dge/dt = -ge / (tc_ge)                                   : 1
+        dgi/dt = -gi / (tc_gi)                                  : 1
         '''
 if test_mode:
     neuron_eqs_e += '\n  theta      :volt'
 else:
     neuron_eqs_e += '\n  dtheta/dt = -theta / (tc_theta)  : volt'
 
-neuron_eqs_e += '\n  dtimer/dt = 100.0 : ms'
+neuron_eqs_e += '\n  dtimer/dt = timer_step : second'
 
 neuron_eqs_i = '''
-        dv/dt = ((v_rest_i - v) + (I_synE + I_synI) / nS) / (10*ms)  : volt
+        dv/dt = ((v_rest_i - v) + (I_synE + I_synI) / nS) / (tc_v_i)  : volt
         I_synE = ge * nS *         -v                           : amp
-        I_synI = gi * nS * (-85.*mV-v)                          : amp
-        dge/dt = -ge/(1.0*ms)                                   : 1
-        dgi/dt = -gi/(2.0*ms)                                  : 1
+        I_synI = gi * nS * (i_syn_v_i - v)                          : amp
+        dge/dt = -ge / (tc_ge)                                   : 1
+        dgi/dt = -gi / (tc_gi)                                  : 1
         '''
 
 # determine STDP rule to use
@@ -513,8 +523,8 @@ else:
 
 # STDP synaptic traces
 eqs_stdp_ee = '''
-            dpre/dt = -pre / tc_pre_ee : 1.0
-            dpost/dt = -post / tc_post_ee : 1.0
+            dpre/dt = -pre / tc_pre_ee : 1 (event-driven)
+            dpost/dt = -post / tc_post_ee : 1 (event-driven)
             '''
 
 # setting STDP update rule
@@ -543,6 +553,7 @@ fig_num = 1
 neuron_groups = {}
 input_groups = {}
 connections = {}
+shared_weights = {}
 stdp_methods = {}
 rate_monitors = {}
 spike_monitors = {}
@@ -550,20 +561,20 @@ spike_counters = {}
 
 result_monitor = np.zeros((update_interval, conv_features, n_e))
 
-neuron_groups['e'] = b.NeuronGroup(n_e_total, neuron_eqs_e, threshold=v_thresh_e, refractory=refrac_e, reset=scr_e, compile=True, freeze=True)
-neuron_groups['i'] = b.NeuronGroup(n_i, neuron_eqs_i, threshold=v_thresh_i, refractory=refrac_i, reset=v_reset_i, compile=True, freeze=True)
+neuron_groups['e'] = b.NeuronGroup(n_e_total, neuron_eqs_e, threshold=v_thresh_e, refractory=refrac_e, reset=scr_e)
+neuron_groups['i'] = b.NeuronGroup(n_i, neuron_eqs_i, threshold=v_thresh_i, refractory=refrac_i, reset=v_reset_i)
 
 ########################################################
 # CREATE NETWORK POPULATIONS AND RECURRENT CONNECTIONS #
 ########################################################
 
-for name in population_names:
+for idx, name in enumerate(population_names):
     print '...creating neuron group:', name
 
     # get a subgroup of size 'n_e' from all exc
-    neuron_groups[name + 'e'] = neuron_groups['e'].subgroup(n_e)
+    neuron_groups[name + 'e'] = b.Subgroup(neuron_groups['e'], start=idx * n_e, stop=(idx + 1) * n_e, name=name + 'e')
     # get a subgroup of size 'n_i' from the inhibitory layer
-    neuron_groups[name + 'i'] = neuron_groups['i'].subgroup(1)
+    neuron_groups[name + 'i'] = b.Subgroup(neuron_groups['e'], start=idx, stop=idx+1, name=name + 'e')
 
     # start the membrane potentials of these groups 40mV below their resting potentials
     neuron_groups[name + 'e'].v = v_rest_e - 40. * b.mV
@@ -572,6 +583,8 @@ for name in population_names:
 print '...creating recurrent connections'
 
 for name in population_names:
+    print '...connecting neuron group', name
+    
     # if we're in test mode / using some stored weights
     if test_mode or weight_path[-8:] == 'weights/':
         # load up adaptive threshold parameters
@@ -585,11 +598,12 @@ for name in population_names:
             # create connection name (composed of population and connections types)
             conn_name = name + conn_type[0] + name + conn_type[1] + ending
             # get the corresponding stored weights from file
-            weight_matrix = get_matrix_from_file('random/' + conn_name + '.npy', n_src=n_e, n_tgt=1)
+            weight_matrix = get_matrix_from_file(data_path + 'random/' + conn_name + '.npy', n_src=n_e, n_tgt=1)
             # create a connection from the first group in conn_name with the second group
-            connections[conn_name] = b.Connection(neuron_groups[conn_name[0 : conn_name.index('e') + 1]], neuron_groups[conn_name[conn_name.index('e') + 1 : conn_name.index('_')]], structure='dense', state='g' + conn_type[0])
+            connections[conn_name] = b.Synapses(source=neuron_groups[conn_name[0 : conn_name.index('e') + 1]], target=neuron_groups[conn_name[conn_name.index('e') + 1 : conn_name.index('_')]], model='w : 1', on_pre='ge += w')
             # instantiate the created connection with the 'weightMatrix' loaded from file
-            connections[conn_name].connect(neuron_groups[conn_name[0 : conn_name.index('e') + 1]], neuron_groups[conn_name[conn_name.index('e') + 1 : conn_name.index('_')]], weight_matrix)
+            connections[conn_name].connect()
+            connections[conn_name].w = weight_matrix.flatten()
 
         elif conn_type == 'ie':
             for other_name in population_names:
@@ -597,28 +611,25 @@ for name in population_names:
                     # create connection name (composed of population and connections types)
                     conn_name = name + conn_type[0] + other_name + conn_type[1] + ending
                     # get the corresponding stored weights from file
-                    weight_matrix = get_matrix_from_file('random/' + conn_name + '.npy', n_src=1, n_tgt=n_e)
+                    weight_matrix = get_matrix_from_file(data_path + 'random/' + conn_name + '.npy', n_src=1, n_tgt=n_e)
                     # create a connection from the first group in conn_name with the second group
-                    connections[conn_name] = b.Connection(neuron_groups[conn_name[0 : conn_name.index('i') + 1]], neuron_groups[conn_name[conn_name.index('i') + 1 : conn_name.index('_')]], structure='dense', state='g' + conn_type[0])
+                    connections[conn_name] = b.Synapses(neuron_groups[conn_name[0 : conn_name.index('i') + 1]], neuron_groups[conn_name[conn_name.index('i') + 1 : conn_name.index('_')]], model='w : 1', on_pre='ge += w')
                     # instantiate the created connection with the 'weightMatrix' loaded from file
-                    connections[conn_name].connect(neuron_groups[conn_name[0 : conn_name.index('i') + 1]], neuron_groups[conn_name[conn_name.index('i') + 1 : conn_name.index('_')]], weight_matrix)
-
-    # if STDP from excitatory -> excitatory is on and this connection is excitatory -> excitatory
-    if ee_STDP_on and 'ee' in recurrent_conn_names:
-        stdp_methods[name + 'e' + name + 'e'] = b.STDP(connections[name + 'e' + name + 'e' + ending], eqs=eqs_stdp_ee, pre=eqs_stdp_pre_ee, post=eqs_stdp_post_ee, wmin=0., wmax=wmax_ee)
+                    connections[conn_name].connect()
+                    connections[conn_name].w = weight_matrix.flatten()
 
     print '...creating monitors for:', name
 
     # spike rate monitors for excitatory and inhibitory neuron populations
-    rate_monitors[name + 'e'] = b.PopulationRateMonitor(neuron_groups[name + 'e'], bin=(single_example_time + resting_time) / b.second)
-    rate_monitors[name + 'i'] = b.PopulationRateMonitor(neuron_groups[name + 'i'], bin=(single_example_time + resting_time) / b.second)
-    spike_counters[name + 'e'] = b.SpikeCounter(neuron_groups[name + 'e'])
+    rate_monitors[name + 'e'] = b.PopulationRateMonitor(neuron_groups[name + 'e'])
+    rate_monitors[name + 'i'] = b.PopulationRateMonitor(neuron_groups[name + 'i'])
 
     # record neuron population spikes if specified
     if record_spikes:
         spike_monitors[name + 'e'] = b.SpikeMonitor(neuron_groups[name + 'e'])
         spike_monitors[name + 'i'] = b.SpikeMonitor(neuron_groups[name + 'i'])
 
+'''
 if record_spikes:
     b.figure(fig_num)
     fig_num += 1
@@ -629,6 +640,7 @@ if record_spikes:
     b.subplot(212)
     inhib_monitors = [ spike_monitors['A' + str(i) + 'i'] for i in xrange(conv_features) ]
     b.raster_plot(*inhib_monitors, refresh=1000 * b.ms, showlast=1000 * b.ms)
+'''
     
 ################################################################# 
 # CREATE INPUT POPULATION AND CONNECTIONS FROM INPUT POPULATION #
@@ -636,12 +648,16 @@ if record_spikes:
 
 # creating Poission spike train from input image (784 vector, 28x28 image)
 for name in input_population_names:
-    input_groups[name + 'e'] = b.PoissonGroup(conv_size ** 2, 0)
-    rate_monitors[name + 'e'] = b.PopulationRateMonitor(input_groups[name + 'e'], bin=(single_example_time + resting_time) / b.second)
+    input_groups[name + 'e'] = b.PoissonGroup(conv_size ** 2, '0 * b.Hz')
+    rate_monitors[name + 'e'] = b.PopulationRateMonitor(input_groups[name + 'e'])
+
+# creaing shared weights for each of the convolution patches
+for idx in xrange(conv_features):
+    shared_weights[idx] = NeuronGroup(n_e, 'w : 1')
 
 # creating connections from input Poisson spike train to convolution patch populations
-for name in input_connection_names:
-    print '\n...creating connections between', name[0:name.index('A')], 'and', name[name.index('A'):]
+for idx1, name in enumerate(input_connection_names):
+    print '\n...creating connections between', name[0 : name.index('A')], 'and', name[name.index('A'):]
     
     # for each of the input connection types (in this case, excitatory -> excitatory)
     for conn_type in input_conn_names:
@@ -654,19 +670,20 @@ for name in input_connection_names:
         else:
             weight_matrix = get_matrix_from_file(weight_path + conn_name + '.npy', conv_size ** 2, 1)
         
-        for idx in xrange(n_e):
+        for idx2 in xrange(n_e):
+            cur_conn_name = name[0:1] + str(idx2) + conn_type[0] + name[name.index('A'):] + conn_type[1] + ending
             # create connections from the windows of the input group to the neuron population
-            connections[name[0:1] + str(idx) + conn_type[0] + name[name.index('A'):] + conn_type[1] + ending] = b.Connection(input_groups[conn_name[0:1] + str(idx) + 'e'], neuron_groups[conn_name[2:5]], structure='sparse', state='g' + conn_type[0], delay=True, max_delay=delay[conn_type][1])
+            connections[cur_conn_name] = b.Synapses(input_groups[cur_conn_name[0:3]], neuron_groups[cur_conn_name[3:6]], model='w_index : integer\n' + eqs_stdp_ee, on_pre=eqs_stdp_pre_ee, on_post=eqs_stdp_post_ee, delay=delay[conn_type][1])
             
-            # instantiate the connection with the stored weight matrix and delay used for this connection type
-            connections[name[0:1] + str(idx) + conn_type[0] + name[name.index('A'):] + conn_type[1] + ending].connect(input_groups[conn_name[0:1] + str(idx) + 'e'], neuron_groups[conn_name[2:5]][idx], np.copy(weight_matrix), delay=delay[conn_type])
-
-    # if excitatory -> excitatory STDP is specified, add it here (input to excitatory populations)
-    if ee_STDP_on:
-        print '...creating STDP for connection', name
-        
-        for idx in xrange(n_e):
-            stdp_methods[name[0:1] + str(idx) + conn_type[0] + name[name.index('A'):] + conn_type[1] + ending] = b.STDP(connections[name[0:1] + str(idx) + conn_type[0] + name[name.index('A'):] + conn_type[1] + ending], eqs=eqs_stdp_ee, pre=eqs_stdp_pre_ee, post=eqs_stdp_post_ee, wmin=0., wmax=wmax_ee)
+            # add a reference to this Synapse object's shared weights
+            print connections[cur_conn_name].__dict__.keys()
+            print 'variables' in connections[cur_conn_name].__dict__.keys()
+            connections[cur_conn_name].__dict__['variables'].add_reference('w', shared_weights, index='w_index')
+            connections[cur_conn_name].w_index = idx1
+            
+            # instantiate the created connection with the 'weightMatrix' loaded from file
+            connections[cur_conn_name].connect()
+            connections[cur_conn_name].w = weight_matrix.flatten()
 
 #################################
 # RUN SIMULATION AND SET INPUTS #

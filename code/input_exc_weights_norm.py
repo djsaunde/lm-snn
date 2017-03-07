@@ -18,7 +18,7 @@ from struct import unpack
 from brian import *
 
 # specify the location of the MNIST data
-MNIST_data_path = './'
+MNIST_data_path = '../data/'
 
 #------------------------------------------------------------------------------ 
 # functions
@@ -89,13 +89,13 @@ def save_connections(ending = ''):
     for connName in save_conns:
         connMatrix = connections[connName][:]
         connListSparse = ([(i,j,connMatrix[i,j]) for i in xrange(connMatrix.shape[0]) for j in xrange(connMatrix.shape[1]) ])
-        np.save(data_path + 'weights/' + connName + '_' +  ending, connListSparse)
+        np.save(data_path + 'weights/' + connName + '_' + ending + '_input_exc_weights_norm', connListSparse)
 
 
 def save_theta(ending = ''):
     print 'save theta'
     for pop_name in population_names:
-        np.save(data_path + 'weights/theta_' + pop_name + ending, neuron_groups[pop_name + 'e'].theta)
+        np.save(data_path + 'weights/theta_' + pop_name + '_' + ending + '_input_exc_weights_norm', neuron_groups[pop_name + 'e'].theta)
 
 
 def normalize_weights():
@@ -281,7 +281,7 @@ b.set_global_preferences(
 
 np.random.seed(0)
 
-data_path = './'
+data_path = '../'
 
 if test_mode:
     weight_path = data_path + 'weights/'
