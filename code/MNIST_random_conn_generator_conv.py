@@ -46,7 +46,7 @@ def create_weights():
     n_e_sqrt = int(math.sqrt(n_e))
 
     # number of inhibitory neurons (number of convolutational features (for now))
-    n_i = conv_features
+    n_i = n_e
     
     ending = '_' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e)
     
@@ -65,8 +65,6 @@ def create_weights():
     conv_indices = []
     for n in xrange(n_e):
         conv_indices.append([ ((n % n_e_sqrt) * conv_stride + (n // n_e_sqrt) * n_input_sqrt * conv_stride) + (x * n_input_sqrt) + y for y in xrange(conv_size) for x in xrange(conv_size) ])
-        
-    print len(conv_indices[0])
     
     connNameList = [ 'XeA' + str(i) + 'e' for i in xrange(conv_features) ]
     for name in connNameList:
@@ -85,7 +83,7 @@ def create_weights():
     
     connNameList = [ 'A' + str(i) + 'eA' + str(i) + 'i' for i in xrange(conv_features) ]
     for name in connNameList:
-        weight_list = [(i, 0, weight['ei']) for i in xrange(n_e)]
+        weight_list = [ (i, i, weight['ei']) for i in xrange(n_e) ]
         
         print '...saving connection matrix:', name + ending
         
@@ -94,18 +92,27 @@ def create_weights():
               
     print '...creating connection matrix from inhbitory layer -> excitatory layer'
     
-    connNameList = [ 'A' + str(i) + 'iA' + str(j) + 'e' for i in xrange(conv_features) for j in xrange(conv_features) if i != j ]
+    connNameList = [ 'A' + str(i) + 'iA' + str(j) + 'e' for i in xrange(conv_features) for j in xrange(conv_features) ]
     for name in connNameList:
-        weight_matrix = np.ones((1, n_e)) * weight['ie']
-        weight_list = [(0, j, weight_matrix[0, j]) for j in xrange(n_e)]
-        
-        print '...saving connection matrix:', name + ending
+        if not name[ name.index('A') + 1 : name.index('i') ] == name[name.index('iA') + 1:]:
+            weight_matrix = np.ones((n_i, n_e)) * weight['ie']
+            weight_list = [ (i, j, weight_matrix[i, j]) for j in xrange(n_e) for i in xrange(n_i) ]
+            
+            print '...saving connection matrix:', name + ending
 
-        np.save(dataPath + name + ending, weight_list)
+            np.save(dataPath + name + ending, weight_list)
+        else:
+            weight_matrix = np.ones((n_i, n_e)) * weight['ie']
+            np.fill_diagonal(weight_matrix, 0)
+            weight_list = [ (i, j, weight_matrix[i, j]) for j in xrange(n_e) for i in xrange(n_i) ]
+            
+            print '...saving connection matrix:', name + ending
+
+            np.save(dataPath + name + ending, weight_list)
     
     print '\n'
          
-if __name__ == "__main__":
+if __name__ == '__main__':
     create_weights()
     
 
