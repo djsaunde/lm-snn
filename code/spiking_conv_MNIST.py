@@ -197,7 +197,7 @@ def get_2d_input_weights():
         for n in xrange(n_e):
             rearranged_weights[idx * conv_size : (idx + 1) * conv_size, n * conv_size : (n + 1) * conv_size] = weight_matrix[:, n].reshape((conv_size, conv_size))
     
-    return rearranged_weights
+    return rearranged_weights.T
 
 
 def plot_2d_input_weights():
@@ -408,9 +408,9 @@ else:
     conv_stride = int(conv_stride)
 
 # number of convolution features
-conv_features = raw_input('Enter number of convolution features to learn (default 9): ')
+conv_features = raw_input('Enter number of convolution features to learn (default 10): ')
 if conv_features == '':
-    conv_features = 9
+    conv_features = 10
 else:
     conv_features = int(conv_features)
 

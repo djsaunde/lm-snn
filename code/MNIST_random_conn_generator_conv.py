@@ -35,9 +35,9 @@ def create_weights():
         conv_stride = int(conv_stride)
 
     # number of convolution features
-    conv_features = raw_input('Enter number of convolution features to learn (default 9): ')
+    conv_features = raw_input('Enter number of convolution features to learn (default 10): ')
     if conv_features == '':
-        conv_features = 9
+        conv_features = 10
     else:
         conv_features = int(conv_features)
 
