@@ -59,7 +59,7 @@ def get_labeled_data(picklename, bTrain = True):
             y[i] = unpack('>B', labels.read(1))[0]
 
         data = {'x': x, 'y': y, 'rows': rows, 'cols': cols}
-        pickle.dump(data, open("%s.pickle" % picklename, "wb"))
+        p.dump(data, open("%s.pickle" % picklename, "wb"))
     return data
 
 
@@ -658,7 +658,7 @@ if record_spikes:
 # creating convolution locations inside the input image
 convolution_locations = {}
 for n in xrange(n_e):
-	convolution_locations[n] = [ ((n % n_e_sqrt) * conv_stride + (n // n_e_sqrt) * n_input_sqrt * conv_stride) + (x * n_input_sqrt) + y for y in xrange(conv_size) for x in xrange(conv_size) ]
+    convolution_locations[n] = [ ((n % n_e_sqrt) * conv_stride + (n // n_e_sqrt) * n_input_sqrt * conv_stride) + (x * n_input_sqrt) + y for y in xrange(conv_size) for x in xrange(conv_size) ]
 
 # creating Poission spike train from input image (784 vector, 28x28 image)
 for name in input_population_names:
@@ -808,6 +808,9 @@ while j < num_examples:
                 perf_plot, performance = update_performance_plot(performance_monitor, performance, j, fig_performance)
                 # printing out classification performance results so far
                 print '\nClassification performance', performance[:int(j / float(update_interval)) + 1], '\n'
+                target = open('../performance/' + ending + '_iter_' + str(j), 'w')
+                target.truncate()
+                target.write(performance[:int(j / float(update_interval)) + 1])
                 
         # set input firing rates back to zero
         for name in input_population_names:
