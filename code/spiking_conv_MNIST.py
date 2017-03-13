@@ -356,7 +356,7 @@ if test_mode:
     update_interval = num_examples
 else:
     weight_path = data_path + 'random/'
-    num_examples = 100 * 1
+    num_examples = 60000 * 1
     use_testing_set = False
     do_plot_performance = True
     record_spikes = True
