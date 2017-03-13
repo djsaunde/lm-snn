@@ -356,12 +356,14 @@ if test_mode:
     update_interval = num_examples
 else:
     weight_path = data_path + 'random/'
-    num_examples = 60000 * 1
+    num_examples = 100 * 1
     use_testing_set = False
     do_plot_performance = True
     record_spikes = True
     ee_STDP_on = True
 
+# plotting or not
+do_plot = True
 
 # number of inputs to the network
 n_input = 784
@@ -441,7 +443,7 @@ else:
     update_interval = 100
 
 # set weight update interval (plotting)
-weight_update_interval = 1
+weight_update_interval = 25
 
 # rest potential parameters, reset potential parameters, threshold potential parameters, and refractory periods
 v_rest_e = -65. * b.mV
@@ -640,7 +642,7 @@ for name in population_names:
         spike_monitors[name + 'e'] = b.SpikeMonitor(neuron_groups[name + 'e'])
         spike_monitors[name + 'i'] = b.SpikeMonitor(neuron_groups[name + 'i'])
 
-if record_spikes:
+if record_spikes and do_plot:
     b.figure(fig_num)
     fig_num += 1
     b.ion()
@@ -711,17 +713,18 @@ input_numbers = [0] * num_examples
 outputNumbers = np.zeros((num_examples, 10))
 
 # plot input weights
-if not test_mode:
+if not test_mode and do_plot:
     input_weight_monitor, fig_weights = plot_2d_input_weights()
     fig_num += 1
 
 # plot input intensities
 rates = np.zeros((n_input_sqrt, n_input_sqrt))
-input_image_monitor, input_image = plot_input()
+if do_plot:
+    input_image_monitor, input_image = plot_input()
 fig_num += 1
 
 # plot performance
-if do_plot_performance:
+if do_plot_performance and do_plot:
     performance_monitor, performance, fig_num, fig_performance = plot_performance(fig_num)
 
 # set firing rates to zero initially
@@ -748,7 +751,8 @@ while j < num_examples:
         rates = training['x'][j % 60000, :, :] / 8. * input_intensity
     
     # plot the input at this step
-    input_image_monitor = update_input(input_image_monitor, input_image)
+    if do_plot:
+        input_image_monitor = update_input(input_image_monitor, input_image)
     
     # sets the input firing rates
     input_groups['Xe'].rate = rates.reshape(n_input)
@@ -760,10 +764,6 @@ while j < num_examples:
     if j % update_interval == 0 and j > 0:
         assignments = get_new_assignments(result_monitor[:], input_numbers[j - update_interval : j])
     
-    # update weights every 'weight_update_interval'
-    if j % weight_update_interval == 0 and not test_mode:
-        update_2d_input_weights(input_weight_monitor, fig_weights)
-    
     # get count of spikes over the past iteration
     current_spike_count = np.asarray( [ spike_counters['A' + str(i) + 'e'].count[:] for i in range(conv_features) ] ) - previous_spike_count
     
@@ -771,6 +771,10 @@ while j < num_examples:
     
     # set weights to those of the most-fired neuron
     set_weights_most_fired()
+
+    # update weights every 'weight_update_interval'
+    if j % weight_update_interval == 0 and not test_mode and do_plot:
+        update_2d_input_weights(input_weight_monitor, fig_weights)
     
     # if there weren't a certain number of spikes
     if np.sum(current_spike_count) < 5:
@@ -803,14 +807,14 @@ while j < num_examples:
         
         # plot performance if appropriate
         if j % update_interval == 0 and j > 0:
-            if do_plot_performance:
+            if do_plot_performance and do_plot:
                 # updating the performance plot
                 perf_plot, performance = update_performance_plot(performance_monitor, performance, j, fig_performance)
                 # printing out classification performance results so far
-                print '\nClassification performance', performance[:int(j / float(update_interval)) + 1], '\n'
-                target = open('../performance/' + ending + '_iter_' + str(j), 'w')
-                target.truncate()
-                target.write(performance[:int(j / float(update_interval)) + 1])
+            print '\nClassification performance', performance[:int(j / float(update_interval)) + 1], '\n'
+            target = open('../performance/' + ending + '_iter_' + str(j), 'w')
+            target.truncate()
+            target.write(performance[:int(j / float(update_interval)) + 1])
                 
         # set input firing rates back to zero
         for name in input_population_names:
@@ -823,7 +827,51 @@ while j < num_examples:
         # increment the example counter
         j += 1
 
+################ 
+# SAVE RESULTS #
+################ 
 
+print '...saving results'
 
+if not test_mode:
+    save_theta()
+if not test_mode:
+    save_connections()
+else:
+    np.save(data_path + 'activity/resultPopVecs' + str(num_examples) + '_' + stdp_input, result_monitor)
+    np.save(data_path + 'activity/inputNumbers' + str(num_examples) + '_' + stdp_input, input_numbers)
 
+################ 
+# PLOT RESULTS #
+################
+
+if do_plot:
+    if rate_monitors:
+        b.figure(fig_num)
+        fig_num += 1
+        for i, name in enumerate(rate_monitors):
+            b.subplot(len(rate_monitors), 1, i + 1)
+            b.plot(rate_monitors[name].times / b.second, rate_monitors[name].rate, '.')
+            b.title('Rates of population ' + name)
+
+    if spike_monitors:
+        b.figure(fig_num)
+        fig_num += 1
+        for i, name in enumerate(spike_monitors):
+            b.subplot(len(spike_monitors), 1, i + 1)
+            b.raster_plot(spike_monitors[name])
+            b.title('Spikes of population ' + name)
+            
+    if spike_counters:
+        b.figure(fig_num)
+        fig_num += 1
+        for i, name in enumerate(spike_counters):
+            b.subplot(len(spike_counters), 1, i + 1)
+            b.plot(np.array([ spike_counters['A' + str(i) + 'e'].count[:] for i in xrange(conv_features) ]))
+            b.title('Spike count of population ' + name)
+
+    plot_2d_input_weights()
+
+    b.ioff()
+    b.show()
 
