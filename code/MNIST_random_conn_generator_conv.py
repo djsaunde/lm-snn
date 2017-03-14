@@ -83,7 +83,7 @@ def create_weights():
     weight_list = []
     for feature in xrange(conv_features):    
         weight_list.extend([ (feature * n_e + i, feature, weight['ei']) for i in xrange(n_e) ])
-        
+            
     print '...saving connection matrix:', 'AeAi' + ending
     
     np.save(dataPath + 'AeAi' + ending, weight_list)
@@ -94,7 +94,10 @@ def create_weights():
     weight_list = []
     for feature in xrange(conv_features):
         weight_matrix = np.ones((1, conv_features * n_e)) * weight['ie']
-        weight_list.extend([ (feature, feature * n_e + i, weight_matrix[0, i]) for i in xrange(conv_features * n_e) ])
+        weight_list.extend([ (feature, i, weight_matrix[0, i]) for i in xrange(conv_features * n_e) ])
+    
+        # weight_matrix = np.ones((conv_features, conv_features * n_e)) * weight['ie']
+        # weight_list.extend([ (feature * n_e + j, feature * n_e + i, weight_matrix[0, i]) for i in xrange(conv_features * n_e) for j in xrange(conv_features) ])
 
     print '...saving connection matrix:', 'AiAe' + ending
 

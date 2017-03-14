@@ -5,7 +5,7 @@ windows to map the input to a reduced space.
 
 import numpy as np
 import matplotlib.cm as cmap
-import time, os.path, scipy, math, sys
+import time, os.path, scipy, math, sys, timeit
 import cPickle as p
 import brian_no_units
 import brian as b
@@ -444,7 +444,10 @@ else:
     update_interval = 100
 
 # set weight update interval (plotting)
-weight_update_interval = 1
+weight_update_interval = 20
+
+# set progress printing interval
+print_progress_interval = 10
 
 # rest potential parameters, reset potential parameters, threshold potential parameters, and refractory periods
 v_rest_e = -65. * b.mV
@@ -614,7 +617,7 @@ for name in population_names:
             # instantiate the created connection with the 'weightMatrix' loaded from file
             for feature in xrange(conv_features):
                 for n in xrange(n_e):
-                    connections[conn_name][feature * n_e + n, n] = weight_matrix[feature * n_e + n, n]
+                    connections[conn_name][feature * n_e + n, feature] = weight_matrix[feature * n_e + n, feature]
 
         elif conn_type == 'ie':
             # create connection name (composed of population and connections types)
@@ -690,9 +693,8 @@ for name in input_connection_names:
         
         for feature in xrange(conv_features):
             for n in xrange(n_e):
-                for x in xrange(conv_size):
-                    for y in xrange(conv_size):
-                        input_connections[conn_name][convolution_locations[n][x * conv_size + y], feature * n_e + n] = weight_matrix[convolution_locations[n][x * conv_size + y], feature * n_e + n]
+                for idx in xrange(conv_size ** 2):
+                    input_connections[conn_name][convolution_locations[n][idx], feature * n_e + n] = weight_matrix[convolution_locations[n][idx], feature * n_e + n]
 
     # if excitatory -> excitatory STDP is specified, add it here (input to excitatory populations)
     if ee_STDP_on:
@@ -737,6 +739,9 @@ for name in input_population_names:
 j = 0
 b.run(0)
 
+# start recording time
+start_time = timeit.default_timer()
+
 while j < num_examples:
     # fetched rates depend on training / test phase, and whether we use the 
     # testing dataset for the test phase
@@ -777,57 +782,45 @@ while j < num_examples:
     if j % weight_update_interval == 0 and not test_mode:
         update_2d_input_weights(input_weight_monitor, fig_weights)
     
-    # if there weren't a certain number of spikes
-    if np.sum(current_spike_count) < 5:
-        # increase the intesity of input
-        input_intensity += 1
-        
-        # set the input firing rates back to zero
-        for name in input_population_names:
-            input_groups[name + 'e'].rate = 0
-        
-        # run the simulation for 'resting_time' to relax back to rest potentials
-        b.run(resting_time)
-    # if there were enough spikes
+	# record the current number of spikes
+    result_monitor[j % update_interval, :] = current_spike_count
+    
+    # decide whether to evaluate on test or training set
+    if test_mode and use_testing_set:
+        input_numbers[j] = testing['y'][j % 10000][0]
     else:
-    	# record the current number of spikes
-        result_monitor[j % update_interval, :] = current_spike_count
-        
-        # decide whether to evaluate on test or training set
-        if test_mode and use_testing_set:
-            input_numbers[j] = testing['y'][j % 10000][0]
-        else:
-            input_numbers[j] = training['y'][j % 60000][0]
-        
-        # get the output classifications of the network
-        outputNumbers[j,:] = get_recognized_number_ranking(assignments, result_monitor[j % update_interval,:])
-        
-        # print progress
-        if j % 10 == 0 and j > 0:
-            print 'runs done:', j, 'of', int(num_examples)
-        
-        # plot performance if appropriate
-        if j % update_interval == 0 and j > 0:
-            if do_plot_performance:
-                # updating the performance plot
-                perf_plot, performance = update_performance_plot(performance_monitor, performance, j, fig_performance)
-                # printing out classification performance results so far
-                print '\nClassification performance', performance[:int(j / float(update_interval)) + 1], '\n'
-                target = open('../performance/' + conn_name + '_' + stdp_input + '_' + ending + '_iter_' + str(j), 'w')
-                target.truncate()
-                target.write(str(performance[:int(j / float(update_interval)) + 1]))
-                target.close()
-                
-        # set input firing rates back to zero
-        for name in input_population_names:
-            input_groups[name + 'e'].rate = 0
-        
-        # run the network for 'resting_time' to relax back to rest potentials
-        b.run(resting_time)
-        # reset the input firing intensity
-        input_intensity = start_input_intensity
-        # increment the example counter
-        j += 1
+        input_numbers[j] = training['y'][j % 60000][0]
+    
+    # get the output classifications of the network
+    outputNumbers[j, :] = get_recognized_number_ranking(assignments, result_monitor[j % update_interval, :])
+    
+    # print progress
+    if j % print_progress_interval == 0 and j > 0:
+        print 'runs done:', j, 'of', int(num_examples), '(time taken for past', print_progress_interval, 'runs:', str(timeit.default_timer() - start_time) + ')'
+        start_time = timeit.default_timer()
+    
+    # plot performance if appropriate
+    if j % update_interval == 0 and j > 0:
+        if do_plot_performance:
+            # updating the performance plot
+            perf_plot, performance = update_performance_plot(performance_monitor, performance, j, fig_performance)
+            # printing out classification performance results so far
+            print '\nClassification performance', performance[:int(j / float(update_interval)) + 1], '\n'
+            target = open('../performance/' + conn_name + '_' + stdp_input + '_' + ending + '_iter_' + str(j), 'w')
+            target.truncate()
+            target.write(str(performance[:int(j / float(update_interval)) + 1]))
+            target.close()
+            
+    # set input firing rates back to zero
+    for name in input_population_names:
+        input_groups[name + 'e'].rate = 0
+    
+    # run the network for 'resting_time' to relax back to rest potentials
+    b.run(resting_time)
+    # reset the input firing intensity
+    input_intensity = start_input_intensity
+    # increment the example counter
+    j += 1
 
 ################ 
 # SAVE RESULTS #
