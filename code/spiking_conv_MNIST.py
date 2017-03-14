@@ -733,6 +733,8 @@ if do_plot:
 # plot performance
 if do_plot_performance and do_plot:
     performance_monitor, performance, fig_num, fig_performance = plot_performance(fig_num)
+else:
+    performance = get_current_performance(np.zeros(int(num_examples / update_interval)), 0)
 
 # set firing rates to zero initially
 for name in input_population_names:
@@ -808,6 +810,8 @@ while j < num_examples:
         if do_plot_performance and do_plot:
             # updating the performance plot
             perf_plot, performance = update_performance_plot(performance_monitor, performance, j, fig_performance)
+        else:
+            performance = get_current_performance(performance, j)
         # printing out classification performance results so far
         print '\nClassification performance', performance[:int(j / float(update_interval)) + 1], '\n'
         target = open('../performance/' + conn_name + '_' + stdp_input + '_' + ending + '_iter_' + str(j), 'w')
