@@ -810,11 +810,12 @@ while j < num_examples:
             if do_plot_performance and do_plot:
                 # updating the performance plot
                 perf_plot, performance = update_performance_plot(performance_monitor, performance, j, fig_performance)
-                # printing out classification performance results so far
+            # printing out classification performance results so far
             print '\nClassification performance', performance[:int(j / float(update_interval)) + 1], '\n'
-            target = open('../performance/' + ending + '_iter_' + str(j), 'w')
+            target = open('../performance/' + conn_name + '_' + stdp_input + '_' + ending + '_iter_' + str(j), 'w')
             target.truncate()
-            target.write(performance[:int(j / float(update_interval)) + 1])
+            target.write(str(performance[:int(j / float(update_interval)) + 1]))
+            target.close()
                 
         # set input firing rates back to zero
         for name in input_population_names:
