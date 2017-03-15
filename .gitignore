@@ -5,3 +5,9 @@
 *.txt
 *.pdf
 *.jpg
+performance/*
+weights/*
+activity/*
+plots/*
+random/*
+time_series/*

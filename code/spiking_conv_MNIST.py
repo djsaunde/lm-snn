@@ -84,7 +84,7 @@ def get_matrix_from_file(file_name, n_src, n_tgt):
     return weight_matrix
 
 
-def save_connections(ending = ''):
+def save_connections(ending=''):
     '''
     Save all connections in 'save_conns'; ending may be set to the index of the last
     example run through the network
@@ -100,21 +100,21 @@ def save_connections(ending = ''):
         # sparsify it into (row, column, entry) tuples
         conn_list_sparse = ([(i, j, conn_matrix[i, j]) for i in xrange(conn_matrix.shape[0]) for j in xrange(conn_matrix.shape[1]) ])
         # save it out to disk
-        np.save(data_path + 'weights/' + conn_name + '_' + stdp_input + '_' + ending, conn_list_sparse)
+        np.save(data_path + 'weights/' + conn_name + '_' + stdp_input + ending, conn_list_sparse)
 
 
-def save_theta(ending = ''):
+def save_theta(ending=''):
     '''
     Save the adaptive threshold parameters to a file.
     '''
 
     # print out saved theta populations
-    print '...saving theta:  ' + ', '.join(population_names)
+    print '...saving theta: ' + pop_name + '_' + stdp_input + '_' + ending
 
     # iterate over population for which to save theta parameters
     for pop_name in population_names:
     	# save out the theta parameters to file
-        np.save(data_path + 'weights/theta_' + pop_name + '_' + stdp_input + '_' + ending, neuron_groups[pop_name + 'e'].theta)
+        np.save(data_path + 'weights/theta_' + pop_name + '_' + stdp_input + ending, neuron_groups[pop_name + 'e'].theta)
 
 
 def set_weights_most_fired():
@@ -282,10 +282,11 @@ def get_new_assignments(result_monitor, input_numbers):
     assignments = np.zeros((conv_features, n_e))
     input_nums = np.asarray(input_numbers)
     maximum_rate = np.zeros(conv_features * n_e)
+    
     for j in xrange(10):
         num_assignments = len(np.where(input_nums == j)[0])
         if num_assignments > 0:
-            rate = np.sum(result_monitor[input_nums == j], axis = 0) / num_assignments
+            rate = np.sum(result_monitor[input_nums == j], axis=0) / num_assignments
             for i in xrange(conv_features * n_e):
                 if rate[i // n_e, i % n_e] > maximum_rate[i]:
                     maximum_rate[i] = rate[i // n_e, i % n_e]
@@ -359,7 +360,7 @@ else:
     ee_STDP_on = True
 
 # plotting or not
-do_plot = True
+do_plot = False
 
 # number of inputs to the network
 n_input = 784
@@ -597,7 +598,7 @@ for name in population_names:
     # if we're in test mode / using some stored weights
     if test_mode or weight_path[-8:] == 'weights/':
         # load up adaptive threshold parameters
-        neuron_groups['e'].theta = np.load(weight_path + 'theta_A_' + stdp_input + '.npy')
+        neuron_groups['e'].theta = np.load(weight_path + 'theta_A_' + stdp_input + '_.npy')
     else:
         # otherwise, set the adaptive additive threshold parameter at 20mV
         neuron_groups['e'].theta = np.ones((n_e_total)) * 20.0 * b.mV
@@ -737,7 +738,6 @@ for name in input_population_names:
 # initialize network
 j = 0
 b.run(0)
-num_repeats = 0
 
 # start recording time
 start_time = timeit.default_timer()
@@ -783,10 +783,9 @@ while j < num_examples:
         update_2d_input_weights(input_weight_monitor, fig_weights)
     
     # if the neurons in the network didn't spike more than four times
-    if np.sum(current_spike_count) < 5 and num_repeats < 3:
+    if np.sum(current_spike_count) < 5:
         # increase the intensity of input
         input_intensity += 2
-        num_repeats += 1
         
         # set all network firing rates to zero
         for name in input_population_names:
@@ -837,7 +836,6 @@ while j < num_examples:
         input_intensity = start_input_intensity
         # increment the example counter
         j += 1
-        num_repeats = 0
 
 ################ 
 # SAVE RESULTS #
@@ -850,8 +848,8 @@ if not test_mode:
 if not test_mode:
     save_connections()
 else:
-    np.save(data_path + 'activity/resultPopVecs' + str(num_examples) + '_' + stdp_input, result_monitor)
-    np.save(data_path + 'activity/inputNumbers' + str(num_examples) + '_' + stdp_input, input_numbers)
+    np.save(data_path + 'activity/resultPopVecs' + str(num_examples) + '_' + stdp_input + '_' + ending, result_monitor)
+    np.save(data_path + 'activity/inputNumbers' + str(num_examples) + '_' + stdp_input + '_' + ending, input_numbers)
 
 ################ 
 # PLOT RESULTS #
