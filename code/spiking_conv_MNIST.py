@@ -10,6 +10,7 @@ import cPickle as p
 import brian_no_units
 import brian as b
 
+from scipy.sparse import coo_matrix
 from struct import unpack
 from brian import *
 
@@ -123,14 +124,15 @@ def set_weights_most_fired():
     '''
     for conn_name in input_connections:
     	for feature in xrange(conv_features):
-            connection = np.copy(input_connections[conn_name][:].todense())[:, feature * n_e:(feature + 1) * n_e]
             column_sums = np.sum(current_spike_count[feature : feature + 1, :], axis=0)
             most_spiked = np.argmax(column_sums)
 
             for n in xrange(n_e):
                 if n != most_spiked:
-                    for idx in xrange(conv_size ** 2):
-                        input_connections[conn_name][convolution_locations[n][idx], feature * n_e + n] = input_connections[conn_name][convolution_locations[most_spiked][idx], feature * n_e + most_spiked]
+                    temp1 = input_connections[conn_name][:, feature * n_e + n].todense()
+                    temp2 = input_connections[conn_name][:, feature * n_e + most_spiked].todense()
+                    temp1[convolution_locations[n]] = temp2[convolution_locations[most_spiked]]
+                    input_connections[conn_name][:, feature * n_e + n] = temp1
 
 
 def normalize_weights():
@@ -138,24 +140,16 @@ def normalize_weights():
     Squash the input -> excitatory weights to sum to a prespecified number.
     '''
     for conn_name in input_connections:
+        connection = input_connections[conn_name][:].todense()
     	for feature in xrange(conv_features):
-            connection = np.copy(input_connections[conn_name][:].todense())[:, feature * n_e:(feature + 1) * n_e]
-            column_sums = np.sum(connection, axis=0)
+            feature_connection = connection[:, feature * n_e : (feature + 1) * n_e]
+            column_sums = np.sum(feature_connection, axis=0)
             column_factors = weight['ee_input'] / column_sums
 
             for n in xrange(n_e):
-                for idx in xrange(conv_size ** 2):
-                    input_connections[conn_name][convolution_locations[n][idx], feature * n_e + n] *= column_factors[n]
-
-
-def is_lattice_connection(i, j):
-    '''
-    Boolean method which checks if two indices in a network correspond to neighboring nodes in a lattice.
-
-    i: First neuron's index
-    k: Second neuron's index
-    '''
-    return i + 1 == j and j % n_input_sqrt != 0 or i - 1 == j and i % n_input_sqrt != 0 or i + n_input_sqrt == j or i - n_input_sqrt == j
+                temp = input_connections[conn_name][:, feature * n_e + n].todense()
+                temp[convolution_locations[n]] *= column_factors[n]
+                input_connections[conn_name][:, feature * n_e + n] = temp
 
 
 def plot_input():
@@ -188,17 +182,17 @@ def get_2d_input_weights():
     
     # counts number of input -> excitatory weights displayed so far
     connection = input_connections['XeAe' + ending][:]
-    weight_matrix = np.zeros((conv_size ** 2, n_e * conv_features))
 
+    # for each convolution feature
     for feature in xrange(conv_features):
+        # for each excitatory neuron in this convolution feature
         for n in xrange(n_e):
-            for idx in xrange(conv_size ** 2):
-                weight_matrix[idx, feature * n_e + n] = connection[convolution_locations[n][idx], feature * n_e + n]
-        
-    for feature in xrange(conv_features):
-	    for n in xrange(n_e):
-	        rearranged_weights[feature * conv_size : (feature + 1) * conv_size, n * conv_size : (n + 1) * conv_size] = weight_matrix[:, feature * n_e + n].reshape((conv_size, conv_size))
+            # get the connection weights from the input to this neuron
+            temp = connection[:, feature * n_e + n].todense()
+            # add it to the rearranged weights for displaying to the user
+            rearranged_weights[feature * conv_size : (feature + 1) * conv_size, n * conv_size : (n + 1) * conv_size] = temp[convolution_locations[n]].reshape((conv_size, conv_size))
 
+    # return the rearranged weights to display to the user
     return rearranged_weights.T
 
 
@@ -336,7 +330,7 @@ b.set_global_preferences(
                         usenewpropagate = True,  # Whether or not to use experimental new C propagation functions.
                         usecstdp = True,  # Whether or not to use experimental new C STDP.
                         openmp = False, # whether or not to use OpenMP pragmas in generated C code.
-                        magic_useframes = True, # defines whether or not the magic functions should serach for objects defined only in the calling frame,
+                        magic_useframes = False, # defines whether or not the magic functions should serach for objects defined only in the calling frame,
                                                 # or if they should find all objects defined in any frame. Set to "True" if not in an interactive shell.
                         useweave_linear_diffeq = True, # Whether to use weave C++ acceleration for the solution of linear differential equations.
                        )
@@ -365,7 +359,7 @@ else:
     ee_STDP_on = True
 
 # plotting or not
-do_plot = False
+do_plot = True
 
 # number of inputs to the network
 n_input = 784
@@ -398,16 +392,16 @@ elif test_mode and classes_input != '':
     testing = new_testing
 
 # size of convolution windows
-conv_size = raw_input('Enter size of square side length of convolution window (default 20): ')
+conv_size = raw_input('Enter size of square side length of convolution window (default 27): ')
 if conv_size == '':
-    conv_size = 20
+    conv_size = 27
 else:
     conv_size = int(conv_size)
 
 # stride of convolution windows
-conv_stride = raw_input('Enter stride size of convolution window (default 8): ')
+conv_stride = raw_input('Enter stride size of convolution window (default 1): ')
 if conv_stride == '':
-    conv_stride = 8
+    conv_stride = 1
 else:
     conv_stride = int(conv_stride)
 
@@ -446,7 +440,7 @@ else:
     update_interval = 100
 
 # set weight update interval (plotting)
-weight_update_interval = 20
+weight_update_interval = 1
 
 # set progress printing interval
 print_progress_interval = 10
@@ -743,6 +737,7 @@ for name in input_population_names:
 # initialize network
 j = 0
 b.run(0)
+num_repeats = 0
 
 # start recording time
 start_time = timeit.default_timer()
@@ -778,7 +773,6 @@ while j < num_examples:
     
     # get count of spikes over the past iteration
     current_spike_count = np.copy(spike_counters['Ae'].count[:]).reshape((conv_features, n_e)) - previous_spike_count
-    
     previous_spike_count = np.copy(spike_counters['Ae'].count[:]).reshape((conv_features, n_e))
     
     # set weights to those of the most-fired neuron
@@ -788,47 +782,62 @@ while j < num_examples:
     if j % weight_update_interval == 0 and not test_mode and do_plot:
         update_2d_input_weights(input_weight_monitor, fig_weights)
     
-	# record the current number of spikes
-    result_monitor[j % update_interval, :] = current_spike_count
-    
-    # decide whether to evaluate on test or training set
-    if test_mode and use_testing_set:
-        input_numbers[j] = testing['y'][j % 10000][0]
+    # if the neurons in the network didn't spike more than four times
+    if np.sum(current_spike_count) < 5 and num_repeats < 3:
+        # increase the intensity of input
+        input_intensity += 2
+        num_repeats += 1
+        
+        # set all network firing rates to zero
+        for name in input_population_names:
+            input_groups[name + 'e'].rate = 0
+
+        # let the network relax back to equilibrium
+        b.run(resting_time)
+    # otherwise, record results and confinue simulation
     else:
-        input_numbers[j] = training['y'][j % 60000][0]
-    
-    # get the output classifications of the network
-    outputNumbers[j, :] = get_recognized_number_ranking(assignments, result_monitor[j % update_interval, :])
-    
-    # print progress
-    if j % print_progress_interval == 0 and j > 0:
-        print 'runs done:', j, 'of', int(num_examples), '(time taken for past', print_progress_interval, 'runs:', str(timeit.default_timer() - start_time) + ')'
-        start_time = timeit.default_timer()
-    
-    # plot performance if appropriate
-    if j % update_interval == 0 and j > 0:
-        if do_plot_performance and do_plot:
-            # updating the performance plot
-            perf_plot, performance = update_performance_plot(performance_monitor, performance, j, fig_performance)
+    	# record the current number of spikes
+        result_monitor[j % update_interval, :] = current_spike_count
+        
+        # decide whether to evaluate on test or training set
+        if test_mode and use_testing_set:
+            input_numbers[j] = testing['y'][j % 10000][0]
         else:
-            performance = get_current_performance(performance, j)
-        # printing out classification performance results so far
-        print '\nClassification performance', performance[:int(j / float(update_interval)) + 1], '\n'
-        target = open('../performance/' + conn_name + '_' + stdp_input + '_' + ending + '_iter_' + str(j), 'w')
-        target.truncate()
-        target.write(str(performance[:int(j / float(update_interval)) + 1]))
-        target.close()
-            
-    # set input firing rates back to zero
-    for name in input_population_names:
-        input_groups[name + 'e'].rate = 0
-    
-    # run the network for 'resting_time' to relax back to rest potentials
-    b.run(resting_time)
-    # reset the input firing intensity
-    input_intensity = start_input_intensity
-    # increment the example counter
-    j += 1
+            input_numbers[j] = training['y'][j % 60000][0]
+        
+        # get the output classifications of the network
+        outputNumbers[j, :] = get_recognized_number_ranking(assignments, result_monitor[j % update_interval, :])
+        
+        # print progress
+        if j % print_progress_interval == 0 and j > 0:
+            print 'runs done:', j, 'of', int(num_examples), '(time taken for past', print_progress_interval, 'runs:', str(timeit.default_timer() - start_time) + ')'
+            start_time = timeit.default_timer()
+        
+        # plot performance if appropriate
+        if j % update_interval == 0 and j > 0:
+            if do_plot_performance and do_plot:
+                # updating the performance plot
+                perf_plot, performance = update_performance_plot(performance_monitor, performance, j, fig_performance)
+            else:
+                performance = get_current_performance(performance, j)
+            # printing out classification performance results so far
+            print '\nClassification performance', performance[:int(j / float(update_interval)) + 1], '\n'
+            target = open('../performance/' + conn_name + '_' + stdp_input + '_' + ending + '_iter_' + str(j), 'w')
+            target.truncate()
+            target.write(str(performance[:int(j / float(update_interval)) + 1]))
+            target.close()
+                
+        # set input firing rates back to zero
+        for name in input_population_names:
+            input_groups[name + 'e'].rate = 0
+        
+        # run the network for 'resting_time' to relax back to rest potentials
+        b.run(resting_time)
+        # reset the input firing intensity
+        input_intensity = start_input_intensity
+        # increment the example counter
+        j += 1
+        num_repeats = 0
 
 ################ 
 # SAVE RESULTS #
