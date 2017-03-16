@@ -89,8 +89,15 @@ def get_new_assignments(result_monitor, input_numbers):
 
 MNIST_data_path = '../data/'
 data_path = '../activity/'
-training_ending = '10000'
-testing_ending = '10000'
+
+training_ending = raw_input('Enter number of training samples: ')
+if training_ending == '':
+    training_ending = '10000'
+
+testing_ending = raw_input('Enter number of test examples: ')
+if testing_ending == '':
+    testing_ending = '10000'
+
 start_time_training = 0
 end_time_training = int(training_ending)
 start_time_testing = 0
@@ -174,7 +181,7 @@ assignments = get_new_assignments(training_result_monitor[start_time_training : 
                                   training_input_numbers[start_time_training : end_time_training])
 
 counter = 0 
-num_tests = end_time_testing / 10000
+num_tests = end_time_testing / 10000clear
 sum_accurracy = [0] * num_tests
 
 

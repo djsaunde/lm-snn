@@ -84,14 +84,14 @@ def get_matrix_from_file(file_name, n_src, n_tgt):
     return weight_matrix
 
 
-def save_connections(ending=''):
+def save_connections():
     '''
     Save all connections in 'save_conns'; ending may be set to the index of the last
     example run through the network
     '''
 
     # print out saved connections
-    print '...saving connections: ' + ', '.join(save_conns)
+    print '...saving connections: weights/' + save_conns[0] + '_' + stdp_input
 
     # iterate over all connections to save
     for conn_name in save_conns:
@@ -100,21 +100,21 @@ def save_connections(ending=''):
         # sparsify it into (row, column, entry) tuples
         conn_list_sparse = ([(i, j, conn_matrix[i, j]) for i in xrange(conn_matrix.shape[0]) for j in xrange(conn_matrix.shape[1]) ])
         # save it out to disk
-        np.save(data_path + 'weights/' + conn_name + '_' + stdp_input + ending, conn_list_sparse)
+        np.save(data_path + 'weights/' + conn_name + '_' + stdp_input, conn_list_sparse)
 
 
-def save_theta(ending=''):
+def save_theta():
     '''
     Save the adaptive threshold parameters to a file.
     '''
 
-    # print out saved theta populations
-    print '...saving theta: ' + pop_name + '_' + stdp_input + '_' + ending
-
     # iterate over population for which to save theta parameters
     for pop_name in population_names:
-    	# save out the theta parameters to file
-        np.save(data_path + 'weights/theta_' + pop_name + '_' + stdp_input + ending, neuron_groups[pop_name + 'e'].theta)
+    	# print out saved theta populations
+        print '...saving theta: weights/theta_' + pop_name + ending + '_' + stdp_input
+
+        # save out the theta parameters to file
+        np.save(data_path + 'weights/theta_' + pop_name + ending + '_' + stdp_input, neuron_groups[pop_name + 'e'].theta)
 
 
 def set_weights_most_fired():
@@ -345,7 +345,7 @@ data_path = '../'
 # set parameters for simulation based on train / test mode
 if test_mode:
     weight_path = data_path + 'weights/'
-    num_examples = 10000 * 1
+    num_examples = 100 * 1
     use_testing_set = True
     do_plot_performance = False
     record_spikes = True
@@ -353,7 +353,7 @@ if test_mode:
     update_interval = num_examples
 else:
     weight_path = data_path + 'random/'
-    num_examples = 60000 * 1
+    num_examples = 100 * 1
     use_testing_set = False
     do_plot_performance = True
     record_spikes = True
@@ -441,7 +441,7 @@ else:
     update_interval = 100
 
 # set weight update interval (plotting)
-weight_update_interval = 1
+weight_update_interval = 25
 
 # set progress printing interval
 print_progress_interval = 10
@@ -598,7 +598,7 @@ for name in population_names:
     # if we're in test mode / using some stored weights
     if test_mode or weight_path[-8:] == 'weights/':
         # load up adaptive threshold parameters
-        neuron_groups['e'].theta = np.load(weight_path + 'theta_A_' + stdp_input + '_.npy')
+        neuron_groups['e'].theta = np.load(weight_path + 'theta_A' + ending + '_' + stdp_input + '.npy')
     else:
         # otherwise, set the adaptive additive threshold parameter at 20mV
         neuron_groups['e'].theta = np.ones((n_e_total)) * 20.0 * b.mV
@@ -681,7 +681,7 @@ for name in input_connection_names:
         
         # get weight matrix depending on training or test phase
         if test_mode:
-            weight_matrix = get_matrix_from_file(weight_path + conn_name + '_' + stdp_input + '_.npy', n_input, conv_features * n_e)
+            weight_matrix = get_matrix_from_file(weight_path + conn_name + '_' + stdp_input + '.npy', n_input, conv_features * n_e)
         else:
             weight_matrix = get_matrix_from_file(weight_path + conn_name + '.npy', n_input, conv_features * n_e)	
 
@@ -738,6 +738,8 @@ for name in input_population_names:
 # initialize network
 j = 0
 b.run(0)
+
+weights_name = 'XeAe' + ending
 
 # start recording time
 start_time = timeit.default_timer()
@@ -848,8 +850,8 @@ if not test_mode:
 if not test_mode:
     save_connections()
 else:
-    np.save(data_path + 'activity/resultPopVecs' + str(num_examples) + '_' + stdp_input + '_' + ending, result_monitor)
-    np.save(data_path + 'activity/inputNumbers' + str(num_examples) + '_' + stdp_input + '_' + ending, input_numbers)
+    np.save(data_path + 'activity/resultPopVecs' + str(num_examples) + '_' + stdp_input + ending, result_monitor)
+    np.save(data_path + 'activity/inputNumbers' + str(num_examples) + '_' + stdp_input + ending, input_numbers)
 
 ################ 
 # PLOT RESULTS #
@@ -863,7 +865,7 @@ if do_plot:
             b.subplot(len(rate_monitors), 1, i + 1)
             b.plot(rate_monitors[name].times / b.second, rate_monitors[name].rate, '.')
             b.title('Rates of population ' + name)
-        
+
     if spike_monitors:
         b.figure(fig_num)
         fig_num += 1
