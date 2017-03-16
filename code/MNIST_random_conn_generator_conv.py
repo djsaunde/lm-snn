@@ -66,49 +66,42 @@ def create_weights():
     for n in xrange(n_e):
         conv_indices.append([ ((n % n_e_sqrt) * conv_stride + (n // n_e_sqrt) * n_input_sqrt * conv_stride) + (x * n_input_sqrt) + y for y in xrange(conv_size) for x in xrange(conv_size) ])
     
-    connNameList = [ 'XeA' + str(i) + 'e' for i in xrange(conv_features) ]
-    for name in connNameList:
-        weight_matrix = (np.random.random((conv_size ** 2, 1)) + 0.01) * weight['ee_input']
-        
-        weight_list = []
+    weight_matrix = (np.random.random((conv_size ** 2, conv_features * n_e)) + 0.01) * weight['ee_input']
+    
+    weight_list = []
+    for feature in xrange(conv_features):
         for j in xrange(n_e):
-            weight_list.extend([ (i, j, weight_matrix[idx, 0]) for idx, i in enumerate(conv_indices[j]) ])
-        
-        print '...saving connection matrix:', name + ending
-        
-        np.save(dataPath + name + ending, weight_list)
+            weight_list.extend([ (i, feature * n_e + j, weight_matrix[idx, feature * n_e + j]) for idx, i in enumerate(conv_indices[j]) ])
+    
+    print '...saving connection matrix:', 'XeAe' + ending
+    
+    np.save(dataPath + 'XeAe' + ending, weight_list)
     
     
     print '...creating connection matrix from excitatory layer -> inbitory layer'
     
-    connNameList = [ 'A' + str(i) + 'eA' + str(i) + 'i' for i in xrange(conv_features) ]
-    for name in connNameList:
-        weight_list = [ (i, i, weight['ei']) for i in xrange(n_e) ]
-        
-        print '...saving connection matrix:', name + ending
-        
-        np.save(dataPath + name + ending, weight_list)
+    weight_list = []
+    for feature in xrange(conv_features):    
+        weight_list.extend([ (feature * n_e + i, feature, weight['ei']) for i in xrange(n_e) ])
+            
+    print '...saving connection matrix:', 'AeAi' + ending
+    
+    np.save(dataPath + 'AeAi' + ending, weight_list)
         
               
     print '...creating connection matrix from inhbitory layer -> excitatory layer'
     
-    connNameList = [ 'A' + str(i) + 'iA' + str(j) + 'e' for i in xrange(conv_features) for j in xrange(conv_features) ]
-    for name in connNameList:
-        if not name[ name.index('A') + 1 : name.index('i') ] == name[name.index('iA') + 1:]:
-            weight_matrix = np.ones((n_i, n_e)) * weight['ie']
-            weight_list = [ (i, j, weight_matrix[i, j]) for j in xrange(n_e) for i in xrange(n_i) ]
-            
-            print '...saving connection matrix:', name + ending
+    weight_list = []
+    for feature in xrange(conv_features):
+        weight_matrix = np.ones((1, conv_features * n_e)) * weight['ie']
+        weight_list.extend([ (feature, i, weight_matrix[0, i]) for i in xrange(conv_features * n_e) ])
+    
+        # weight_matrix = np.ones((conv_features, conv_features * n_e)) * weight['ie']
+        # weight_list.extend([ (feature * n_e + j, feature * n_e + i, weight_matrix[0, i]) for i in xrange(conv_features * n_e) for j in xrange(conv_features) ])
 
-            np.save(dataPath + name + ending, weight_list)
-        else:
-            weight_matrix = np.ones((n_i, n_e)) * weight['ie']
-            np.fill_diagonal(weight_matrix, 0)
-            weight_list = [ (i, j, weight_matrix[i, j]) for j in xrange(n_e) for i in xrange(n_i) ]
-            
-            print '...saving connection matrix:', name + ending
+    print '...saving connection matrix:', 'AiAe' + ending
 
-            np.save(dataPath + name + ending, weight_list)
+    np.save(dataPath + 'AiAe' + ending, weight_list)
     
     print '\n'
          

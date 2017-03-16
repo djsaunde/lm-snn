@@ -5,13 +5,16 @@ windows to map the input to a reduced space.
 
 import numpy as np
 import matplotlib.cm as cmap
-import time, os.path, scipy, math, sys
+import time, os.path, scipy, math, sys, timeit
 import cPickle as p
 import brian_no_units
 import brian as b
 
+from scipy.sparse import coo_matrix
 from struct import unpack
 from brian import *
+
+np.set_printoptions(threshold=np.nan)
 
 # only show log messages of level ERROR or higher
 b.log_level_error()
@@ -73,9 +76,6 @@ def get_matrix_from_file(file_name, n_src, n_tgt):
     # correctly-shaped zeros matrix
     readout = np.load(file_name)
     weight_matrix = np.zeros((n_src, n_tgt))
-    
-    print file_name
-    print readout.shape
 
     # read the 'readout' ndarray values into weight_matrix by (row, column) indices
     weight_matrix[np.int32(readout[:,0]), np.int32(readout[:,1])] = readout[:,2]
@@ -84,14 +84,14 @@ def get_matrix_from_file(file_name, n_src, n_tgt):
     return weight_matrix
 
 
-def save_connections(ending = ''):
+def save_connections():
     '''
     Save all connections in 'save_conns'; ending may be set to the index of the last
     example run through the network
     '''
 
     # print out saved connections
-    print '...saving connections: ' + ', '.join(save_conns)
+    print '...saving connections: weights/' + save_conns[0] + '_' + stdp_input
 
     # iterate over all connections to save
     for conn_name in save_conns:
@@ -100,21 +100,21 @@ def save_connections(ending = ''):
         # sparsify it into (row, column, entry) tuples
         conn_list_sparse = ([(i, j, conn_matrix[i, j]) for i in xrange(conn_matrix.shape[0]) for j in xrange(conn_matrix.shape[1]) ])
         # save it out to disk
-        np.save(data_path + 'weights/' + conn_name + '_' + stdp_input + '_' + ending, conn_list_sparse)
+        np.save(data_path + 'weights/' + conn_name + '_' + stdp_input, conn_list_sparse)
 
 
-def save_theta(ending = ''):
+def save_theta():
     '''
     Save the adaptive threshold parameters to a file.
     '''
 
-    # print out saved theta populations
-    print '...saving theta:  ' + ', '.join(population_names)
-
     # iterate over population for which to save theta parameters
     for pop_name in population_names:
-    	# save out the theta parameters to file
-        np.save(data_path + 'weights/theta_' + pop_name + '_' + stdp_input + '_' + ending, neuron_groups[pop_name + 'e'].theta)
+    	# print out saved theta populations
+        print '...saving theta: weights/theta_' + pop_name + ending + '_' + stdp_input
+
+        # save out the theta parameters to file
+        np.save(data_path + 'weights/theta_' + pop_name + ending + '_' + stdp_input, neuron_groups[pop_name + 'e'].theta)
 
 
 def set_weights_most_fired():
@@ -123,37 +123,33 @@ def set_weights_most_fired():
     fired the most in the last iteration.
     '''
     for conn_name in input_connections:
-        connection = input_connections[conn_name][:]
-        column_sums = np.sum(current_spike_count, axis=0)
-        most_spiked = np.argmax(column_sums)
+    	for feature in xrange(conv_features):
+            column_sums = np.sum(current_spike_count[feature : feature + 1, :], axis=0)
+            most_spiked = np.argmax(column_sums)
 
-        for n in xrange(n_e):
-            for x in xrange(conv_size):
-                for y in xrange(conv_size):
-                    connection[convolution_locations[n][x * conv_size + y], n] = connection[convolution_locations[most_spiked][x * conv_size + y], most_spiked]
+            for n in xrange(n_e):
+                if n != most_spiked:
+                    temp1 = input_connections[conn_name][:, feature * n_e + n].todense()
+                    temp2 = input_connections[conn_name][:, feature * n_e + most_spiked].todense()
+                    temp1[convolution_locations[n]] = temp2[convolution_locations[most_spiked]]
+                    input_connections[conn_name][:, feature * n_e + n] = temp1
 
 
 def normalize_weights():
     '''
-    Squash the weights to sum to a prespecified number.
+    Squash the input -> excitatory weights to sum to a prespecified number.
     '''
     for conn_name in input_connections:
-            connection = input_connections[conn_name][:]
-            temp_conn = np.copy(connection.todense())
-            column_sums = np.sum(temp_conn, axis=0)
+        connection = input_connections[conn_name][:].todense()
+    	for feature in xrange(conv_features):
+            feature_connection = connection[:, feature * n_e : (feature + 1) * n_e]
+            column_sums = np.sum(feature_connection, axis=0)
             column_factors = weight['ee_input'] / column_sums
-            for j in xrange(n_e):
-                connection[:, j] *= column_factors[j]
 
-
-def is_lattice_connection(i, j):
-    '''
-    Boolean method which checks if two indices in a network correspond to neighboring nodes in a lattice.
-
-    i: First neuron's index
-    k: Second neuron's index
-    '''
-    return i + 1 == j and j % n_input_sqrt != 0 or i - 1 == j and i % n_input_sqrt != 0 or i + n_input_sqrt == j or i - n_input_sqrt == j
+            for n in xrange(n_e):
+                temp = input_connections[conn_name][:, feature * n_e + n].todense()
+                temp[convolution_locations[n]] *= column_factors[n]
+                input_connections[conn_name][:, feature * n_e + n] = temp
 
 
 def plot_input():
@@ -185,18 +181,18 @@ def get_2d_input_weights():
     rearranged_weights = np.zeros(( conv_features * conv_size, conv_size * n_e ))
     
     # counts number of input -> excitatory weights displayed so far
-    for idx, name in enumerate(input_connections.keys()):
-        connection = input_connections[name][:]
-        weight_matrix = np.zeros((conv_size ** 2, n_e))
+    connection = input_connections['XeAe' + ending][:]
 
+    # for each convolution feature
+    for feature in xrange(conv_features):
+        # for each excitatory neuron in this convolution feature
         for n in xrange(n_e):
-            for x in xrange(conv_size):
-                for y in xrange(conv_size):
-                    weight_matrix[x * conv_size + y, n] = connection[convolution_locations[n][x * conv_size + y], n]
-        
-        for n in xrange(n_e):
-            rearranged_weights[idx * conv_size : (idx + 1) * conv_size, n * conv_size : (n + 1) * conv_size] = weight_matrix[:, n].reshape((conv_size, conv_size))
-    
+            # get the connection weights from the input to this neuron
+            temp = connection[:, feature * n_e + n].todense()
+            # add it to the rearranged weights for displaying to the user
+            rearranged_weights[feature * conv_size : (feature + 1) * conv_size, n * conv_size : (n + 1) * conv_size] = temp[convolution_locations[n]].reshape((conv_size, conv_size))
+
+    # return the rearranged weights to display to the user
     return rearranged_weights.T
 
 
@@ -286,10 +282,11 @@ def get_new_assignments(result_monitor, input_numbers):
     assignments = np.zeros((conv_features, n_e))
     input_nums = np.asarray(input_numbers)
     maximum_rate = np.zeros(conv_features * n_e)
+    
     for j in xrange(10):
         num_assignments = len(np.where(input_nums == j)[0])
         if num_assignments > 0:
-            rate = np.sum(result_monitor[input_nums == j], axis = 0) / num_assignments
+            rate = np.sum(result_monitor[input_nums == j], axis=0) / num_assignments
             for i in xrange(conv_features * n_e):
                 if rate[i // n_e, i % n_e] > maximum_rate[i]:
                     maximum_rate[i] = rate[i // n_e, i % n_e]
@@ -334,7 +331,7 @@ b.set_global_preferences(
                         usenewpropagate = True,  # Whether or not to use experimental new C propagation functions.
                         usecstdp = True,  # Whether or not to use experimental new C STDP.
                         openmp = False, # whether or not to use OpenMP pragmas in generated C code.
-                        magic_useframes = True, # defines whether or not the magic functions should serach for objects defined only in the calling frame,
+                        magic_useframes = False, # defines whether or not the magic functions should serach for objects defined only in the calling frame,
                                                 # or if they should find all objects defined in any frame. Set to "True" if not in an interactive shell.
                         useweave_linear_diffeq = True, # Whether to use weave C++ acceleration for the solution of linear differential equations.
                        )
@@ -348,7 +345,7 @@ data_path = '../'
 # set parameters for simulation based on train / test mode
 if test_mode:
     weight_path = data_path + 'weights/'
-    num_examples = 10000 * 1
+    num_examples = 100 * 1
     use_testing_set = True
     do_plot_performance = False
     record_spikes = True
@@ -356,7 +353,7 @@ if test_mode:
     update_interval = num_examples
 else:
     weight_path = data_path + 'random/'
-    num_examples = 60000 * 1
+    num_examples = 100 * 1
     use_testing_set = False
     do_plot_performance = True
     record_spikes = True
@@ -396,16 +393,16 @@ elif test_mode and classes_input != '':
     testing = new_testing
 
 # size of convolution windows
-conv_size = raw_input('Enter size of square side length of convolution window (default 20): ')
+conv_size = raw_input('Enter size of square side length of convolution window (default 27): ')
 if conv_size == '':
-    conv_size = 20
+    conv_size = 27
 else:
     conv_size = int(conv_size)
 
 # stride of convolution windows
-conv_stride = raw_input('Enter stride size of convolution window (default 8): ')
+conv_stride = raw_input('Enter stride size of convolution window (default 1): ')
 if conv_stride == '':
-    conv_stride = 8
+    conv_stride = 1
 else:
     conv_stride = int(conv_stride)
 
@@ -418,6 +415,7 @@ else:
 
 # number of excitatory neurons (number output from convolutional layer)
 n_e = ((n_input_sqrt - conv_size) / conv_stride + 1) ** 2
+
 n_e_total = n_e * conv_features
 n_e_sqrt = int(math.sqrt(n_e))
 
@@ -445,6 +443,9 @@ else:
 # set weight update interval (plotting)
 weight_update_interval = 25
 
+# set progress printing interval
+print_progress_interval = 10
+
 # rest potential parameters, reset potential parameters, threshold potential parameters, and refractory periods
 v_rest_e = -65. * b.mV
 v_rest_i = -60. * b.mV
@@ -461,9 +462,9 @@ delay = {}
 
 # naming neuron populations (X for input, A for population, XA for input -> connection, etc...
 input_population_names = [ 'X' ]
-population_names = [ 'A' + str(i) for i in xrange(conv_features) ]
-input_connection_names = [ 'XA' + str(i) for i in xrange(conv_features) ]
-save_conns = [ 'XeA' + str(i) + 'e' + ending for i in xrange(conv_features) ]
+population_names = [ 'A' ]
+input_connection_names = [ 'XA' ]
+save_conns = [ 'XeAe' + ending ]
 input_conn_names = [ 'ee_input' ]
 recurrent_conn_names = [ 'ei', 'ie' ]
 weight['ee_input'] = (conv_size ** 2) / 7.0
@@ -573,7 +574,7 @@ spike_counters = {}
 result_monitor = np.zeros((update_interval, conv_features, n_e))
 
 neuron_groups['e'] = b.NeuronGroup(n_e_total, neuron_eqs_e, threshold=v_thresh_e, refractory=refrac_e, reset=scr_e, compile=True, freeze=True)
-neuron_groups['i'] = b.NeuronGroup(n_e_total, neuron_eqs_i, threshold=v_thresh_i, refractory=refrac_i, reset=v_reset_i, compile=True, freeze=True)
+neuron_groups['i'] = b.NeuronGroup(n_e_total / n_e, neuron_eqs_i, threshold=v_thresh_i, refractory=refrac_i, reset=v_reset_i, compile=True, freeze=True)
 
 ########################################################
 # CREATE NETWORK POPULATIONS AND RECURRENT CONNECTIONS #
@@ -583,9 +584,9 @@ for name in population_names:
     print '...creating neuron group:', name
 
     # get a subgroup of size 'n_e' from all exc
-    neuron_groups[name + 'e'] = neuron_groups['e'].subgroup(n_e)
+    neuron_groups[name + 'e'] = neuron_groups['e'].subgroup(conv_features * n_e)
     # get a subgroup of size 'n_i' from the inhibitory layer
-    neuron_groups[name + 'i'] = neuron_groups['i'].subgroup(n_e)
+    neuron_groups[name + 'i'] = neuron_groups['i'].subgroup(conv_features)
 
     # start the membrane potentials of these groups 40mV below their resting potentials
     neuron_groups[name + 'e'].v = v_rest_e - 40. * b.mV
@@ -597,7 +598,7 @@ for name in population_names:
     # if we're in test mode / using some stored weights
     if test_mode or weight_path[-8:] == 'weights/':
         # load up adaptive threshold parameters
-        neuron_groups['e'].theta = np.load(weight_path + 'theta_A_' + stdp_input + '.npy')
+        neuron_groups['e'].theta = np.load(weight_path + 'theta_A' + ending + '_' + stdp_input + '.npy')
     else:
         # otherwise, set the adaptive additive threshold parameter at 20mV
         neuron_groups['e'].theta = np.ones((n_e_total)) * 20.0 * b.mV
@@ -607,24 +608,28 @@ for name in population_names:
             # create connection name (composed of population and connections types)
             conn_name = name + conn_type[0] + name + conn_type[1] + ending
             # get the corresponding stored weights from file
-            weight_matrix = get_matrix_from_file(data_path + 'random/' + conn_name + '.npy', n_src=n_e, n_tgt=n_e)
+            weight_matrix = get_matrix_from_file(data_path + 'random/' + conn_name + '.npy', n_src=conv_features * n_e, n_tgt=conv_features)
             # create a connection from the first group in conn_name with the second group
-            connections[conn_name] = b.Connection(neuron_groups[conn_name[0 : conn_name.index('e') + 1]], neuron_groups[conn_name[conn_name.index('e') + 1 : conn_name.index('_')]], structure='dense', state='g' + conn_type[0])
+            connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
             # instantiate the created connection with the 'weightMatrix' loaded from file
-            connections[conn_name].connect(neuron_groups[conn_name[0 : conn_name.index('e') + 1]], neuron_groups[conn_name[conn_name.index('e') + 1 : conn_name.index('_')]], weight_matrix)
+            for feature in xrange(conv_features):
+                for n in xrange(n_e):
+                    connections[conn_name][feature * n_e + n, feature] = weight_matrix[feature * n_e + n, feature]
 
         elif conn_type == 'ie':
-            for other_name in population_names:
-            	if other_name != name:
-                    # create connection name (composed of population and connections types)
-                    conn_name = name + conn_type[0] + other_name + conn_type[1] + ending
-                    # get the corresponding stored weights from file
-                    weight_matrix = get_matrix_from_file(data_path + 'random/' + conn_name + '.npy', n_src=n_e, n_tgt=n_e)
-                    # create a connection from the first group in conn_name with the second group
-                    connections[conn_name] = b.Connection(neuron_groups[conn_name[0 : conn_name.index('i') + 1]], neuron_groups[conn_name[conn_name.index('i') + 1 : conn_name.index('_')]], structure='sparse', state='g' + conn_type[0])
-                    
-                    # instantiate the created connection with the 'weightMatrix' loaded from file
-                    connections[conn_name].connect(neuron_groups[conn_name[0 : conn_name.index('i') + 1]], neuron_groups[conn_name[conn_name.index('i') + 1 : conn_name.index('_')]], weight_matrix)
+            # create connection name (composed of population and connections types)
+            conn_name = name + conn_type[0] + name + conn_type[1] + ending
+            # get the corresponding stored weights from file
+            weight_matrix = get_matrix_from_file(data_path + 'random/' + conn_name + '.npy', n_src=conv_features, n_tgt=(conv_features ** 2) * n_e)
+            # create a connection from the first group in conn_name with the second group
+            connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
+            # instantiate the created connection with the 'weightMatrix' loaded from file
+            for feature in xrange(conv_features):
+                for other_feature in xrange(conv_features):
+                    if feature != other_feature:
+                        for n in xrange(n_e):
+                            connections[conn_name][feature, other_feature * n_e + n] = weight_matrix[feature, other_feature * n_e + n]
+
 
     # if STDP from excitatory -> excitatory is on and this connection is excitatory -> excitatory
     if ee_STDP_on and 'ee' in recurrent_conn_names:
@@ -647,11 +652,9 @@ if record_spikes and do_plot:
     fig_num += 1
     b.ion()
     b.subplot(211)
-    exc_monitors = [ spike_monitors['A' + str(i) + 'e'] for i in xrange(conv_features) ]
-    b.raster_plot(*exc_monitors, refresh=1000 * b.ms, showlast=1000 * b.ms)
+    b.raster_plot(spike_monitors['Ae'], refresh=1000 * b.ms, showlast=1000 * b.ms)
     b.subplot(212)
-    inhib_monitors = [ spike_monitors['A' + str(i) + 'i'] for i in xrange(conv_features) ]
-    b.raster_plot(*inhib_monitors, refresh=1000 * b.ms, showlast=1000 * b.ms)
+    b.raster_plot(spike_monitors['Ai'], refresh=1000 * b.ms, showlast=1000 * b.ms)
     
 ################################################################# 
 # CREATE INPUT POPULATION AND CONNECTIONS FROM INPUT POPULATION #
@@ -669,36 +672,35 @@ for name in input_population_names:
 
 # creating connections from input Poisson spike train to convolution patch populations
 for name in input_connection_names:
-    print '\n...creating connections between', name[0:name.index('A')], 'and', name[name.index('A'):]
+    print '\n...creating connections between', name[0], 'and', name[1]
     
     # for each of the input connection types (in this case, excitatory -> excitatory)
     for conn_type in input_conn_names:
         # saved connection name
-        conn_name = name[0:1] + conn_type[0] + name[name.index('A'):] + conn_type[1] + ending
+        conn_name = name[0] + conn_type[0] + name[1] + conn_type[1] + ending
         
         # get weight matrix depending on training or test phase
         if test_mode:
-            weight_matrix = get_matrix_from_file(weight_path + conn_name + '_' + stdp_input + '_.npy', n_input, n_e)
+            weight_matrix = get_matrix_from_file(weight_path + conn_name + '_' + stdp_input + '.npy', n_input, conv_features * n_e)
         else:
-            weight_matrix = get_matrix_from_file(weight_path + conn_name + '.npy', n_input, n_e)
-            
+            weight_matrix = get_matrix_from_file(weight_path + conn_name + '.npy', n_input, conv_features * n_e)	
+
         # create connections from the windows of the input group to the neuron population
-        input_connections[conn_name] = b.Connection(input_groups['Xe'], neuron_groups[name[name.index('A'):] + conn_type[1]], structure='sparse', state='g' + conn_type[0], delay=True, max_delay=delay[conn_type][1])
+        input_connections[conn_name] = b.Connection(input_groups['Xe'], neuron_groups[name[1] + conn_type[1]], structure='sparse', state='g' + conn_type[0], delay=True, max_delay=delay[conn_type][1])
         
-        for n in xrange(n_e):
-            for x in xrange(conv_size):
-                for y in xrange(conv_size):
-                    input_connections[conn_name][convolution_locations[n][x * conv_size + y], n] = weight_matrix[convolution_locations[n][x * conv_size + y], n]
-        
+        for feature in xrange(conv_features):
+            for n in xrange(n_e):
+                for idx in xrange(conv_size ** 2):
+                    input_connections[conn_name][convolution_locations[n][idx], feature * n_e + n] = weight_matrix[convolution_locations[n][idx], feature * n_e + n]
+
     # if excitatory -> excitatory STDP is specified, add it here (input to excitatory populations)
     if ee_STDP_on:
         print '...creating STDP for connection', name
         
         # STDP connection name
-        conn_name = name[0:1] + conn_type[0] + name[name.index('A'):] + conn_type[1] + ending
-        for idx in xrange(n_e):
-            # create the STDP object
-            stdp_methods[conn_name] = b.STDP(input_connections[conn_name], eqs=eqs_stdp_ee, pre=eqs_stdp_pre_ee, post=eqs_stdp_post_ee, wmin=0., wmax=wmax_ee)
+        conn_name = name[0] + conn_type[0] + name[1] + conn_type[1] + ending
+        # create the STDP object
+        stdp_methods[conn_name] = b.STDP(input_connections[conn_name], eqs=eqs_stdp_ee, pre=eqs_stdp_pre_ee, post=eqs_stdp_post_ee, wmin=0., wmax=wmax_ee)
 
 print '\n'
 
@@ -718,14 +720,16 @@ if not test_mode and do_plot:
     fig_num += 1
 
 # plot input intensities
-rates = np.zeros((n_input_sqrt, n_input_sqrt))
 if do_plot:
+    rates = np.zeros((n_input_sqrt, n_input_sqrt))
     input_image_monitor, input_image = plot_input()
-fig_num += 1
+    fig_num += 1
 
 # plot performance
 if do_plot_performance and do_plot:
     performance_monitor, performance, fig_num, fig_performance = plot_performance(fig_num)
+else:
+    performance = get_current_performance(np.zeros(int(num_examples / update_interval)), 0)
 
 # set firing rates to zero initially
 for name in input_population_names:
@@ -734,6 +738,9 @@ for name in input_population_names:
 # initialize network
 j = 0
 b.run(0)
+
+# start recording time
+start_time = timeit.default_timer()
 
 while j < num_examples:
     # fetched rates depend on training / test phase, and whether we use the 
@@ -765,9 +772,8 @@ while j < num_examples:
         assignments = get_new_assignments(result_monitor[:], input_numbers[j - update_interval : j])
     
     # get count of spikes over the past iteration
-    current_spike_count = np.asarray( [ spike_counters['A' + str(i) + 'e'].count[:] for i in range(conv_features) ] ) - previous_spike_count
-    
-    previous_spike_count = np.copy( [ spike_counters['A' + str(i) + 'e'].count[:] for i in range(conv_features) ] )
+    current_spike_count = np.copy(spike_counters['Ae'].count[:]).reshape((conv_features, n_e)) - previous_spike_count
+    previous_spike_count = np.copy(spike_counters['Ae'].count[:]).reshape((conv_features, n_e))
     
     # set weights to those of the most-fired neuron
     set_weights_most_fired()
@@ -776,18 +782,18 @@ while j < num_examples:
     if j % weight_update_interval == 0 and not test_mode and do_plot:
         update_2d_input_weights(input_weight_monitor, fig_weights)
     
-    # if there weren't a certain number of spikes
+    # if the neurons in the network didn't spike more than four times
     if np.sum(current_spike_count) < 5:
-        # increase the intesity of input
-        input_intensity += 1
+        # increase the intensity of input
+        input_intensity += 2
         
-        # set the input firing rates back to zero
+        # set all network firing rates to zero
         for name in input_population_names:
             input_groups[name + 'e'].rate = 0
-        
-        # run the simulation for 'resting_time' to relax back to rest potentials
+
+        # let the network relax back to equilibrium
         b.run(resting_time)
-    # if there were enough spikes
+    # otherwise, record results and confinue simulation
     else:
     	# record the current number of spikes
         result_monitor[j % update_interval, :] = current_spike_count
@@ -799,17 +805,20 @@ while j < num_examples:
             input_numbers[j] = training['y'][j % 60000][0]
         
         # get the output classifications of the network
-        outputNumbers[j,:] = get_recognized_number_ranking(assignments, result_monitor[j % update_interval,:])
+        outputNumbers[j, :] = get_recognized_number_ranking(assignments, result_monitor[j % update_interval, :])
         
         # print progress
-        if j % 10 == 0 and j > 0:
-            print 'runs done:', j, 'of', int(num_examples)
+        if j % print_progress_interval == 0 and j > 0:
+            print 'runs done:', j, 'of', int(num_examples), '(time taken for past', print_progress_interval, 'runs:', str(timeit.default_timer() - start_time) + ')'
+            start_time = timeit.default_timer()
         
         # plot performance if appropriate
         if j % update_interval == 0 and j > 0:
             if do_plot_performance and do_plot:
                 # updating the performance plot
                 perf_plot, performance = update_performance_plot(performance_monitor, performance, j, fig_performance)
+            else:
+                performance = get_current_performance(performance, j)
             # printing out classification performance results so far
             print '\nClassification performance', performance[:int(j / float(update_interval)) + 1], '\n'
             target = open('../performance/' + conn_name + '_' + stdp_input + '_' + ending + '_iter_' + str(j), 'w')
@@ -839,8 +848,8 @@ if not test_mode:
 if not test_mode:
     save_connections()
 else:
-    np.save(data_path + 'activity/resultPopVecs' + str(num_examples) + '_' + stdp_input, result_monitor)
-    np.save(data_path + 'activity/inputNumbers' + str(num_examples) + '_' + stdp_input, input_numbers)
+    np.save(data_path + 'activity/resultPopVecs' + str(num_examples) + '_' + stdp_input + ending, result_monitor)
+    np.save(data_path + 'activity/inputNumbers' + str(num_examples) + '_' + stdp_input + ending, input_numbers)
 
 ################ 
 # PLOT RESULTS #
@@ -868,11 +877,10 @@ if do_plot:
         fig_num += 1
         for i, name in enumerate(spike_counters):
             b.subplot(len(spike_counters), 1, i + 1)
-            b.plot(np.array([ spike_counters['A' + str(i) + 'e'].count[:] for i in xrange(conv_features) ]))
+            b.plot(np.asarray(spike_counters['Ae'].count[:]))
             b.title('Spike count of population ' + name)
 
     plot_2d_input_weights()
 
     b.ioff()
     b.show()
-
