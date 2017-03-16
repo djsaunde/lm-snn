@@ -739,6 +739,8 @@ for name in input_population_names:
 j = 0
 b.run(0)
 
+weights_name = 'XeAe' + ending
+
 # start recording time
 start_time = timeit.default_timer()
 
