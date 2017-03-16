@@ -21,7 +21,7 @@ def create_weights():
     nI = nE
     
     # where to store the created weights
-    dataPath = './random/'
+    dataPath = '../random/'
     
     # creating weights
     weight = {}
