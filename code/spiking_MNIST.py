@@ -797,7 +797,7 @@ if rate_monitors:
     fig_num += 1
     for i, name in enumerate(rate_monitors):
         b.subplot(len(rate_monitors), 1, i + 1)
-        b.plot(rate_monitors[name].times/b.second, rate_monitors[name].rate, '.')
+        b.plot(rate_monitors[name].times / b.second, rate_monitors[name].rate, '.')
         b.title('Rates of population ' + name)
     
 if spike_monitors:
