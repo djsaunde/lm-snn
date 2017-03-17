@@ -181,7 +181,7 @@ assignments = get_new_assignments(training_result_monitor[start_time_training : 
                                   training_input_numbers[start_time_training : end_time_training])
 
 counter = 0 
-num_tests = end_time_testing / 10000clear
+num_tests = end_time_testing / 10000
 sum_accurracy = [0] * num_tests
 
 

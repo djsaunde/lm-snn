@@ -586,7 +586,7 @@ for name in population_names:
     # if we're in test mode / using some stored weights
     if test_mode or weight_path[-8:] == 'weights/':
         # load up adaptive threshold parameters
-        neuron_groups['e'].theta = np.load(weight_path + 'theta_A_' + stdp_input + '.npy')
+        neuron_groups['e'].theta = np.load(weight_path + 'theta_A_' + stdp_input + '_' + ending + '.npy')
     else:
         # otherwise, set the adaptive additive threshold parameter at 20mV
         neuron_groups['e'].theta = np.ones((n_e)) * 20.0 * b.mV
@@ -647,7 +647,7 @@ for name in input_connection_names:
             if stdp_input == 'no_weight_dependence_postpre':
                 weightMatrix = get_matrix_from_file(weight_path + connName + '_' + stdp_input + '_54000.npy')
             else:
-                weightMatrix = get_matrix_from_file(weight_path + connName + '_' + stdp_input + '_.npy')
+                weightMatrix = get_matrix_from_file(weight_path + connName + '_' + stdp_input + '_' + ending + '.npy')
         else:
             weightMatrix = get_matrix_from_file(weight_path + connName + '.npy')
         

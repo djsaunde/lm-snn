@@ -345,7 +345,7 @@ data_path = '../'
 # set parameters for simulation based on train / test mode
 if test_mode:
     weight_path = data_path + 'weights/'
-    num_examples = 100 * 1
+    num_examples = 10000 * 1
     use_testing_set = True
     do_plot_performance = False
     record_spikes = True
@@ -353,7 +353,7 @@ if test_mode:
     update_interval = num_examples
 else:
     weight_path = data_path + 'random/'
-    num_examples = 100 * 1
+    num_examples = 60000 * 1
     use_testing_set = False
     do_plot_performance = True
     record_spikes = True
@@ -598,7 +598,10 @@ for name in population_names:
     # if we're in test mode / using some stored weights
     if test_mode or weight_path[-8:] == 'weights/':
         # load up adaptive threshold parameters
-        neuron_groups['e'].theta = np.load(weight_path + 'theta_A' + ending + '_' + stdp_input + '.npy')
+        try:
+            neuron_groups['e'].theta = np.load(weight_path + 'theta_A' + ending + '_' + stdp_input + '.npy')
+        except IOError:
+            neuron_groups['e'].theta = np.ones((n_e_total)) * 20.0 * b.mV
     else:
         # otherwise, set the adaptive additive threshold parameter at 20mV
         neuron_groups['e'].theta = np.ones((n_e_total)) * 20.0 * b.mV
@@ -681,7 +684,7 @@ for name in input_connection_names:
         
         # get weight matrix depending on training or test phase
         if test_mode:
-            weight_matrix = get_matrix_from_file(weight_path + conn_name + '_' + stdp_input + '.npy', n_input, conv_features * n_e)
+            weight_matrix = get_matrix_from_file(weight_path + conn_name + '_' + stdp_input + '_.npy', n_input, conv_features * n_e)
         else:
             weight_matrix = get_matrix_from_file(weight_path + conn_name + '.npy', n_input, conv_features * n_e)	
 
