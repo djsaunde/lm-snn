@@ -350,7 +350,6 @@ if test_mode:
     do_plot_performance = False
     record_spikes = True
     ee_STDP_on = False
-    update_interval = num_examples
 else:
     weight_path = data_path + 'random/'
     num_examples = 60000 * 1
@@ -435,7 +434,7 @@ resting_time = 0.15 * b.second
 runtime = num_examples * (single_example_time + resting_time)
 
 # set the update interval
-if num_examples <= 10000:
+if test_mode:
     update_interval = num_examples
 else:
     update_interval = 100
@@ -826,7 +825,7 @@ while j < num_examples:
                 performance = get_current_performance(performance, j)
             # printing out classification performance results so far
             print '\nClassification performance', performance[:int(j / float(update_interval)) + 1], '\n'
-            target = open('../performance/' + conn_name + '_' + stdp_input + '_' + ending + '_iter_' + str(j), 'w')
+            target = open('../performance/' + weights_name + '_' + stdp_input + '_' + ending + '_iter_' + str(j), 'w')
             target.truncate()
             target.write(str(performance[:int(j / float(update_interval)) + 1]))
             target.close()

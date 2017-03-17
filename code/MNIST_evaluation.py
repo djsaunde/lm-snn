@@ -61,6 +61,10 @@ def get_labeled_data(picklename, b_train=True):
 
 
 def get_recognized_number_ranking(assignments, spike_rates):
+    '''
+    Given the label assignments of the excitatory layer and their spike rates over
+    the past 'update_interval', get the ranking of each of the categories of input.
+    '''
     summed_rates = [0] * 10
     num_assignments = [0] * 10
     for i in xrange(10):
@@ -70,9 +74,13 @@ def get_recognized_number_ranking(assignments, spike_rates):
     return np.argsort(summed_rates)[::-1]
 
 
-def get_new_assignments(result_monitor, input_numbers):    
-    assignments = np.ones((conv_features, n_e)) * -1
-    input_nums = np.asarray(input_numbers)#.reshape((conv_features, n_e))
+def get_new_assignments(result_monitor, input_numbers):
+    '''
+    Based on the results from the previous 'update_interval', assign labels to the
+    excitatory neurons.
+    '''
+    assignments = np.zeros((conv_features, n_e))
+    input_nums = np.asarray(input_numbers)
     maximum_rate = np.zeros(conv_features * n_e)
     
     for j in xrange(10):
@@ -83,7 +91,7 @@ def get_new_assignments(result_monitor, input_numbers):
                 if rate[i // n_e, i % n_e] > maximum_rate[i]:
                     maximum_rate[i] = rate[i // n_e, i % n_e]
                     assignments[i // n_e, i % n_e] = j
-
+    
     return assignments
 
 
@@ -187,14 +195,16 @@ sum_accurracy = [0] * num_tests
 
 while (counter < num_tests):
     end_time = min(end_time_testing, 10000 * (counter + 1))
-    start_time = 10000*counter
-    test_results = np.zeros((10, end_time-start_time))
+    start_time = 10000 * counter
+    test_results = np.zeros((10, end_time - start_time))
     
     print '...calculating accuracy for sum'
     
     for i in xrange(end_time - start_time):
-        test_results[:,i] = get_recognized_number_ranking(assignments, testing_result_monitor[i + start_time, :])
+        test_results[:, i] = get_recognized_number_ranking(assignments, testing_result_monitor[i + start_time, :])
     
+    print test_results
+
     difference = test_results[0,:] - testing_input_numbers[start_time:end_time]
     correct = len(np.where(difference == 0)[0])
     incorrect = np.where(difference != 0)[0]
