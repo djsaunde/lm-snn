@@ -111,13 +111,13 @@ def save_connections():
     print '...saving connections: ' + ', '.join(save_conns)
 
     # iterate over all connections to save
-    for connName in save_conns:
+    for conn_name in save_conns:
         # get the connection matrix for this connection
-        connMatrix = connections[connName][:]
+        connMatrix = connections[conn_name][:]
         # sparsify it into (row, column, entry) tuples
         connListSparse = ([(i,j,connMatrix[i,j]) for i in xrange(connMatrix.shape[0]) for j in xrange(connMatrix.shape[1]) ])
         # save it out to disk
-        np.save(data_path + 'weights/' + connName + '_' + stdp_input + '_' + ending, connListSparse)
+        np.save(data_path + 'weights/' + conn_name + '_' + stdp_input + '_' + ending, connListSparse)
 
 
 def save_theta():
