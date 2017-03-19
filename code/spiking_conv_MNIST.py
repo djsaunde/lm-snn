@@ -735,7 +735,7 @@ for name in input_population_names:
     input_groups[name + 'e'].rate = 0
 
 # initialize network
-j = 0
+j = 0, num_retries = 0
 b.run(0)
 
 weights_name = 'XeAe' + ending
@@ -785,9 +785,10 @@ while j < num_examples:
         update_2d_input_weights(input_weight_monitor, fig_weights)
     
     # if the neurons in the network didn't spike more than four times
-    if np.sum(current_spike_count) < 5:
+    if np.sum(current_spike_count) < 5 and num_retries < 3:
         # increase the intensity of input
         input_intensity += 2
+        num_retries += 1
         
         # set all network firing rates to zero
         for name in input_population_names:
@@ -797,6 +798,7 @@ while j < num_examples:
         b.run(resting_time)
     # otherwise, record results and confinue simulation
     else:
+        num_retries = 0
     	# record the current number of spikes
         result_monitor[j % update_interval, :] = current_spike_count
         
