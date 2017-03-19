@@ -680,7 +680,7 @@ for name in input_connection_names:
         
         # get weight matrix depending on training or test phase
         if test_mode:
-            weight_matrix = get_matrix_from_file(weight_path + conn_name + '_' + stdp_input + '_.npy', n_input, conv_features * n_e)
+            weight_matrix = get_matrix_from_file(weight_path + conn_name + '_' + stdp_input + '.npy', n_input, conv_features * n_e)
         else:
             weight_matrix = get_matrix_from_file(weight_path + conn_name + '.npy', n_input, conv_features * n_e)	
 
@@ -849,8 +849,8 @@ if not test_mode:
 if not test_mode:
     save_connections()
 else:
-    np.save(data_path + 'activity/resultPopVecs' + str(num_examples) + '_' + stdp_input + ending, result_monitor)
-    np.save(data_path + 'activity/inputNumbers' + str(num_examples) + '_' + stdp_input + ending, input_numbers)
+    np.save(data_path + 'activity/resultPopVecs' + str(num_examples) + '_' + stdp_input + '_' + ending, result_monitor)
+    np.save(data_path + 'activity/inputNumbers' + str(num_examples) + '_' + stdp_input + '_' + ending, input_numbers)
 
 ################ 
 # PLOT RESULTS #
