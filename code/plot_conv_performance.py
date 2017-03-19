@@ -9,7 +9,7 @@ perf_dir = '../performance/'
 
 perfs = {}
 for file_name in os.listdir(perf_dir):
-    if '59900' in file_name:
+    if '59900' in file_name and 'XeAe100' not in file_name:
         perf_text = open(perf_dir + file_name, 'r').readlines()
         perfs[file_name] = [ float(token) for token in ''.join(perf_text).replace('\n', '').replace('[', '').replace(']', '').split()  ]
 
@@ -30,6 +30,9 @@ for perf in sorted(perfs.keys()):
     plt.ylabel('Classification accuracy (out of 100%)')
 
     title_strs = perf[5:perf.index('weight') - 1].split('_')
+    print title_strs
+    print perf
+    print perf[5:perf.index('weight') - 1].split('_')
 
     plt.title('Classification accuracy by iteration number (' + title_strs[0] + 'x' + title_strs[0] + ' convolution, stride ' + title_strs[1] + ', ' + title_strs[2] + ' convolution features, gving ' + title_strs[3] + ' excitatory neurons per convolutional patch')
     plt.savefig(perf_dir + 'performance_plots/Classification accuracy by iteration number (' + title_strs[0] + 'x' + title_strs[0] + ' convolution, stride ' + title_strs[1] + ', ' + title_strs[2] + ' convolution features, gving ' + title_strs[3] + ' excitatory neurons per convolutional patch')

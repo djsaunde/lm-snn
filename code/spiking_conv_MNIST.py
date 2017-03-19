@@ -597,10 +597,7 @@ for name in population_names:
     # if we're in test mode / using some stored weights
     if test_mode or weight_path[-8:] == 'weights/':
         # load up adaptive threshold parameters
-        try:
-            neuron_groups['e'].theta = np.load(weight_path + 'theta_A' + ending + '_' + stdp_input + '.npy')
-        except IOError:
-            neuron_groups['e'].theta = np.ones((n_e_total)) * 20.0 * b.mV
+        neuron_groups['e'].theta = np.load(weight_path + 'theta_A' + ending + '_' + stdp_input + '.npy')
     else:
         # otherwise, set the adaptive additive threshold parameter at 20mV
         neuron_groups['e'].theta = np.ones((n_e_total)) * 20.0 * b.mV
