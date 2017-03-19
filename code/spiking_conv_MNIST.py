@@ -823,8 +823,9 @@ while j < num_examples:
                 performance = get_current_performance(performance, j)
             # printing out classification performance results so far
             print '\nClassification performance', performance[:int(j / float(update_interval)) + 1], '\n'
-            target = open('../performance/' + weights_name + '_' + stdp_input + '_' + ending + '_iter_' + str(j), 'w')
+            target = open('../performance/' + weights_name + '_' + stdp_input + '.txt', 'w')
             target.truncate()
+            target.write('Iteration ' + str(j) + '\n')
             target.write(str(performance[:int(j / float(update_interval)) + 1]))
             target.close()
                 
@@ -840,7 +841,8 @@ while j < num_examples:
         j += 1
 
 # set weights to those of the most-fired neuron
-set_weights_most_fired()
+if not test_mode:
+    set_weights_most_fired()
 
 ################ 
 # SAVE RESULTS #
