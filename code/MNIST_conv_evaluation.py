@@ -9,7 +9,7 @@ import brian as b
 from brian import *
 
 import numpy as np
-import matplotlib, time, scipy, math
+import matplotlib, time, scipy, math, sys
 import matplotlib.cm as cmap
 import os.path
 import cPickle as pickle
@@ -17,6 +17,8 @@ import cPickle as pickle
 from struct import unpack
 
 import brian.experimental.realtime_monitor as rltmMon
+
+np.set_printoptions(threshold=np.nan)
 
 
 #------------------------------------------------------------------------------
@@ -87,16 +89,19 @@ def get_new_assignments(result_monitor, input_numbers):
         num_assignments = len(np.where(input_nums == j)[0])
         if num_assignments > 0:
             rate = np.sum(result_monitor[input_nums == j], axis=0) / num_assignments
+            print np.asarray(rate * num_assignments, dtype=np.int)
             for i in xrange(conv_features * n_e):
                 if rate[i // n_e, i % n_e] > maximum_rate[i]:
                     maximum_rate[i] = rate[i // n_e, i % n_e]
                     assignments[i // n_e, i % n_e] = j
-    
+    sys.exit()
     return assignments
 
 
 MNIST_data_path = '../data/'
 data_path = '../activity/'
+
+print '\n'
 
 training_ending = raw_input('Enter number of training samples: ')
 if training_ending == '':
@@ -117,12 +122,29 @@ n_input = 784
 n_input_sqrt = int(math.sqrt(n_input))
 
 # size of convolution windows
-conv_size = raw_input('Enter number of excitatory neurons: ')
+conv_size = raw_input('Enter size of square side length of convolution window (default 27): ')
 if conv_size == '':
-    conv_size = 100
+    conv_size = 27
 else:
     conv_size = int(conv_size)
 
+# stride of convolution windows
+conv_stride = raw_input('Enter stride size of convolution window (default 1): ')
+if conv_stride == '':
+    conv_stride = 1
+else:
+    conv_stride = int(conv_stride)
+
+# number of convolution features
+conv_features = raw_input('Enter number of convolution features to learn (default 10): ')
+if conv_features == '':
+    conv_features = 10
+else:
+    conv_features = int(conv_features)
+
+# number of excitatory neurons (number output from convolutional layer)
+n_e = ((n_input_sqrt - conv_size) / conv_stride + 1) ** 2
+n_e_total = n_e * conv_features
 n_e_sqrt = int(math.sqrt(n_e))
 
 # number of inhibitory neurons (number of convolutational features (for now))
@@ -148,7 +170,7 @@ else:
 print '\n'
 
 # set ending of filename saves
-ending = '_' + stdp_input + str(n_e)
+ending = '_' + stdp_input + '_' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e)
 
 
 print '...loading MNIST'
@@ -169,6 +191,8 @@ test_results_max = np.zeros((10, end_time_testing - start_time_testing))
 test_results_top = np.zeros((10, end_time_testing - start_time_testing))
 test_results_fixed = np.zeros((10, end_time_testing - start_time_testing))
 assignments = get_new_assignments(training_result_monitor[start_time_training : end_time_training], training_input_numbers[start_time_training : end_time_training])
+
+print training_result_monitor[start_time_training : end_time_training]
 
 counter = 0 
 num_tests = end_time_testing / 10000
