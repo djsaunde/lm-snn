@@ -9,7 +9,11 @@ import brian as b
 from brian import *
 
 import numpy as np
+<<<<<<< HEAD
 import matplotlib, time, scipy, math, sys
+=======
+import matplotlib, time, scipy, math
+>>>>>>> 1a51ece7f284d3dbbf1378bbc9fe4d88d8bdfc19
 import matplotlib.cm as cmap
 import os.path
 import cPickle as pickle
@@ -20,7 +24,10 @@ import brian.experimental.realtime_monitor as rltmMon
 
 np.set_printoptions(threshold=np.nan)
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 1a51ece7f284d3dbbf1378bbc9fe4d88d8bdfc19
 #------------------------------------------------------------------------------
 # functions
 #------------------------------------------------------------------------------
@@ -94,7 +101,7 @@ def get_new_assignments(result_monitor, input_numbers):
                 if rate[i // n_e, i % n_e] > maximum_rate[i]:
                     maximum_rate[i] = rate[i // n_e, i % n_e]
                     assignments[i // n_e, i % n_e] = j
-    sys.exit()
+    
     return assignments
 
 
@@ -192,7 +199,6 @@ test_results_top = np.zeros((10, end_time_testing - start_time_testing))
 test_results_fixed = np.zeros((10, end_time_testing - start_time_testing))
 assignments = get_new_assignments(training_result_monitor[start_time_training : end_time_training], training_input_numbers[start_time_training : end_time_training])
 
-print training_result_monitor[start_time_training : end_time_training]
 
 counter = 0 
 num_tests = end_time_testing / 10000
@@ -208,13 +214,11 @@ while (counter < num_tests):
     
     for i in xrange(end_time - start_time):
         test_results[:, i] = get_recognized_number_ranking(assignments, testing_result_monitor[i + start_time, :])
-    
-    print test_results
 
     difference = test_results[0,:] - testing_input_numbers[start_time:end_time]
     correct = len(np.where(difference == 0)[0])
     incorrect = np.where(difference != 0)[0]
-    sum_accurracy[counter] = correct/float(end_time-start_time) * 100
+    sum_accurracy[counter] = correct / float(end_time-start_time) * 100
     
     print 'Sum response - accuracy: ', sum_accurracy[counter], ' num incorrect: ', len(incorrect)
     

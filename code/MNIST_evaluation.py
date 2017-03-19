@@ -5,38 +5,35 @@ Created on 15.12.2014
 '''
 
 import brian as b
-
 from brian import *
-
 import numpy as np
-import matplotlib, time, scipy, math
+import matplotlib
 import matplotlib.cm as cmap
+import time
 import os.path
+import scipy 
 import cPickle as pickle
-
 from struct import unpack
-
 import brian.experimental.realtime_monitor as rltmMon
 
 
-#------------------------------------------------------------------------------
+#------------------------------------------------------------------------------ 
 # functions
-#------------------------------------------------------------------------------
-def get_labeled_data(picklename, b_train=True):
-    '''
-    Read input-vector (image) and target class (label, 0-9) and return
-    it as list of tuples.
-    '''
+#------------------------------------------------------------------------------     
+def get_labeled_data(picklename, bTrain = True):
+    """Read input-vector (image) and target class (label, 0-9) and return
+       it as list of tuples.
+    """
     if os.path.isfile('%s.pickle' % picklename):
         data = pickle.load(open('%s.pickle' % picklename))
     else:
         # Open the images with gzip in read binary mode
-        if b_train:
-            images = open(MNIST_data_path + 'train-images-idx3-ubyte','rb')
-            labels = open(MNIST_data_path + 'train-labels-idx1-ubyte','rb')
+        if bTrain:
+            images = open(MNIST_data_path + 'train-images.idx3-ubyte','rb')
+            labels = open(MNIST_data_path + 'train-labels.idx1-ubyte','rb')
         else:
-            images = open(MNIST_data_path + 't10k-images-idx3-ubyte','rb')
-            labels = open(MNIST_data_path + 't10k-labels-idx1-ubyte','rb')
+            images = open(MNIST_data_path + 't10k-images.idx3-ubyte','rb')
+            labels = open(MNIST_data_path + 't10k-labels.idx1-ubyte','rb')
         # Get metadata for images
         images.read(4)  # skip the magic_number
         number_of_images = unpack('>I', images.read(4))[0]
@@ -59,12 +56,7 @@ def get_labeled_data(picklename, b_train=True):
         pickle.dump(data, open("%s.pickle" % picklename, "wb"))
     return data
 
-
 def get_recognized_number_ranking(assignments, spike_rates):
-    '''
-    Given the label assignments of the excitatory layer and their spike rates over
-    the past 'update_interval', get the ranking of each of the categories of input.
-    '''
     summed_rates = [0] * 10
     num_assignments = [0] * 10
     for i in xrange(10):
@@ -73,25 +65,19 @@ def get_recognized_number_ranking(assignments, spike_rates):
             summed_rates[i] = np.sum(spike_rates[assignments == i]) / num_assignments[i]
     return np.argsort(summed_rates)[::-1]
 
-
 def get_new_assignments(result_monitor, input_numbers):
-    '''
-    Based on the results from the previous 'update_interval', assign labels to the
-    excitatory neurons.
-    '''
-    assignments = np.zeros((conv_features, n_e))
+    print result_monitor.shape
+    assignments = np.ones(n_e) * -1 # initialize them as not assigned
     input_nums = np.asarray(input_numbers)
-    maximum_rate = np.zeros(conv_features * n_e)
-    
+    maximum_rate = [0] * n_e    
     for j in xrange(10):
-        num_assignments = len(np.where(input_nums == j)[0])
-        if num_assignments > 0:
-            rate = np.sum(result_monitor[input_nums == j], axis=0) / num_assignments
-            for i in xrange(conv_features * n_e):
-                if rate[i // n_e, i % n_e] > maximum_rate[i]:
-                    maximum_rate[i] = rate[i // n_e, i % n_e]
-                    assignments[i // n_e, i % n_e] = j
-    
+        num_inputs = len(np.where(input_nums == j)[0])
+        if num_inputs > 0:
+            rate = np.sum(result_monitor[input_nums == j], axis = 0) / num_inputs
+        for i in xrange(n_e):
+            if rate[i] > maximum_rate[i]:
+                maximum_rate[i] = rate[i]
+                assignments[i] = j 
     return assignments
 
 
@@ -117,11 +103,11 @@ n_input = 784
 n_input_sqrt = int(math.sqrt(n_input))
 
 # size of convolution windows
-conv_size = raw_input('Enter number of excitatory neurons: ')
+n_e = raw_input('Enter number of excitatory neurons: ')
 if conv_size == '':
-    conv_size = 100
+    n_e = 100
 else:
-    conv_size = int(conv_size)
+    n_e = int(conv_size)
 
 n_e_sqrt = int(math.sqrt(n_e))
 
@@ -132,36 +118,35 @@ n_i = n_e
 stdp_input = ''
 
 if raw_input('Use weight dependence (default no)?: ') in [ 'no', '' ]:
-    use_weight_dependence = False
-    stdp_input += 'weight_dependence_'
+	use_weight_dependence = False
+	stdp_input += 'weight_dependence_'
 else:
-    use_weight_dependence = True
-    stdp_input += 'no_weight_dependence_'
+	use_weight_dependence = True
+	stdp_input += 'no_weight_dependence_'
 
 if raw_input('Enter (yes / no) for post-pre (default yes): ') in [ 'yes', '' ]:
-    post_pre = True
-    stdp_input += 'postpre'
+	post_pre = True
+	stdp_input += 'postpre'
 else:
-    post_pre = False
-    stdp_input += 'no_postpre'
-
-print '\n'
+	post_pre = False
+	stdp_input += 'no_postpre'
 
 # set ending of filename saves
 ending = '_' + stdp_input + str(n_e)
 
+n_input = 784
+ending = ''
+
 
 print '...loading MNIST'
-training = get_labeled_data(MNIST_data_path + 'training', b_train=True)
-testing = get_labeled_data(MNIST_data_path + 'testing', b_train=False)
-
+training = get_labeled_data(MNIST_data_path + 'training')
+testing = get_labeled_data(MNIST_data_path + 'testing', bTrain = False)
 
 print '...loading results'
-training_result_monitor = np.load(data_path + 'resultPopVecs' + training_ending + ending + '.npy')
-training_input_numbers = np.load(data_path + 'inputNumbers' + training_ending + ending + '.npy')
-testing_result_monitor = np.load(data_path + 'resultPopVecs' + testing_ending + ending + '.npy')
-testing_input_numbers = np.load(data_path + 'inputNumbers' + testing_ending + ending + '.npy')
-
+training_result_monitor = np.load(data_path + 'resultPopVecs' + training_ending + '_' + stdp_input + '.npy')
+training_input_numbers = np.load(data_path + 'inputNumbers' + training_ending + '_' + stdp_input + '.npy')
+testing_result_monitor = np.load(data_path + 'resultPopVecs' + testing_ending + '_' + stdp_input + '.npy')
+testing_input_numbers = np.load(data_path + 'inputNumbers' + testing_ending + '_' + stdp_input + '.npy')
 
 print '...getting assignments'
 test_results = np.zeros((10, end_time_testing - start_time_testing))
@@ -170,32 +155,24 @@ test_results_top = np.zeros((10, end_time_testing - start_time_testing))
 test_results_fixed = np.zeros((10, end_time_testing - start_time_testing))
 assignments = get_new_assignments(training_result_monitor[start_time_training : end_time_training], training_input_numbers[start_time_training : end_time_training])
 
+
 counter = 0 
 num_tests = end_time_testing / 10000
 sum_accurracy = [0] * num_tests
-
-
 while (counter < num_tests):
-    end_time = min(end_time_testing, 10000 * (counter + 1))
-    start_time = 10000 * counter
-    test_results = np.zeros((10, end_time - start_time))
-    
-    print '...calculating accuracy for sum'
-    
+    end_time = min(end_time_testing, 10000*(counter+1))
+    start_time = 10000*counter
+    test_results = np.zeros((10, end_time-start_time))
+    print 'calculate accuracy for sum'
     for i in xrange(end_time - start_time):
-        test_results[:, i] = get_recognized_number_ranking(assignments, testing_result_monitor[i + start_time, :])
-    
-    print test_results
-
+        test_results[:,i] = get_recognized_number_ranking(assignments, testing_result_monitor[i+start_time,:])
     difference = test_results[0,:] - testing_input_numbers[start_time:end_time]
     correct = len(np.where(difference == 0)[0])
     incorrect = np.where(difference != 0)[0]
     sum_accurracy[counter] = correct/float(end_time-start_time) * 100
-    
     print 'Sum response - accuracy: ', sum_accurracy[counter], ' num incorrect: ', len(incorrect)
-    
     counter += 1
+print 'Sum response - accuracy --> mean: ', np.mean(sum_accurracy),  '--> standard deviation: ', np.std(sum_accurracy)
 
-print 'Sum response - accuracy --> mean: ', np.mean(sum_accurracy), '\n'
 
 b.show()
