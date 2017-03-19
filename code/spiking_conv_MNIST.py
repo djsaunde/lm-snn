@@ -735,7 +735,8 @@ for name in input_population_names:
     input_groups[name + 'e'].rate = 0
 
 # initialize network
-j = 0, num_retries = 0
+j = 0
+num_retries = 0
 b.run(0)
 
 weights_name = 'XeAe' + ending
