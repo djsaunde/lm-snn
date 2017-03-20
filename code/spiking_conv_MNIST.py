@@ -124,15 +124,21 @@ def set_weights_most_fired():
     '''
     for conn_name in input_connections:
     	for feature in xrange(conv_features):
+            # count up the spikes for the neurons in this convolution patch
             column_sums = np.sum(current_spike_count[feature : feature + 1, :], axis=0)
+
+            # find the excitatory neuron which spiked the most
             most_spiked = np.argmax(column_sums)
 
+            # create a "dense" version of the most spiked excitatory neuron's weight
+            most_spiked_dense = input_connections[conn_name][:, feature * n_e + most_spiked].todense()
+
+            # set all other neurons' (in the same convolution patch) weights the same as the most-spiked neuron in the patch
             for n in xrange(n_e):
                 if n != most_spiked:
-                    temp1 = input_connections[conn_name][:, feature * n_e + n].todense()
-                    temp2 = input_connections[conn_name][:, feature * n_e + most_spiked].todense()
-                    temp1[convolution_locations[n]] = temp2[convolution_locations[most_spiked]]
-                    input_connections[conn_name][:, feature * n_e + n] = temp1
+                    other_dense = input_connections[conn_name][:, feature * n_e + n].todense()
+                    other_dense[convolution_locations[n]] = most_spiked_dense[convolution_locations[most_spiked]]
+                    input_connections[conn_name][:, feature * n_e + n] = other_dense
 
 
 def normalize_weights():
@@ -147,9 +153,9 @@ def normalize_weights():
             column_factors = weight['ee_input'] / column_sums
 
             for n in xrange(n_e):
-                temp = input_connections[conn_name][:, feature * n_e + n].todense()
-                temp[convolution_locations[n]] *= column_factors[n]
-                input_connections[conn_name][:, feature * n_e + n] = temp
+                dense_weights = input_connections[conn_name][:, feature * n_e + n].todense()
+                dense_weights[convolution_locations[n]] *= column_factors[n]
+                input_connections[conn_name][:, feature * n_e + n] = dense_weights
 
 
 def plot_input():
