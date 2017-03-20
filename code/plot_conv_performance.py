@@ -1,4 +1,4 @@
-    from __future__ import division
+from __future__ import division
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -9,8 +9,8 @@ perf_dir = '../performance/'
 
 perfs = {}
 for file_name in os.listdir(perf_dir):
-    if '59900' in file_name and 'XeAe100' not in file_name:
-        perf_text = open(perf_dir + file_name, 'r').readlines()[2:]
+    if '.txt' in file_name and 'XeAe100' not in file_name:
+        perf_text = open(perf_dir + file_name, 'r').readlines()[1:]
         perfs[file_name] = [ float(token) for token in ''.join(perf_text).replace('\n', '').replace('[', '').replace(']', '').split()  ]
 
 plots = []
