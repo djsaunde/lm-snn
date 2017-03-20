@@ -9,11 +9,7 @@ import brian as b
 from brian import *
 
 import numpy as np
-<<<<<<< HEAD
 import matplotlib, time, scipy, math, sys
-=======
-import matplotlib, time, scipy, math
->>>>>>> 1a51ece7f284d3dbbf1378bbc9fe4d88d8bdfc19
 import matplotlib.cm as cmap
 import os.path
 import cPickle as pickle
@@ -24,10 +20,6 @@ import brian.experimental.realtime_monitor as rltmMon
 
 np.set_printoptions(threshold=np.nan)
 
-<<<<<<< HEAD
-
-=======
->>>>>>> 1a51ece7f284d3dbbf1378bbc9fe4d88d8bdfc19
 #------------------------------------------------------------------------------
 # functions
 #------------------------------------------------------------------------------
@@ -177,7 +169,7 @@ else:
 print '\n'
 
 # set ending of filename saves
-ending = '_' + stdp_input + '_' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e)
+ending = '_' + stdp_input + '__' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e)
 
 
 print '...loading MNIST'
