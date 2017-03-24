@@ -9,11 +9,7 @@ import brian as b
 from brian import *
 
 import numpy as np
-<<<<<<< HEAD
 import matplotlib, time, scipy, math, sys
-=======
-import matplotlib, time, scipy, math
->>>>>>> 1a51ece7f284d3dbbf1378bbc9fe4d88d8bdfc19
 import matplotlib.cm as cmap
 import os.path
 import cPickle as pickle
@@ -24,10 +20,6 @@ import brian.experimental.realtime_monitor as rltmMon
 
 np.set_printoptions(threshold=np.nan)
 
-<<<<<<< HEAD
-
-=======
->>>>>>> 1a51ece7f284d3dbbf1378bbc9fe4d88d8bdfc19
 #------------------------------------------------------------------------------
 # functions
 #------------------------------------------------------------------------------
@@ -91,7 +83,7 @@ def get_new_assignments(result_monitor, input_numbers):
     assignments = np.zeros((conv_features, n_e))
     input_nums = np.asarray(input_numbers)
     maximum_rate = np.zeros(conv_features * n_e)
-    
+
     for j in xrange(10):
         num_assignments = len(np.where(input_nums == j)[0])
         if num_assignments > 0:
@@ -101,7 +93,7 @@ def get_new_assignments(result_monitor, input_numbers):
                 if rate[i // n_e, i % n_e] > maximum_rate[i]:
                     maximum_rate[i] = rate[i // n_e, i % n_e]
                     assignments[i // n_e, i % n_e] = j
-    
+
     return assignments
 
 
@@ -200,7 +192,7 @@ test_results_fixed = np.zeros((10, end_time_testing - start_time_testing))
 assignments = get_new_assignments(training_result_monitor[start_time_training : end_time_training], training_input_numbers[start_time_training : end_time_training])
 
 
-counter = 0 
+counter = 0
 num_tests = end_time_testing / 10000
 sum_accurracy = [0] * num_tests
 
@@ -209,9 +201,9 @@ while (counter < num_tests):
     end_time = min(end_time_testing, 10000 * (counter + 1))
     start_time = 10000 * counter
     test_results = np.zeros((10, end_time - start_time))
-    
+
     print '...calculating accuracy for sum'
-    
+
     for i in xrange(end_time - start_time):
         test_results[:, i] = get_recognized_number_ranking(assignments, testing_result_monitor[i + start_time, :])
 
@@ -219,9 +211,9 @@ while (counter < num_tests):
     correct = len(np.where(difference == 0)[0])
     incorrect = np.where(difference != 0)[0]
     sum_accurracy[counter] = correct / float(end_time-start_time) * 100
-    
+
     print 'Sum response - accuracy: ', sum_accurracy[counter], ' num incorrect: ', len(incorrect)
-    
+
     counter += 1
 
 print 'Sum response - accuracy --> mean: ', np.mean(sum_accurracy), '\n'

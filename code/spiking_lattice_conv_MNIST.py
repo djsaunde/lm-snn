@@ -117,10 +117,23 @@ def save_theta():
         np.save(data_path + 'weights/theta_' + pop_name + '_' + ending + '_' + stdp_input, neuron_groups[pop_name + 'e'].theta)
 
 
+def is_lattice_connection(i, j):
+    '''
+    Boolean method which checks if two indices in a network correspond to neighboring nodes in a lattice.
+
+    i: First neuron's index
+    k: Second neuron's index
+    '''
+    return i + 1 == j and j % n_e_sqrt != 0 or i - 1 == j and i % n_e_sqrt != 0 or i + n_e_sqrt == j or i - n_e_sqrt == j
+
+
 def set_weights_most_fired():
     '''
     For each convolutional patch, set the weights to those of the neuron which
     fired the most in the last iteration.
+
+    In this version of the convolutional network, we average the weights of the most fired neuron in the patch
+    with the average of the sum of the weights of its neighbors in the lattice (i.e., 1/2 * most_spiked + 1/2 * (average(neighbors))).
     '''
     for conn_name in input_connections:
     	for feature in xrange(conv_features):
@@ -133,11 +146,23 @@ def set_weights_most_fired():
             # create a "dense" version of the most spiked excitatory neuron's weight
             most_spiked_dense = input_connections[conn_name][:, feature * n_e + most_spiked].todense()
 
+            # get dense version of all neighboring weight matrices
+            neighbors_dense = []
+            for neighbor in lattice_neighbors[most_spiked]:
+                neighbors_dense.append(input_connections[conn_name][:, feature * n_e + most_spiked].todense()[convolution_locations[neighbor]])
+
+            # get average of all neighboring weights
+            neighbors_sum = np.zeros(conv_size **2)
+            for neighbor in neighbors_dense:
+                neighbors_sum += neighbor
+
+            neighbors_average = neighbors_sum / float(len(neighbors_dense))
+
             # set all other neurons' (in the same convolution patch) weights the same as the most-spiked neuron in the patch
             for n in xrange(n_e):
                 if n != most_spiked:
                     other_dense = input_connections[conn_name][:, feature * n_e + n].todense()
-                    other_dense[convolution_locations[n]] = most_spiked_dense[convolution_locations[most_spiked]]
+                    other_dense[convolution_locations[n]] = 0.5 * most_spiked_dense[convolution_locations[most_spiked]] + 0.5 * neighbors_average
                     input_connections[conn_name][:, feature * n_e + n] = other_dense
 
 
@@ -420,9 +445,17 @@ else:
 
 # number of excitatory neurons (number output from convolutional layer)
 n_e = ((n_input_sqrt - conv_size) / conv_stride + 1) ** 2
-
 n_e_total = n_e * conv_features
 n_e_sqrt = int(math.sqrt(n_e))
+
+# calculate neighbors in the lattice for excitatory patches
+lattice_neighbors = {}
+for i in xrange(n_e):
+    lattice_neighbors[i] = []
+    for j in xrange(n_e):
+        if i != j:
+            if is_lattice_connection(i, j):
+                lattice_neighbors[i].append(j)
 
 # number of inhibitory neurons (number of convolutational features (for now))
 n_i = n_e

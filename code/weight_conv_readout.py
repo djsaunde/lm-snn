@@ -1,169 +1,133 @@
 import numpy as np
-from pylab import *
-import matplotlib.cm as cm
+import matplotlib.cm as cmap
+import time, os.path, scipy, math, sys, timeit
+import cPickle as p
+import brian_no_units
+import brian as b
 
-ending = ''
-chosenCmap = cm.get_cmap('hot_r') #cm.get_cmap('gist_ncar')
+from scipy.sparse import coo_matrix
+from struct import unpack
+from brian import *
 
-readoutnames = []
-readoutnames.append('XeAe' + ending)
+weight_path = '../weights/'
 
-def computePopVector(popArray):
-    size = len(popArray)
-    complex_unit_roots = np.array([np.exp(1j*(2*np.pi/size)*cur_pos) for cur_pos in xrange(size)])
-    cur_pos = (np.angle(np.sum(popArray * complex_unit_roots)) % (2*np.pi)) / (2*np.pi)
-    return cur_pos
+fig_num = 0
+wmax_ee = 1.0
+
+def get_matrix_from_file(file_name, n_src, n_tgt):
+    '''
+    Given the name of a file pointing to a .npy ndarray object, load it into
+    'weight_matrix' and return it
+    '''
+
+    # load the stored ndarray into 'readout', instantiate 'weight_matrix' as 
+    # correctly-shaped zeros matrix
+    readout = np.load(file_name)
+    weight_matrix = np.zeros((n_src, n_tgt))
+
+    # read the 'readout' ndarray values into weight_matrix by (row, column) indices
+    weight_matrix[np.int32(readout[:,0]), np.int32(readout[:,1])] = readout[:,2]
+
+    # return the weight matrix read from file
+    return weight_matrix
+
 
 def get_2d_input_weights():
-    weight_matrix = XA_values
-    n_e_sqrt = int(np.sqrt(n_e))
-    n_in_sqrt = int(np.sqrt(n_input))
-    num_values_col = n_e_sqrt*n_in_sqrt
-    num_values_row = num_values_col
-    rearranged_weights = np.zeros((num_values_col, num_values_row))
-        
-    for i in xrange(n_e_sqrt):
-        for j in xrange(n_e_sqrt):
-                rearranged_weights[i*n_in_sqrt : (i+1)*n_in_sqrt, j*n_in_sqrt : (j+1)*n_in_sqrt] = \
-                    weight_matrix[:, i + j*n_e_sqrt].reshape((n_in_sqrt, n_in_sqrt))
-    return rearranged_weights
+    '''
+    Get the weights from the input to excitatory layer and reshape it to be two
+    dimensional and square.
+    '''
+    rearranged_weights = np.zeros(( conv_features * conv_size, conv_size * n_e ))
+    
+    # counts number of input -> excitatory weights displayed so far
+    connection = weight_matrix
+
+    # for each convolution feature
+    for feature in xrange(conv_features):
+        # for each excitatory neuron in this convolution feature
+        for n in xrange(n_e):
+            # get the connection weights from the input to this neuron
+            temp = connection[:, feature * n_e + n]
+            # add it to the rearranged weights for displaying to the user
+            rearranged_weights[feature * conv_size : (feature + 1) * conv_size, n * conv_size : (n + 1) * conv_size] = temp[convolution_locations[n]].reshape((conv_size, conv_size))
+
+    # return the rearranged weights to display to the user
+    return rearranged_weights.T
+
 
 def plot_2d_input_weights():
-    name = 'XeAe'
+    '''
+    Plot the weights from input to excitatory layer to view during training.
+    '''
     weights = get_2d_input_weights()
-    fig = figure(figsize = (18, 18))
-    im2 = imshow(weights, interpolation = "nearest", vmin = 0, cmap = chosenCmap) #my_cmap
-    colorbar(im2)
-    title('weights of connection' + name)
+    fig = b.figure(fig_num, figsize=(18, 18))
+    im2 = b.imshow(weights, interpolation='nearest', vmin=0, vmax=wmax_ee, cmap=cmap.get_cmap('hot_r'))
+    b.colorbar(im2)
+    b.title('Convolutional Connection Weights')
     fig.canvas.draw()
     return im2, fig
 
-bright_grey = '#f4f4f4'    # 
-red   = '#ff0000'  # 
-green   = '#00ff00'  # 
-black   = '#000000'    # 
-my_cmap = matplotlib.colors.LinearSegmentedColormap.from_list('own2',[bright_grey,black])
-
+# number of inputs to the network
 n_input = 784
-n_e = 400
+n_input_sqrt = int(math.sqrt(n_input))
 
-for name in readoutnames:
-    readout = np.load(name + '.npy')
-    if (name == 'XeAe' + ending):
-        value_arr = np.nan * np.ones((n_input, n_e))
-    else:
-        value_arr = np.nan * np.ones((n_e, n_e))
-    connection_parameters = readout
-    #                 print connection_parameters
-    for conn in connection_parameters: 
-    #                     print conn
-        # don't need to pass offset as arg, now we store the parent projection
-        src, tgt, value = conn
-        if np.isnan(value_arr[src, tgt]):
-            value_arr[src, tgt] = value
-        else:
-            value_arr[src, tgt] += value
-    if (name == 'YeAe' + ending):
-        values = np.asarray(value_arr)#.transpose()
-	for i in xrange(n_e):
-            print values[i,i]
-    else:
-        values = np.asarray(value_arr)
-        
-    fi = figure()
-#     if name == 'AeAe' + ending or  name == 'HeHe' + ending or  name == 'AeHe' + ending or  name == 'BeHe' + ending \
-#         or  name == 'CeHe' + ending or  name == 'HeAe' + ending or  name == 'HeBe' + ending or  name == 'HeCe' + ending \
-#         or  name == 'AiAe' + ending or  name == 'BiBe' + ending or  name == 'CiCe' + ending or  name == 'HiHe' + ending :
-# #         if name == 'A_H_E_E' or  name == 'B_H_E_E' or  name == 'C_H_E_E':
-# #             popVecs = np.zeros(n_e)
-# #             tempValues = np.nan_to_num(values)
-# #             for x in xrange(n_e):
-# #                 popVecs[x] = computePopVector(tempValues[:nEH,x].transpose())
-# #             argSortPopVecs = np.argsort(popVecs, axis = 0)
-# #             tempValues = np.asarray([values[:,i] for i in argSortPopVecs])
-# # #             print popVecs, argSortPopVecs, np.shape(tempValues), np.shape(values)
-# #             im = imshow(tempValues[:n_e, :n_e], interpolation="nearest", cmap=cm.get_cmap(my_cmap))  # copper_r   autumn_r  Greys  my_cmap  gist_rainbow
-# #         else:
-#         im = imshow(values[:n_e, :n_e], interpolation="nearest", cmap=cm.get_cmap(my_cmap))  # copper_r   autumn_r  Greys  my_cmap  gist_rainbow
-#             #     im = imshow(values, interpolation="nearest", cmap=cm.get_cmap('gist_rainbow'))  # copper_r   autumn_r  Greys  my_cmap  gist_rainbow
-#     else:
-#         im = imshow(values, interpolation="nearest", cmap=cm.get_cmap('gist_ncar'), aspect='auto')  # copper_r   autumn_r  Greys  my_cmap  gist_rainbow
-#         # im = imshow(values, interpolation="nearest", cmap=cm.get_cmap('spectral'))  # copper_r   autumn_r  Greys  my_cmap  gist_rainbow
-    im = imshow(values, interpolation="nearest", cmap = chosenCmap, aspect='auto')  # copper_r   autumn_r  Greys  my_cmap  gist_rainbow
-    cbar = colorbar(im)
-    xlabel('Target excitatory neuron number')
-    ylabel('Source excitatory neuron number')
-    title(name)
-    savefig(str(fi.number))
+# size of convolution windows
+conv_size = raw_input('Enter size of square side length of convolution window (default 27): ')
+if conv_size == '':
+    conv_size = 27
+else:
+    conv_size = int(conv_size)
 
-    if name == 'XeAe' + ending:
-        XA_values = np.copy(values)#.transpose()
-    if name == 'YeBe' + ending:
-        YB_values = np.copy(values)#.transpose()
-    if name == 'ZeCe' + ending:
-        ZC_values = np.copy(values)#.transpose()
-    if name == 'AeAe' + ending:
-        AA_values = np.copy(values)
-    if name == 'BeBe' + ending:
-        BB_values = np.copy(values)
-    if name == 'CeCe' + ending:
-        CC_values = np.copy(values)
-    if name == 'AeHe' + ending:
-        AH_values = np.copy(values)
-    if name == 'BeHe' + ending:
-        BH_values = np.copy(values)
-    if name == 'CeHe' + ending:
-        CH_values = np.copy(values)
-    if name == 'HeAe' + ending:
-        HA_values = np.copy(values)
-    if name == 'HeBe' + ending:
-        HB_values = np.copy(values)
-    if name == 'HeCe' + ending:
-        HC_values = np.copy(values)
+# stride of convolution windows
+conv_stride = raw_input('Enter stride size of convolution window (default 1): ')
+if conv_stride == '':
+    conv_stride = 1
+else:
+    conv_stride = int(conv_stride)
 
+# number of convolution features
+conv_features = raw_input('Enter number of convolution features to learn (default 10): ')
+if conv_features == '':
+    conv_features = 10
+else:
+    conv_features = int(conv_features)
 
-# readout = np.loadtxt('H_A_E_E.txt')
-# for i in nEH:
-    
-im, fi = plot_2d_input_weights()
-savefig(str(fi.number))
-# 
-# 
-# from mpl_toolkits.mplot3d import Axes3D
-# point  = np.array([1, 2, 3])
-# normal = np.array([1, 1, 2])
-# 
-# # a plane is a*x+b*y+c*z+d=0
-# # [a,b,c] is the normal. Thus, we have to calculate
-# # d and we're set
-# d = -point.dot(normal)
-# 
-# # create x,y
-# xx, yy = np.meshgrid(range(200), range(200))
-# 
-# # calculate corresponding z
-# z = (1 * xx + 1 * yy) % 200
-# 
-# # plot the surface
-# plt3d = plt.figure().gca(projection='3d')
-# plt3d.plot_surface(xx, yy, z)
+# number of excitatory neurons (number output from convolutional layer)
+n_e = ((n_input_sqrt - conv_size) / conv_stride + 1) ** 2
 
-XA_sum = np.nansum(XA_values[0:n_input,0:n_e], axis = 0)/n_e
-AA_sum = np.nansum(AA_values[0:n_e,0:n_e], axis = 0)/n_e
+n_e_total = n_e * conv_features
+n_e_sqrt = int(math.sqrt(n_e))
 
-fi = figure()
-plot(XA_sum, AA_sum, 'w.')
-for label, x, y in zip(range(200), XA_sum, AA_sum):
-    plt.annotate(label, 
-                xy = (x, y), xytext = (-0, 0),
-                textcoords = 'offset points', ha = 'right', va = 'bottom',
-                color = 'k')
-xlabel('summed input from X to A for A neurons')
-ylabel('summed input from A to A for A neurons')
-savefig(str(fi.number))
+# number of inhibitory neurons (number of convolutational features (for now))
+n_i = n_e
 
+# creating convolution locations inside the input image
+convolution_locations = {}
+for n in xrange(n_e):
+    convolution_locations[n] = [ ((n % n_e_sqrt) * conv_stride + (n // n_e_sqrt) * n_input_sqrt * conv_stride) + (x * n_input_sqrt) + y for y in xrange(conv_size) for x in xrange(conv_size) ]
 
+# determine STDP rule to use
+stdp_input = ''
 
-print 'done'
+if raw_input('Use weight dependence (default no)?: ') in [ 'no', '' ]:
+    use_weight_dependence = False
+    stdp_input += 'weight_dependence_'
+else:
+    use_weight_dependence = True
+    stdp_input += 'no_weight_dependence_'
 
-show()
+if raw_input('Enter (yes / no) for post-pre (default yes): ') in [ 'yes', '' ]:
+    post_pre = True
+    stdp_input += 'postpre'
+else:
+    post_pre = False
+    stdp_input += 'no_postpre'
+
+# set ending of filename saves
+ending = str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e)
+
+weight_matrix = get_matrix_from_file(weight_path + 'XeAe_' + ending + '_' + stdp_input + '.npy', n_input, conv_features * n_e)
+
+plot_2d_input_weights()
+
+b.show()
