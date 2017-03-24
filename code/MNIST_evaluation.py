@@ -104,10 +104,10 @@ n_input_sqrt = int(math.sqrt(n_input))
 
 # size of convolution windows
 n_e = raw_input('Enter number of excitatory neurons: ')
-if conv_size == '':
+if n_e == '':
     n_e = 100
 else:
-    n_e = int(conv_size)
+    n_e = int(n_e)
 
 n_e_sqrt = int(math.sqrt(n_e))
 

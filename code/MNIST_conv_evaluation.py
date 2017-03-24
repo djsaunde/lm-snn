@@ -88,7 +88,6 @@ def get_new_assignments(result_monitor, input_numbers):
         num_assignments = len(np.where(input_nums == j)[0])
         if num_assignments > 0:
             rate = np.sum(result_monitor[input_nums == j], axis=0) / num_assignments
-            print np.asarray(rate * num_assignments, dtype=np.int)
             for i in xrange(conv_features * n_e):
                 if rate[i // n_e, i % n_e] > maximum_rate[i]:
                     maximum_rate[i] = rate[i // n_e, i % n_e]
@@ -169,7 +168,7 @@ else:
 print '\n'
 
 # set ending of filename saves
-ending = '_' + stdp_input + '_' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e)
+ending = '_' + stdp_input + '__' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e)
 
 
 print '...loading MNIST'
