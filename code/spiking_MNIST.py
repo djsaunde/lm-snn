@@ -361,7 +361,7 @@ if test_mode:
     ee_STDP_on = False
 else:
     weight_path = data_path + 'random/eth_model_random/'
-    num_examples = 200 * 1
+    num_examples = 60000 * 1
     use_testing_set = False
     do_plot_performance = False
     record_spikes = True
