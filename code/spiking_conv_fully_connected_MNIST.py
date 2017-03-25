@@ -123,7 +123,7 @@ def set_weights_most_fired():
     fired the most in the last iteration.
     '''
     for conn_name in input_connections:
-        if conn_name == 'Xe_CONV1e':
+        if conn_name == 'X_CONV1':
             for feature in xrange(conv_features):
                 # count up the spikes for the neurons in this convolution patch
                 column_sums = np.sum(current_spike_count[feature : feature + 1, :], axis=0)
@@ -147,22 +147,23 @@ def normalize_weights():
     Squash the input -> excitatory weights to sum to a prespecified number.
     '''
     for conn_name in input_connections:
-        if conn_name == 'Xe_CONV1e':
+        if conn_name == 'X_CONV1':
             connection = input_connections[conn_name][:].todense()
             for feature in xrange(conv_features):
                 feature_connection = connection[:, feature * n_e_patch : (feature + 1) * n_e_patch]
                 column_sums = np.sum(feature_connection, axis=0)
-                column_factors = weight['Xe_CONV1e'] / column_sums
+                column_factors = weight['XeCONV1e'] / column_sums
 
                 for n in xrange(n_e_patch):
                     dense_weights = input_connections[conn_name][:, feature * n_e_patch + n].todense()
                     dense_weights[convolution_locations[n]] *= column_factors[n]
                     input_connections[conn_name][:, feature * n_e_patch + n] = dense_weights
 
-        elif conn_name == 'CONV1e_FULL1e':
+        elif conn_name == 'CONV1_FULL1':
             connection = input_connections[conn_name][:]
-            column_sums = np.sum(connection, axis=0)
-            column_factors = weight['CONV1e_FULL1e'] / column_sums
+            temp_conn = np.copy(connection)
+            column_sums = np.sum(temp_conn, axis=0)
+            column_factors = weight['CONV1eFULL1e'] / column_sums
             for idx in xrange(n_e_full):
                 connection[:, idx] *= column_factors[idx]
 
@@ -238,30 +239,20 @@ def get_2d_conv_weights():
     Get the weights from the convolutional layer to fully-connected layer and reshape it to be user-viewable.
     '''
     # counts number of input -> excitatory weights displayed so far
-    connection = input_connections['CONV1_FULL1'][:]
-
-    # weight matrix instantiation
-    weight_matrix = np.zeros((n_e_conv, n_e_full))
+    weight_matrix = np.copy(input_connections['CONV1_FULL1'][:]).T
 
     # intermediate values for dimensionality of 2D weights
     n_e_full_sqrt = int(np.sqrt(n_e_full))
-    conv_size_sqrt = int(np.sqrt(conv_size))
 
     # dimensionality of 2D weights 
-    num_values_col = n_e_full_sqrt * conv_size_sqrt
-    num_values_row = num_values_col
+    num_values_col = n_e_full_sqrt * conv_features
+    num_values_row = n_e_full_sqrt * n_e_patch
     rearranged_weights = np.zeros((num_values_col, num_values_row))
-    
-    # connection matrix
-    weight_matrix = np.copy(connection)
-
-    print weight_matrix.shape
 
     # setting 2D weights
-    for i in xrange(n_e_full_sqrt):
-        for j in xrange(n_e_full_sqrt):
-            rearranged_weights[i * conv_size_sqrt : (i + 1) * conv_size_sqrt, j * conv_size_sqrt : (j + 1) * conv_size_sqrt] = \
-                weight_matrix[:, i + j * n_e_full_sqrt].reshape((conv_size_sqrt, conv_size_sqrt))
+    for i in xrange(conv_features):
+        for j in xrange(n_e_patch):
+            rearranged_weights[i * n_e_full_sqrt : (i + 1) * n_e_full_sqrt, j * n_e_full_sqrt : (j + 1) * n_e_full_sqrt] = weight_matrix[:, i + j * n_e_full_sqrt].reshape((n_e_full_sqrt, n_e_full_sqrt))
 
     # return the rearranged weights
     return rearranged_weights
@@ -284,7 +275,7 @@ def update_2d_conv_weights(im, fig):
     '''
     Update the plot of the weights from input to excitatory layer to view during training.
     '''
-    weights = get_2d_input_weights()
+    weights = get_2d_conv_weights()
     im.set_array(weights)
     fig.canvas.draw()
     return im
@@ -486,9 +477,9 @@ else:
     conv_features = int(conv_features)
 
 # size of the fully-connected laye (used for "voting" / classification)
-full_size = raw_input('Enter number of neurons in the fully-connected layer (default 20): ')
+full_size = raw_input('Enter number of neurons in the fully-connected layer (default 25): ')
 if full_size == '':
-    full_size = 20
+    full_size = 25
 else:
     full_size = int(full_size)
 
@@ -526,7 +517,7 @@ else:
     update_interval = 100
 
 # set weight update interval (plotting)
-weight_update_interval = 25
+weight_update_interval = 1
 
 # set progress printing interval
 print_progress_interval = 10
@@ -607,6 +598,21 @@ neuron_eqs_i = '''
         dge/dt = -ge/(1.0*ms)                                   : 1
         dgi/dt = -gi/(2.0*ms)                                  : 1
         '''
+
+# equations for neurons
+neuron_eqs_e_fc = '''
+        dv/dt = ((v_rest_e - v) + (I_synE + I_synI) / nS) / (100 * ms)  : volt
+        I_synE = ge * nS *         -v                           : amp
+        I_synI = gi * nS * (-100.*mV-v)                          : amp
+        dge/dt = -ge/(1.0*ms)                                   : 1
+        dgi/dt = -gi/(2.0*ms)                                  : 1
+        '''
+if test_mode:
+    neuron_eqs_e += '\n  theta      :volt'
+else:
+    neuron_eqs_e += '\n  dtheta/dt = -theta / (tc_theta)  : volt'
+
+neuron_eqs_e += '\n  dtimer/dt = 100.0 : ms'
 
 # determine STDP rule to use
 stdp_input = ''
@@ -822,7 +828,7 @@ for name in input_connection_names:
                 weight_matrix = get_matrix_from_file(weight_path + connection_name + '.npy', n_src=conv_features * n_e_patch, n_tgt=n_e_full)
 
             # create connections from the windows of the input group to the neuron population
-            input_connections[name] = b.Connection(neuron_groups[name[:name.index('_')] + conn_type[0]], neuron_groups[name[name.index('_') + 1:] + conn_type[1]], structure='sparse', state='g' + conn_type[0], delay=True, max_delay=delay[conn_type][1])
+            input_connections[name] = b.Connection(neuron_groups[name[:name.index('_')] + conn_type[0]], neuron_groups[name[name.index('_') + 1:] + conn_type[1]], structure='dense', state='g' + conn_type[0], delay=True, max_delay=delay[conn_type][1])
             
             # set the weights of the connection
             input_connections[name].connect(neuron_groups[name[:name.index('_')] + conn_type[0]], neuron_groups[name[name.index('_') + 1:] + conn_type[1]], weight_matrix)
@@ -849,6 +855,9 @@ output_numbers = np.zeros((num_examples, 10))
 # plot input weights
 if not test_mode and do_plot:
     input_weight_monitor, fig_weights = plot_2d_input_weights()
+
+    fig_num += 1
+
     conv_weight_monitor, fig2_weights = plot_2d_conv_weights()
 
     fig_num += 1
