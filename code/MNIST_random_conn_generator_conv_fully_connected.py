@@ -42,9 +42,9 @@ def create_weights():
         conv_features = int(conv_features)
 
     # size of the fully-connected laye (used for "voting" / classification)
-    full_size = raw_input('Enter number of neurons in the fully-connected layer (default 20): ')
+    full_size = raw_input('Enter number of neurons in the fully-connected layer (default 25): ')
     if full_size == '':
-        full_size = 20
+        full_size = 25
     else:
         full_size = int(full_size)
 
