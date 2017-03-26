@@ -14,7 +14,7 @@ def is_lattice_connection(sqrt, i, j):
     '''
     Boolean method which checks if two indices in a network correspond to neighboring nodes in a lattice.
 
-    n: number of nodes in lattice
+    sqrt: square root of the number of nodes in population
     i: First neuron's index
     k: Second neuron's index
     '''
@@ -30,6 +30,8 @@ def create_weights():
     # number of inputs
     n_input = 784
     n_input_sqrt = int(math.sqrt(n_input))
+
+    print '\n'
     
     # size of convolution windows
     conv_size = raw_input('Enter size of square side length of convolution window (default 27): ')
@@ -66,8 +68,8 @@ def create_weights():
     
     # creating weights
     weight = {}
-    weight['ee_input'] = 0.30
-    weight['ee_patch'] = 0.30
+    weight['ee_input'] = 0.3
+    weight['ee_patch'] = 0.3
     weight['ei'] = 10.4
     weight['ie'] = 17.4
     
@@ -105,8 +107,8 @@ def create_weights():
     
     weight_list = []
     for feature in xrange(conv_features):
-        weight_matrix = np.ones((1, conv_features * n_e)) * weight['ie']
-        weight_list.extend([ (feature, i, weight_matrix[0, i]) for i in xrange(conv_features * n_e) ])
+        weight_matrix = np.ones((conv_features * n_e, conv_features * n_e)) * weight['ie']
+        weight_list.extend([ (i, j, weight_matrix[i, j]) for i in xrange(conv_features * n_e) for j in xrange(conv_features * n_e) ])
     
     print '...saving connection matrix:', 'AiAe' + ending
 
@@ -118,11 +120,9 @@ def create_weights():
     weight_list = []
     for this_feature in xrange(conv_features):
         for other_feature in xrange(conv_features):
-            if this_feature != other_feature:
-                for n_this in xrange(n_e):
-                    for n_other in xrange(n_e):
-                        if is_lattice_connection(n_e_sqrt, n_this, n_other):
-                            weight_list.append((this_feature * n_e + n_this, other_feature * n_e + n_other, random.random() * weight['ee_patch'] + 0.01)
+            for n_this in xrange(n_e):
+                for n_other in xrange(n_e):
+                    weight_list.append((this_feature * n_e + n_this, other_feature * n_e + n_other, random.random() * weight['ee_patch'] + 0.01))
 
     print '...saving connection matrix:', 'AeAe' + ending
 
