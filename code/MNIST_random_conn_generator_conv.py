@@ -8,6 +8,9 @@ for each of the convolution patches.
 import scipy.ndimage as sp
 import numpy as np
 import pylab, math
+
+n_input = 784
+n_input_sqrt = int(math.sqrt(n_input))
         
     
 def create_weights():
