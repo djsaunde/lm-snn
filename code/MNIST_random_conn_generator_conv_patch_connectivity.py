@@ -7,7 +7,18 @@ for each of the convolution patches.
 
 import scipy.ndimage as sp
 import numpy as np
-import pylab, math
+import pylab, math, random
+
+
+def is_lattice_connection(sqrt, i, j):
+    '''
+    Boolean method which checks if two indices in a network correspond to neighboring nodes in a lattice.
+
+    n: number of nodes in lattice
+    i: First neuron's index
+    k: Second neuron's index
+    '''
+    return i + 1 == j and j % sqrt != 0 or i - 1 == j and i % sqrt != 0 or i + sqrt == j or i - sqrt == j
         
     
 def create_weights():
@@ -16,17 +27,21 @@ def create_weights():
     for the original ETH model.
     '''
     
+    # number of inputs
+    n_input = 784
+    n_input_sqrt = int(math.sqrt(n_input))
+    
     # size of convolution windows
-    conv_size = raw_input('Enter size of square side length of convolution window (default 20): ')
+    conv_size = raw_input('Enter size of square side length of convolution window (default 27): ')
     if conv_size == '':
-        conv_size = 20
+        conv_size = 27
     else:
         conv_size = int(conv_size)
 
     # stride of convolution windows
-    conv_stride = raw_input('Enter stride size of convolution window (default 8): ')
+    conv_stride = raw_input('Enter stride size of convolution window (default 1): ')
     if conv_stride == '':
-        conv_stride = 8
+        conv_stride = 1
     else:
         conv_stride = int(conv_stride)
 
@@ -47,11 +62,12 @@ def create_weights():
     ending = '_' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e)
     
     # where to store the created weights
-    dataPath = '../random/conv_random/'
+    data_path = '../random/conv_patch_connectivity_random/'
     
     # creating weights
     weight = {}
     weight['ee_input'] = 0.30
+    weight['ee_patch'] = 0.30
     weight['ei'] = 10.4
     weight['ie'] = 17.4
     
@@ -71,7 +87,7 @@ def create_weights():
     
     print '...saving connection matrix:', 'XeAe' + ending
     
-    np.save(dataPath + 'XeAe' + ending, weight_list)
+    np.save(data_path + 'XeAe' + ending, weight_list)
     
     
     print '...creating connection matrix from excitatory layer -> inbitory layer'
@@ -82,7 +98,7 @@ def create_weights():
             
     print '...saving connection matrix:', 'AeAi' + ending
     
-    np.save(dataPath + 'AeAi' + ending, weight_list)
+    np.save(data_path + 'AeAi' + ending, weight_list)
         
               
     print '...creating connection matrix from inhibitory layer -> excitatory layer'
@@ -92,25 +108,28 @@ def create_weights():
         weight_matrix = np.ones((1, conv_features * n_e)) * weight['ie']
         weight_list.extend([ (feature, i, weight_matrix[0, i]) for i in xrange(conv_features * n_e) ])
     
-        # weight_matrix = np.ones((conv_features, conv_features * n_e)) * weight['ie']
-        # weight_list.extend([ (feature * n_e + j, feature * n_e + i, weight_matrix[0, i]) for i in xrange(conv_features * n_e) for j in xrange(conv_features) ])
-
     print '...saving connection matrix:', 'AiAe' + ending
 
-    np.save(dataPath + 'AiAe' + ending, weight_list)
-    
+    np.save(data_path + 'AiAe' + ending, weight_list)
+
+
+    print '...creating connection matrix between patches'
+
+    weight_list = []
+    for this_feature in xrange(conv_features):
+        for other_feature in xrange(conv_features):
+            if this_feature != other_feature:
+                for n_this in xrange(n_e):
+                    for n_other in xrange(n_e):
+                        if is_lattice_connection(n_e_sqrt, n_this, n_other):
+                            weight_list.append((this_feature * n_e + n_this, other_feature * n_e + n_other, random.random() * weight['ee_patch'] + 0.01)
+
+    print '...saving connection matrix:', 'AeAe' + ending
+
+    np.save(data_path + 'AeAe' + ending, weight_list)
+
     print '\n'
-         
+
+
 if __name__ == '__main__':
     create_weights()
-    
-
-
-
-
-
-
-
-
-
-
