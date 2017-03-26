@@ -97,7 +97,7 @@ def get_new_assignments(result_monitor, input_numbers):
 
 
 MNIST_data_path = '../data/'
-data_path = '../activity/'
+data_path = '../activity/conv_activity/'
 
 print '\n'
 
