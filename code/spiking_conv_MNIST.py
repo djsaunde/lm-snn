@@ -365,7 +365,7 @@ else:
     ee_STDP_on = True
 
 # plotting or not
-do_plot = False
+do_plot = True
 
 # number of inputs to the network
 n_input = 784
@@ -832,7 +832,7 @@ while j < num_examples:
                 performance = get_current_performance(performance, j)
             # printing out classification performance results so far
             print '\nClassification performance', performance[:int(j / float(update_interval)) + 1], '\n'
-            target = open('../performance/conv_performance' + weights_name + '_' + stdp_input + '.txt', 'w')
+            target = open('../performance/conv_performance/' + weights_name + '_' + stdp_input + '.txt', 'w')
             target.truncate()
             target.write('Iteration ' + str(j) + '\n')
             target.write(str(performance[:int(j / float(update_interval)) + 1]))
