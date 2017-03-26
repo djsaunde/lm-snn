@@ -775,11 +775,12 @@ while j < (int(num_examples)):
                 performance = get_current_performance(performance, j)
             # printing out classification performance results so far
             print '\nClassification performance', performance[:int(j / float(update_interval)) + 1], '\n'
-            target = open('../performance/eth_model_performance/' + weights_name + '_' + stdp_input + '_iter_' + str(j), 'w')
+            target = open('../performance/eth_model_performance/' + weights_name + '_' + stdp_input + '.txt', 'w')
             target.truncate()
+            target.write('Iteration ' + str(j) + '\n')
             target.write(str(performance[:int(j / float(update_interval)) + 1]))
             target.close()
-                
+
         # set input firing rates back to zero
         for name in input_population_names:
             input_groups[name + 'e'].rate = 0
