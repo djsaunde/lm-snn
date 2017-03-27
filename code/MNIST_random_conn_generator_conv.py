@@ -8,14 +8,17 @@ for each of the convolution patches.
 import scipy.ndimage as sp
 import numpy as np
 import pylab, math
-        
-    
+
+
+n_input = 784
+n_input_sqrt = int(math.sqrt(n_input))
+
 def create_weights():
     '''
     Run from the main method. Creates the weights for all the network's synapses,
     for the original ETH model.
     '''
-    
+
     # size of convolution windows
     conv_size = raw_input('Enter size of square side length of convolution window (default 20): ')
     if conv_size == '':

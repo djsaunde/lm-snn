@@ -335,10 +335,24 @@ def get_recognized_number_ranking(assignments, spike_rates):
     '''
     summed_rates = [0] * 10
     num_assignments = [0] * 10
+
+    most_spiked_array = np.array(np.zeros((conv_features, n_e)), dtype=bool)
+
+    for feature in xrange(conv_features):
+        # count up the spikes for the neurons in this convolution patch
+        column_sums = np.sum(spike_rates[feature : feature + 1, :], axis=0)
+
+        # find the excitatory neuron which spiked the most
+        most_spiked_array[feature, np.argmax(column_sums)] = True
+
+    # for each label
     for i in xrange(10):
-        num_assignments[i] = len(np.where(assignments == i)[0])
+        # get the number of label assignments of this type
+        num_assignments[i] = len(np.where(assignments[most_spiked_array] == i))
         if num_assignments[i] > 0:
-            summed_rates[i] = np.sum(spike_rates[assignments == i]) / num_assignments[i]
+            # sum the spike rates of all excitatory neurons with this label, which fired the most in its patch
+            summed_rates[i] = np.sum(spike_rates[np.where(assignments[most_spiked_array] == i)]) / num_assignments[i]
+
     return np.argsort(summed_rates)[::-1]
 
 
@@ -435,31 +449,10 @@ do_plot = True
 n_input = 784
 n_input_sqrt = int(math.sqrt(n_input))
 
-# number of classes to learn
-classes_input = raw_input('Enter classes to learn as comma-separated list (e.g, 0,1,2,3,...) (default all 10 classes): ')
-if classes_input == '':
-    classes = range(10)
-else:
-    classes = set([ int(token) for token in classes_input.split(',') ])
-
-# reduce size of dataset if necessary
-if not test_mode and classes_input != '':
-    new_training = {'x' : [], 'y' : [], 'rows' : training['rows'], 'cols' : training['cols']}
-    for idx in xrange(len(training['x'])):
-        if training['y'][idx][0] in classes:
-            new_training['y'].append(training['y'][idx])
-            new_training['x'].append(training['x'][idx])
-    new_training['x'], new_training['y'] = np.asarray(new_training['x']), np.asarray(new_training['y'])
-    training = new_training
-
-elif test_mode and classes_input != '':
-    new_testing = {'x' : [], 'y' : [], 'rows' : testing['rows'], 'cols' : testing['cols']}
-    for idx in xrange(len(testing['x'])):
-        if testing['y'][idx][0] in classes:
-            new_testing['y'].append(testing['y'][idx])
-            new_testing['x'].append(testing['x'][idx])
-    new_testing['x'], new_testing['y'] = np.asarray(new_testing['x']), np.asarray(new_testing['y'])
-    testing = new_testing
+# type of patch connectivity
+connectivity = raw_input('Enter connectivity type ("pairs", "all") between patches (default all): ')
+if connectivity == '':
+    connectivity = 'all'
 
 # size of convolution windows
 conv_size = raw_input('Enter size of square side length of convolution window (default 27): ')
@@ -509,7 +502,7 @@ else:
     update_interval = 100
 
 # set weight update interval (plotting)
-weight_update_interval = 1
+weight_update_interval = 10
 
 # set progress printing interval
 print_progress_interval = 10
@@ -536,7 +529,6 @@ save_conns = [ 'XeAe' + '_' + ending ]
 input_conn_names = [ 'ee_input' ]
 recurrent_conn_names = [ 'ei', 'ie', 'ee' ]
 weight['ee_input'] = (conv_size ** 2) * 0.15
-weight['ee_recurr'] = (4 * n_e - 3 * (n_e_sqrt - 2) - 2 * 4) * 1.5
 delay['ee_input'] = (0 * b.ms, 10 * b.ms)
 delay['ei_input'] = (0 * b.ms, 5 * b.ms)
 input_intensity = start_input_intensity = 2.0
@@ -701,13 +693,26 @@ for name in population_names:
             #create a connection from the first group in conn_name with the second group
             connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
             # instantiate the created connection
-            for feature in xrange(conv_features):
-                for other_feature in xrange(conv_features):
-                    if feature != other_feature:
+            if connectivity == 'all':
+                for feature in xrange(conv_features):
+                    for other_feature in xrange(conv_features):
+                        if feature != other_feature:
+                            for this_n in xrange(n_e):
+                                for other_n in xrange(n_e):
+                                    if is_lattice_connection(n_e_sqrt, this_n, other_n):
+                                        connections[conn_name][feature * n_e + this_n, other_feature * n_e + other_n] = b.random() * 0.3 + 0.01
+            elif connectivity == 'pairs':
+                for feature in xrange(conv_features):
+                    if feature % 2 == 0:
                         for this_n in xrange(n_e):
                             for other_n in xrange(n_e):
                                 if is_lattice_connection(n_e_sqrt, this_n, other_n):
-                                    connections[conn_name][feature * n_e + this_n, other_feature * n_e + other_n] = b.random() * 0.3 + 0.01
+                                    connections[conn_name][feature * n_e + this_n, (feature + 1) * n_e + other_n] = b.random() * 0.3 + 0.01
+                    elif feature % 2 == 1:
+                        for this_n in xrange(n_e):
+                            for other_n in xrange(n_e):
+                                if is_lattice_connection(n_e_sqrt, this_n, other_n):
+                                    connections[conn_name][feature * n_e + this_n, (feature - 1) * n_e + other_n] = b.random() * 0.3 + 0.01
 
 
     # if STDP from excitatory -> excitatory is on and this connection is excitatory -> excitatory
@@ -744,9 +749,26 @@ convolution_locations = {}
 for n in xrange(n_e):
     convolution_locations[n] = [ ((n % n_e_sqrt) * conv_stride + (n // n_e_sqrt) * n_input_sqrt * conv_stride) + (x * n_input_sqrt) + y for y in xrange(conv_size) for x in xrange(conv_size) ]
 
-lattice_locations = {}
-for this_n in xrange(conv_features * n_e):
-    lattice_locations[this_n] = [ other_n for other_n in xrange(conv_features * n_e) if is_lattice_connection(n_e_sqrt, this_n % n_e, other_n % n_e) ]
+# creating lattice locations for each patch
+if connectivity == 'all':
+    lattice_locations = {}
+    for this_n in xrange(conv_features * n_e):
+        lattice_locations[this_n] = [ other_n for other_n in xrange(conv_features * n_e) if is_lattice_connection(n_e_sqrt, this_n % n_e, other_n % n_e) ]
+elif connectivity == 'pairs':
+    lattice_locations = {}
+    for this_n in xrange(conv_features * n_e):
+        lattice_locations[this_n] = []
+        for other_n in xrange(conv_features * n_e):
+            if this_n // n_e % 2 == 0:
+                if is_lattice_connection(n_e_sqrt, this_n % n_e, other_n % n_e) and other_n // n_e == this_n // n_e + 1:
+                    lattice_locations[this_n].append(other_n)
+            elif this_n // n_e % 2 == 1:
+                if is_lattice_connection(n_e_sqrt, this_n % n_e, other_n % n_e) and other_n // n_e == this_n // n_e - 1:
+                    lattice_locations[this_n].append(other_n)
+
+# setting up parameters for weight normalization between patches
+num_lattice_connections = sum([ len(value) for value in lattice_locations.values() ])
+weight['ee_recurr'] = (num_lattice_connections / conv_features) * 0.15
 
 # creating Poission spike train from input image (784 vector, 28x28 image)
 for name in input_population_names:
