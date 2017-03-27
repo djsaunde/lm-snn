@@ -446,7 +446,7 @@ else:
     update_interval = 100
 
 # set weight update interval (plotting)
-weight_update_interval = 1
+weight_update_interval = 10
 
 # set progress printing interval
 print_progress_interval = 10

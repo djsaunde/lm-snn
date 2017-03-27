@@ -9,7 +9,7 @@ from scipy.sparse import coo_matrix
 from struct import unpack
 from brian import *
 
-weight_path = '../weights/conv_weights/'
+weight_path = '../weights/conv_patch_connectivity/weights/'
 
 fig_num = 0
 wmax_ee = 1.0

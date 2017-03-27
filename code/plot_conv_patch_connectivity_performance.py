@@ -5,7 +5,7 @@ import numpy as np
 import os
 
 
-perf_dir = '../performance/conv_performance/'
+perf_dir = '../performance/conv_patch_connectivity_performance/'
 
 perfs = {}
 for file_name in os.listdir(perf_dir):
@@ -13,9 +13,10 @@ for file_name in os.listdir(perf_dir):
         perf_text = open(perf_dir + file_name, 'r').readlines()[1:]
         perfs[file_name] = [ float(token) for token in ''.join(perf_text).replace('\n', '').replace('[', '').replace(']', '').split()  ]
 
+print '\n'
+
 plots = []
 for perf in sorted(perfs.keys()):
-    # plots.append(plt.plot(perfs[perf]), label=perf[5:perf.index('weight') - 1])[0])
     perf_plot, = plt.plot(perfs[perf], label='performance')
     average_plot, = plt.plot([ np.mean(perfs[perf]) ] * len(perfs[perf]), label='average: ' + str(np.mean(perfs[perf])))
     upper_std_plot, = plt.plot([ np.mean(perfs[perf]) + np.std(perfs[perf]) ] * len(perfs[perf]), label='plus one standard deviation: ' + str(np.mean(perfs[perf]) + np.std(perfs[perf])))
@@ -36,4 +37,4 @@ for perf in sorted(perfs.keys()):
     plt.savefig(perf_dir + 'performance_plots/Classification accuracy by iteration number (' + title_strs[0] + 'x' + title_strs[0] + ' convolution, stride ' + title_strs[1] + ', ' + title_strs[2] + ' convolution features, gving ' + title_strs[3] + ' excitatory neurons per convolutional patch')
     plt.show()
 
-# plt.legend(handles=[ plot for plot in plots ])
+print '\n'
