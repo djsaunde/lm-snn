@@ -11,17 +11,17 @@ import pylab
     
 def create_weights():
     '''
-    Run from the main method. Creates the weights for all the network's synapses,
+    Run from the main method. Creates the weights for all the n_etwork's synapses,
     for the original ETH model.
     '''
     
     # number of inputs and exc / inhib neurons
-    nInput = 784
-    nE = input('Enter number of excitatory / inhibitory neurons: ')
-    nI = nE
+    n_input = 784
+    n_e = input('Enter number of excitatory / inhibitory neurons: ')
+    n_i = n_e
     
     # where to store the created weights
-    dataPath = '../random/'
+    data_path = '../random/eth_model_random/'
     
     # creating weights
     weight = {}
@@ -29,41 +29,44 @@ def create_weights():
     weight['ei'] = 10.4
     weight['ie'] = 17.0
     
+    print '\n'
     
     print '...creating random connection matrix from input -> excitatory layer'
     
-    connNameList = ['XeAe']
-    for name in connNameList:
-        weight_matrix = (np.random.random((nInput, nE)) + 0.01) * weight['ee_input']
-        weight_list = [(i, j, weight_matrix[i,j]) for j in xrange(nE) for i in xrange(nInput)]
+    conn_name_list = ['XeAe']
+    for name in conn_name_list:
+        weight_matrix = (np.random.random((n_input, n_e)) + 0.01) * weight['ee_input']
+        weight_list = [(i, j, weight_matrix[i,j]) for j in xrange(n_e) for i in xrange(n_input)]
         
-        print '...saving connection matrix:', name + str(nE)
+        print '...saving connection matrix:', name + str(n_e)
         
-        np.save(dataPath + name + str(nE), weight_list)
+        np.save(data_path + name + str(n_e), weight_list)
     
     
     print '...creating connection matrix from excitatory layer -> inbitory layer'
     
-    connNameList = ['AeAi']
-    for name in connNameList:
-        weight_list = [(i, i, weight['ei']) for i in xrange(nE)]
+    conn_name_list = ['AeAi']
+    for name in conn_name_list:
+        weight_list = [(i, i, weight['ei']) for i in xrange(n_e)]
         
-        print '...saving connection matrix:', name + str(nE)
+        print '...saving connection matrix:', name + str(n_e)
         
-        np.save(dataPath + name + str(nE), weight_list)
+        np.save(data_path + name + str(n_e), weight_list)
         
               
     print '...creating connection matrix from inhbitory layer -> excitatory layer'
     
-    connNameList = ['AiAe']
-    for name in connNameList:
-        weight_matrix = np.ones((nI, nE)) * weight['ie']
+    conn_name_list = ['AiAe']
+    for name in conn_name_list:
+        weight_matrix = np.ones((n_i, n_e)) * weight['ie']
         np.fill_diagonal(weight_matrix, 0)
-        weight_list = [(i, j, weight_matrix[i,j]) for i in xrange(nI) for j in xrange(nE)]
+        weight_list = [(i, j, weight_matrix[i,j]) for i in xrange(n_i) for j in xrange(n_e)]
         
-        print '...saving connection matrix:', name + str(nI)
+        print '...saving connection matrix:', name + str(n_i)
 
-        np.save(dataPath + name + str(nE), weight_list)
+        np.save(data_path + name + str(n_e), weight_list)
+
+    print '\n'
     
          
 if __name__ == "__main__":

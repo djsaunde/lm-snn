@@ -91,7 +91,7 @@ def save_connections():
     '''
 
     # print out saved connections
-    print '...saving connections: weights/' + save_conns[0] + '_' + stdp_input
+    print '...saving connections: weights/conv_weights' + save_conns[0] + '_' + stdp_input
 
     # iterate over all connections to save
     for conn_name in save_conns:
@@ -100,7 +100,7 @@ def save_connections():
         # sparsify it into (row, column, entry) tuples
         conn_list_sparse = ([(i, j, conn_matrix[i, j]) for i in xrange(conn_matrix.shape[0]) for j in xrange(conn_matrix.shape[1]) ])
         # save it out to disk
-        np.save(data_path + 'weights/' + conn_name + '_' + stdp_input, conn_list_sparse)
+        np.save(data_path + 'weights/conv_weights/' + conn_name + '_' + stdp_input, conn_list_sparse)
 
 
 def save_theta():
@@ -111,10 +111,10 @@ def save_theta():
     # iterate over population for which to save theta parameters
     for pop_name in population_names:
     	# print out saved theta populations
-        print '...saving theta: weights/theta_' + pop_name + '_' + ending + '_' + stdp_input
+        print '...saving theta: weights/conv_weights/theta_' + pop_name + '_' + ending + '_' + stdp_input
 
         # save out the theta parameters to file
-        np.save(data_path + 'weights/theta_' + pop_name + '_' + ending + '_' + stdp_input, neuron_groups[pop_name + 'e'].theta)
+        np.save(data_path + 'weights/conv_weights/theta_' + pop_name + '_' + ending + '_' + stdp_input, neuron_groups[pop_name + 'e'].theta)
 
 
 def set_weights_most_fired():
@@ -350,14 +350,14 @@ data_path = '../'
 
 # set parameters for simulation based on train / test mode
 if test_mode:
-    weight_path = data_path + 'weights/'
+    weight_path = data_path + 'weights/conv_weights/'
     num_examples = 10000 * 1
     use_testing_set = True
     do_plot_performance = False
     record_spikes = True
     ee_STDP_on = False
 else:
-    weight_path = data_path + 'random/'
+    weight_path = data_path + 'random/conv_random/'
     num_examples = 60000 * 1
     use_testing_set = False
     do_plot_performance = True
@@ -601,7 +601,7 @@ print '...creating recurrent connections'
 
 for name in population_names:
     # if we're in test mode / using some stored weights
-    if test_mode or weight_path[-8:] == 'weights/':
+    if test_mode or weight_path[-8:] == 'weights/conv_weights/':
         # load up adaptive threshold parameters
         neuron_groups['e'].theta = np.load(weight_path + 'theta_A' + '_' + ending + '_' + stdp_input + '.npy')
     else:
@@ -613,7 +613,7 @@ for name in population_names:
             # create connection name (composed of population and connections types)
             conn_name = name + conn_type[0] + name + conn_type[1] + '_' + ending
             # get the corresponding stored weights from file
-            weight_matrix = get_matrix_from_file(data_path + 'random/' + conn_name + '.npy', n_src=conv_features * n_e, n_tgt=conv_features)
+            weight_matrix = get_matrix_from_file(data_path + 'random/conv_random/' + conn_name + '.npy', n_src=conv_features * n_e, n_tgt=conv_features)
             # create a connection from the first group in conn_name with the second group
             connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
             # instantiate the created connection with the 'weightMatrix' loaded from file
@@ -625,7 +625,7 @@ for name in population_names:
             # create connection name (composed of population and connections types)
             conn_name = name + conn_type[0] + name + conn_type[1] + '_' + ending
             # get the corresponding stored weights from file
-            weight_matrix = get_matrix_from_file(data_path + 'random/' + conn_name + '.npy', n_src=conv_features, n_tgt=(conv_features ** 2) * n_e)
+            weight_matrix = get_matrix_from_file(data_path + 'random/conv_random/' + conn_name + '.npy', n_src=conv_features, n_tgt=(conv_features ** 2) * n_e)
             # create a connection from the first group in conn_name with the second group
             connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
             # instantiate the created connection with the 'weightMatrix' loaded from file
@@ -832,7 +832,7 @@ while j < num_examples:
                 performance = get_current_performance(performance, j)
             # printing out classification performance results so far
             print '\nClassification performance', performance[:int(j / float(update_interval)) + 1], '\n'
-            target = open('../performance/' + weights_name + '_' + stdp_input + '.txt', 'w')
+            target = open('../performance/conv_performance/' + weights_name + '_' + stdp_input + '.txt', 'w')
             target.truncate()
             target.write('Iteration ' + str(j) + '\n')
             target.write(str(performance[:int(j / float(update_interval)) + 1]))
@@ -864,8 +864,8 @@ if not test_mode:
 if not test_mode:
     save_connections()
 else:
-    np.save(data_path + 'activity/resultPopVecs' + str(num_examples) + '_' + stdp_input + '_' + ending, result_monitor)
-    np.save(data_path + 'activity/inputNumbers' + str(num_examples) + '_' + stdp_input + '_' + ending, input_numbers)
+    np.save(data_path + 'activity/conv_activity/resultPopVecs' + str(num_examples) + '_' + stdp_input + '_' + ending, result_monitor)
+    np.save(data_path + 'activity/conv_activity/inputNumbers' + str(num_examples) + '_' + stdp_input + '_' + ending, input_numbers)
 
 ################ 
 # PLOT RESULTS #

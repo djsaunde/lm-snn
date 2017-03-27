@@ -82,7 +82,7 @@ def get_new_assignments(result_monitor, input_numbers):
 
 
 MNIST_data_path = '../data/'
-data_path = '../activity/'
+data_path = '../activity/eth_model_activity/'
 
 training_ending = raw_input('Enter number of training samples: ')
 if training_ending == '':

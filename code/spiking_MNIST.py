@@ -117,7 +117,7 @@ def save_connections():
         # sparsify it into (row, column, entry) tuples
         connListSparse = ([(i,j,connMatrix[i,j]) for i in xrange(connMatrix.shape[0]) for j in xrange(connMatrix.shape[1]) ])
         # save it out to disk
-        np.save(data_path + 'weights/' + conn_name + '_' + stdp_input + '_' + ending, connListSparse)
+        np.save(data_path + 'weights/eth_model_weights/' + conn_name + '_' + stdp_input + '_' + ending, connListSparse)
 
 
 def save_theta():
@@ -131,7 +131,7 @@ def save_theta():
     # iterate over population for which to save theta parameters
     for pop_name in population_names:
     	# save out the theta parameters to file
-        np.save(data_path + 'weights/theta_' + pop_name + '_' + stdp_input + '_' + ending, neuron_groups[pop_name + 'e'].theta)
+        np.save(data_path + 'weights/eth_model_weights/theta_' + pop_name + '_' + stdp_input + '_' + ending, neuron_groups[pop_name + 'e'].theta)
 
 
 def normalize_weights():
@@ -179,8 +179,8 @@ def get_2d_input_weights():
 
     for i in xrange(n_e_sqrt):
         for j in xrange(n_e_sqrt):
-                rearranged_weights[i*n_in_sqrt : (i+1)*n_in_sqrt, j*n_in_sqrt : (j+1)*n_in_sqrt] = \
-                    weight_matrix[:, i + j*n_e_sqrt].reshape((n_in_sqrt, n_in_sqrt))
+            rearranged_weights[i*n_in_sqrt : (i+1)*n_in_sqrt, j*n_in_sqrt : (j+1)*n_in_sqrt] = \
+                weight_matrix[:, i + j*n_e_sqrt].reshape((n_in_sqrt, n_in_sqrt))
 
     return rearranged_weights
 
@@ -353,14 +353,14 @@ data_path = '../'
 
 # set parameters for simulation based on train / test mode
 if test_mode:
-    weight_path = data_path + 'weights/'
+    weight_path = data_path + 'weights/eth_model_weights/'
     num_examples = 10000 * 1
     use_testing_set = True
     do_plot_performance = False
     record_spikes = True
     ee_STDP_on = False
 else:
-    weight_path = data_path + 'random/'
+    weight_path = data_path + 'random/eth_model_random/'
     num_examples = 60000 * 1
     use_testing_set = False
     do_plot_performance = False
@@ -584,7 +584,7 @@ for name in population_names:
     neuron_groups[name + 'i'].v = v_rest_i - 40. * b.mV
 
     # if we're in test mode / using some stored weights
-    if test_mode or weight_path[-8:] == 'weights/':
+    if test_mode or weight_path[-8:] == 'weights/eth_model_weights/':
         # load up adaptive threshold parameters
         neuron_groups['e'].theta = np.load(weight_path + 'theta_A_' + stdp_input + '_' + ending + '.npy')
     else:
@@ -597,7 +597,7 @@ for name in population_names:
         # create connection name (composed of population and connections types)
         conn_name = name + conn_type[0] + name + conn_type[1] + ending
         # get the corresponding stored weights from file
-        weight_matrix = get_matrix_from_file(data_path + 'random/' + conn_name + '.npy')
+        weight_matrix = get_matrix_from_file(data_path + 'random/eth_model_random/' + conn_name + '.npy')
         # create a connection from the first group in conn_name with the second group
         connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure=conn_structure, state='g' + conn_type[0])
         # instantiate the created connection with the 'weightMatrix' loaded from file
@@ -775,11 +775,12 @@ while j < (int(num_examples)):
                 performance = get_current_performance(performance, j)
             # printing out classification performance results so far
             print '\nClassification performance', performance[:int(j / float(update_interval)) + 1], '\n'
-            target = open('../performance/' + weights_name + '_' + stdp_input + '_iter_' + str(j), 'w')
+            target = open('../performance/eth_model_performance/' + weights_name + '_' + stdp_input + '.txt', 'w')
             target.truncate()
+            target.write('Iteration ' + str(j) + '\n')
             target.write(str(performance[:int(j / float(update_interval)) + 1]))
             target.close()
-                
+
         # set input firing rates back to zero
         for name in input_population_names:
             input_groups[name + 'e'].rate = 0
@@ -803,8 +804,8 @@ if not test_mode:
 if not test_mode:
     save_connections()
 else:
-    np.save(data_path + 'activity/resultPopVecs' + str(num_examples) + '_' + stdp_input, result_monitor)
-    np.save(data_path + 'activity/inputNumbers' + str(num_examples) + '_' + stdp_input, input_numbers)
+    np.save(data_path + 'activity/eth_model_activity/resultPopVecs' + str(num_examples) + '_' + stdp_input, result_monitor)
+    np.save(data_path + 'activity/eth_model_activity/inputNumbers' + str(num_examples) + '_' + stdp_input, input_numbers)
 
 ################ 
 # PLOT RESULTS #

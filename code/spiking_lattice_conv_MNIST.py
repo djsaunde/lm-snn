@@ -382,7 +382,7 @@ if test_mode:
     record_spikes = True
     ee_STDP_on = False
 else:
-    weight_path = data_path + 'random/'
+    weight_path = data_path + 'random/lattice_random/'
     num_examples = 60000 * 1
     use_testing_set = False
     do_plot_performance = True
@@ -634,7 +634,7 @@ print '...creating recurrent connections'
 
 for name in population_names:
     # if we're in test mode / using some stored weights
-    if test_mode or weight_path[-8:] == 'weights/':
+    if test_mode or weight_path[-8:] == 'weights/lattice_weights/':
         # load up adaptive threshold parameters
         neuron_groups['e'].theta = np.load(weight_path + 'theta_A' + '_' + ending + '_' + stdp_input + '.npy')
     else:
@@ -646,7 +646,7 @@ for name in population_names:
             # create connection name (composed of population and connections types)
             conn_name = name + conn_type[0] + name + conn_type[1] + '_' + ending
             # get the corresponding stored weights from file
-            weight_matrix = get_matrix_from_file(data_path + 'random/' + conn_name + '.npy', n_src=conv_features * n_e, n_tgt=conv_features)
+            weight_matrix = get_matrix_from_file(data_path + 'random/lattice_random/' + conn_name + '.npy', n_src=conv_features * n_e, n_tgt=conv_features)
             # create a connection from the first group in conn_name with the second group
             connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
             # instantiate the created connection with the 'weightMatrix' loaded from file
@@ -658,7 +658,7 @@ for name in population_names:
             # create connection name (composed of population and connections types)
             conn_name = name + conn_type[0] + name + conn_type[1] + '_' + ending
             # get the corresponding stored weights from file
-            weight_matrix = get_matrix_from_file(data_path + 'random/' + conn_name + '.npy', n_src=conv_features, n_tgt=(conv_features ** 2) * n_e)
+            weight_matrix = get_matrix_from_file(data_path + 'random/lattice_random/' + conn_name + '.npy', n_src=conv_features, n_tgt=(conv_features ** 2) * n_e)
             # create a connection from the first group in conn_name with the second group
             connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
             # instantiate the created connection with the 'weightMatrix' loaded from file

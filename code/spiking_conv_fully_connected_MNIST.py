@@ -126,7 +126,7 @@ def set_weights_most_fired():
         if conn_name == 'X_CONV1':
             for feature in xrange(conv_features):
                 # count up the spikes for the neurons in this convolution patch
-                column_sums = np.sum(current_spike_count[feature : feature + 1, :], axis=0)
+                column_sums = np.sum(current_conv_spike_count[feature : feature + 1, :], axis=0)
 
                 # find the excitatory neuron which spiked the most
                 most_spiked = np.argmax(column_sums)
@@ -426,34 +426,6 @@ do_plot = True
 # number of inputs to the network
 n_input = 784
 n_input_sqrt = int(math.sqrt(n_input))
-
-'''
-# number of classes to learn
-classes_input = raw_input('Enter classes to learn as comma-separated list (e.g, 0,1,2,3,...) (default all 10 classes): ')
-if classes_input == '':
-    classes = range(10)
-else:
-    classes = set([ int(token) for token in classes_input.split(',') ])
-
-# reduce size of dataset if necessary
-if not test_mode and classes_input != '':
-    new_training = {'x' : [], 'y' : [], 'rows' : training['rows'], 'cols' : training['cols']}
-    for idx in xrange(len(training['x'])):
-        if training['y'][idx][0] in classes:
-            new_training['y'].append(training['y'][idx])
-            new_training['x'].append(training['x'][idx])
-    new_training['x'], new_training['y'] = np.asarray(new_training['x']), np.asarray(new_training['y'])
-    training = new_training
-
-elif test_mode and classes_input != '':
-    new_testing = {'x' : [], 'y' : [], 'rows' : testing['rows'], 'cols' : testing['cols']}
-    for idx in xrange(len(testing['x'])):
-        if testing['y'][idx][0] in classes:
-            new_testing['y'].append(testing['y'][idx])
-            new_testing['x'].append(testing['x'][idx])
-    new_testing['x'], new_testing['y'] = np.asarray(new_testing['x']), np.asarray(new_testing['y'])
-    testing = new_testing
-'''
 
 # size of convolution windows
 conv_size = raw_input('Enter size of square side length of convolution window (default 27): ')
@@ -847,7 +819,8 @@ print '\n'
 #################################
 
 # bookkeeping variables
-previous_spike_count = np.zeros(n_e_full)
+previous_conv_spike_count = np.zeros((n_input, conv_features * n_e_patch))
+previous_fc_spike_count = np.zeros(n_e_full)
 assignments = np.ones(n_e_full) * -1
 input_numbers = [0] * num_examples
 output_numbers = np.zeros((num_examples, 10))
@@ -855,11 +828,8 @@ output_numbers = np.zeros((num_examples, 10))
 # plot input weights
 if not test_mode and do_plot:
     input_weight_monitor, fig_weights = plot_2d_input_weights()
-
     fig_num += 1
-
     conv_weight_monitor, fig2_weights = plot_2d_conv_weights()
-
     fig_num += 1
 
 # plot input intensities
@@ -918,8 +888,10 @@ while j < num_examples:
         assignments = get_new_assignments(result_monitor[:], input_numbers[j - update_interval : j])
     
     # get count of spikes over the past iteration
-    current_spike_count = np.copy(spike_counters['FULL1e'].count[:]).reshape(n_e_full) - previous_spike_count
-    previous_spike_count = np.copy(spike_counters['FULL1e'].count[:]).reshape(n_e_full)
+    current_conv_spike_count = np.copy(spike_counters['CONV1e'].count[:]).reshape((conv_features * n_e_patch)) - previous_conv_spike_count
+    previous_conv_spike_count = np.copy(spike_counters['CONV1e'].count[:]).reshape((conv_features * n_e_patch))
+    current_fc_spike_count = np.copy(spike_counters['FULL1e'].count[:]).reshape((n_e_full)) - previous_fc_spike_count
+    previous_fc_spike_count = np.copy(spike_counters['FULL1e'].count[:]).reshape(n_e_full)
     
     # set weights to those of the most-fired neuron
     if not test_mode:
@@ -931,7 +903,7 @@ while j < num_examples:
         update_2d_conv_weights(conv_weight_monitor, fig2_weights)
     
     # if the neurons in the network didn't spike more than four times
-    if np.sum(current_spike_count) < 5 and num_retries < 3:
+    if np.sum(current_fc_spike_count) + np.sum(current_conv_spike_count) < 5 and num_retries < 3:
         # increase the intensity of input
         input_intensity += 2
         num_retries += 1
@@ -946,7 +918,7 @@ while j < num_examples:
     else:
         num_retries = 0
     	# record the current number of spikes
-        result_monitor[j % update_interval, :] = current_spike_count
+        result_monitor[j % update_interval, :] = current_fc_spike_count
         
         # decide whether to evaluate on test or training set
         if test_mode and use_testing_set:

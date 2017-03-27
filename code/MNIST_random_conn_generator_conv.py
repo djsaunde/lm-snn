@@ -8,6 +8,9 @@ for each of the convolution patches.
 import scipy.ndimage as sp
 import numpy as np
 import pylab, math
+
+n_input = 784
+n_input_sqrt = int(math.sqrt(n_input))
         
     
 def create_weights():
@@ -15,10 +18,6 @@ def create_weights():
     Run from the main method. Creates the weights for all the network's synapses,
     for the original ETH model.
     '''
-    
-    # number of inputs
-    n_input = 784
-    n_input_sqrt = int(math.sqrt(n_input))
     
     # size of convolution windows
     conv_size = raw_input('Enter size of square side length of convolution window (default 20): ')
@@ -51,7 +50,7 @@ def create_weights():
     ending = '_' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e)
     
     # where to store the created weights
-    dataPath = '../random/'
+    dataPath = '../random/conv_random/'
     
     # creating weights
     weight = {}
@@ -89,7 +88,7 @@ def create_weights():
     np.save(dataPath + 'AeAi' + ending, weight_list)
         
               
-    print '...creating connection matrix from inhbitory layer -> excitatory layer'
+    print '...creating connection matrix from inhibitory layer -> excitatory layer'
     
     weight_list = []
     for feature in xrange(conv_features):
