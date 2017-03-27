@@ -97,7 +97,7 @@ def get_new_assignments(result_monitor, input_numbers):
 
 
 MNIST_data_path = '../data/'
-data_path = '../activity/conv_patch_connectity_activity/'
+data_path = '../activity/lattice_activity/'
 
 print '\n'
 
@@ -168,7 +168,7 @@ else:
 print '\n'
 
 # set ending of filename saves
-ending = '_' + stdp_input + '__' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e)
+ending = stdp_input + '_' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e)
 
 
 print '...loading MNIST'
@@ -177,10 +177,10 @@ testing = get_labeled_data(MNIST_data_path + 'testing', b_train=False)
 
 
 print '...loading results'
-training_result_monitor = np.load(data_path + 'resultPopVecs' + training_ending + ending + '.npy')
-training_input_numbers = np.load(data_path + 'inputNumbers' + training_ending + ending + '.npy')
-testing_result_monitor = np.load(data_path + 'resultPopVecs' + testing_ending + ending + '.npy')
-testing_input_numbers = np.load(data_path + 'inputNumbers' + testing_ending + ending + '.npy')
+training_result_monitor = np.load(data_path + 'resultPopVecs' + training_ending + '_' + ending + '.npy')
+training_input_numbers = np.load(data_path + 'inputNumbers' + training_ending + '_' + ending + '.npy')
+testing_result_monitor = np.load(data_path + 'resultPopVecs' + testing_ending + '_' + ending + '.npy')
+testing_input_numbers = np.load(data_path + 'inputNumbers' + testing_ending + '_' + ending + '.npy')
 
 
 print '...getting assignments'
