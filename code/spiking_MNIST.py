@@ -7,11 +7,8 @@ Extending Peter U. Diehl's work.
 
 import numpy as np
 import matplotlib.cm as cmap
-import time
+import time, os.path, scipy, math, sys, timeit
 import os.path
-import scipy
-import math
-import cPickle as pickle
 import brian_no_units
 import brian as b
 import cPickle as p
@@ -23,16 +20,16 @@ from brian import *
 MNIST_data_path = '../data/'
 
 
-def get_labeled_data(picklename, bTrain = True):
+def get_labeled_data(picklename, b_train = True):
     '''
     Read input-vector (image) and target class (label, 0-9) and return it as 
     a list of tuples.
     '''
     if os.path.isfile('%s.pickle' % picklename):
-        data = pickle.load(open('%s.pickle' % picklename))
+        data = p.load(open('%s.pickle' % picklename))
     else:
         # Open the images with gzip in read binary mode
-        if bTrain:
+        if b_train:
             images = open(MNIST_data_path + 'train-images-idx3-ubyte', 'rb')
             labels = open(MNIST_data_path + 'train-labels-idx1-ubyte', 'rb')
         else:
@@ -62,7 +59,7 @@ def get_labeled_data(picklename, bTrain = True):
             y[i] = unpack('>B', labels.read(1))[0]
 
         data = {'x': x, 'y': y, 'rows': rows, 'cols': cols}
-        pickle.dump(data, open("%s.pickle" % picklename, "wb"))
+        p.dump(data, open("%s.pickle" % picklename, "wb"))
     return data
 
 
@@ -104,7 +101,7 @@ def get_matrix_from_file(file_name):
     return weight_matrix
 
 
-def save_connections(ending = ''):
+def save_connections():
     '''
     Save all connections in 'save_conns'; ending may be set to the index of the last
     example run through the network
@@ -114,16 +111,16 @@ def save_connections(ending = ''):
     print '...saving connections: ' + ', '.join(save_conns)
 
     # iterate over all connections to save
-    for connName in save_conns:
+    for conn_name in save_conns:
         # get the connection matrix for this connection
-        connMatrix = connections[connName][:]
+        connMatrix = connections[conn_name][:]
         # sparsify it into (row, column, entry) tuples
         connListSparse = ([(i,j,connMatrix[i,j]) for i in xrange(connMatrix.shape[0]) for j in xrange(connMatrix.shape[1]) ])
         # save it out to disk
-        np.save(data_path + 'weights/' + connName + '_' + stdp_input + '_' + ending, connListSparse)
+        np.save(data_path + 'weights/eth_model_weights/' + conn_name + '_' + stdp_input + '_' + ending, connListSparse)
 
 
-def save_theta(ending = ''):
+def save_theta():
     '''
     Save the adaptive threshold parameters to a file.
     '''
@@ -134,7 +131,7 @@ def save_theta(ending = ''):
     # iterate over population for which to save theta parameters
     for pop_name in population_names:
     	# save out the theta parameters to file
-        np.save(data_path + 'weights/theta_' + pop_name + '_' + stdp_input + '_' + ending, neuron_groups[pop_name + 'e'].theta)
+        np.save(data_path + 'weights/eth_model_weights/theta_' + pop_name + '_' + stdp_input + '_' + ending, neuron_groups[pop_name + 'e'].theta)
 
 
 def normalize_weights():
@@ -182,8 +179,8 @@ def get_2d_input_weights():
 
     for i in xrange(n_e_sqrt):
         for j in xrange(n_e_sqrt):
-                rearranged_weights[i*n_in_sqrt : (i+1)*n_in_sqrt, j*n_in_sqrt : (j+1)*n_in_sqrt] = \
-                    weight_matrix[:, i + j*n_e_sqrt].reshape((n_in_sqrt, n_in_sqrt))
+            rearranged_weights[i*n_in_sqrt : (i+1)*n_in_sqrt, j*n_in_sqrt : (j+1)*n_in_sqrt] = \
+                weight_matrix[:, i + j*n_e_sqrt].reshape((n_in_sqrt, n_in_sqrt))
 
     return rearranged_weights
 
@@ -323,7 +320,7 @@ if not test_mode:
 
 else:
 	start = time.time()
-	testing = get_labeled_data(MNIST_data_path + 'testing', bTrain = False)
+	testing = get_labeled_data(MNIST_data_path + 'testing', b_train=False)
 	end = time.time()
 	print 'time needed to load test set:', end - start
 
@@ -356,21 +353,22 @@ data_path = '../'
 
 # set parameters for simulation based on train / test mode
 if test_mode:
-    weight_path = data_path + 'weights/'
+    weight_path = data_path + 'weights/eth_model_weights/'
     num_examples = 10000 * 1
     use_testing_set = True
     do_plot_performance = False
     record_spikes = True
     ee_STDP_on = False
-    update_interval = num_examples
 else:
-    weight_path = data_path + 'random/'
+    weight_path = data_path + 'random/eth_model_random/'
     num_examples = 60000 * 1
     use_testing_set = False
-    do_plot_performance = True
+    do_plot_performance = False
     record_spikes = True
     ee_STDP_on = True
 
+# plotting or not
+do_plot = False
 
 # number of inputs to the network
 n_input = 784
@@ -424,12 +422,16 @@ resting_time = 0.15 * b.second
 runtime = num_examples * (single_example_time + resting_time)
 
 # set the update interval and weight update interval (for network weights?)
-if num_examples <= 10000:
+if test_mode:
     update_interval = num_examples
 else:
     update_interval = 100
     
+# set weight update interval (plotting)
 weight_update_interval = 25
+
+# set progress printing interval
+print_progress_interval = 10
 
 # rest potential parameters, reset potential parameters, threshold potential parameters, and refractory periods
 v_rest_e = -65. * b.mV
@@ -582,9 +584,9 @@ for name in population_names:
     neuron_groups[name + 'i'].v = v_rest_i - 40. * b.mV
 
     # if we're in test mode / using some stored weights
-    if test_mode or weight_path[-8:] == 'weights/':
+    if test_mode or weight_path[-8:] == 'weights/eth_model_weights/':
         # load up adaptive threshold parameters
-        neuron_groups['e'].theta = np.load(weight_path + 'theta_A_' + stdp_input + '.npy')
+        neuron_groups['e'].theta = np.load(weight_path + 'theta_A_' + stdp_input + '_' + ending + '.npy')
     else:
         # otherwise, set the adaptive additive threshold parameter at 20mV
         neuron_groups['e'].theta = np.ones((n_e)) * 20.0 * b.mV
@@ -595,7 +597,7 @@ for name in population_names:
         # create connection name (composed of population and connections types)
         conn_name = name + conn_type[0] + name + conn_type[1] + ending
         # get the corresponding stored weights from file
-        weight_matrix = get_matrix_from_file(data_path + 'random/' + conn_name + '.npy')
+        weight_matrix = get_matrix_from_file(data_path + 'random/eth_model_random/' + conn_name + '.npy')
         # create a connection from the first group in conn_name with the second group
         connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure=conn_structure, state='g' + conn_type[0])
         # instantiate the created connection with the 'weightMatrix' loaded from file
@@ -618,7 +620,7 @@ for name in population_names:
         spike_monitors[name + 'i'] = b.SpikeMonitor(neuron_groups[name + 'i'])
 
 # record (exc, inhib) network spikes if specified
-if record_spikes:
+if record_spikes and do_plot:
     b.figure(fig_num)
     fig_num += 1
     b.ion()
@@ -645,7 +647,7 @@ for name in input_connection_names:
             if stdp_input == 'no_weight_dependence_postpre':
                 weightMatrix = get_matrix_from_file(weight_path + connName + '_' + stdp_input + '_54000.npy')
             else:
-                weightMatrix = get_matrix_from_file(weight_path + connName + '_' + stdp_input + '_.npy')
+                weightMatrix = get_matrix_from_file(weight_path + connName + '_' + stdp_input + '_' + ending + '.npy')
         else:
             weightMatrix = get_matrix_from_file(weight_path + connName + '.npy')
         
@@ -669,18 +671,21 @@ input_numbers = [0] * num_examples
 outputNumbers = np.zeros((num_examples, 10))
 
 # plot input weights
-if not test_mode:
+if not test_mode and do_plot:
     input_weight_monitor, fig_weights = plot_2d_input_weights()
     fig_num += 1
 
 # plot input intensities
-rates = np.zeros((int(np.sqrt(n_input)), int(np.sqrt(n_input))))
-input_image_monitor, input_image = plot_input()
-fig_num += 1
+if do_plot:
+    rates = np.zeros((int(np.sqrt(n_input)), int(np.sqrt(n_input))))
+    input_image_monitor, input_image = plot_input()
+    fig_num += 1
 
 # plot performance
-if do_plot_performance:
+if do_plot_performance and do_plot:
     performance_monitor, performance, fig_num, fig_performance = plot_performance(fig_num)
+else:
+    performance = get_current_performance(np.zeros(int(num_examples / update_interval)), 0)
 
 # set firing rates to zero initially
 for name in input_population_names:
@@ -689,6 +694,11 @@ for name in input_population_names:
 # initialize network
 j = 0
 b.run(0)
+
+weights_name = 'XeAe' + ending
+
+# keep track of time during the simulation
+start_time = timeit.default_timer()
 
 while j < (int(num_examples)):
 
@@ -705,7 +715,8 @@ while j < (int(num_examples)):
         rates = training['x'][j % 60000, :, :].reshape((n_input)) / 8. * input_intensity
     
     # plot the input at this step
-    input_image_monitor = update_input(input_image_monitor, input_image)
+    if do_plot:
+        input_image_monitor = update_input(input_image_monitor, input_image)
     
     # sets the input firing rates
     input_groups['Xe'].rate = rates
@@ -718,7 +729,7 @@ while j < (int(num_examples)):
         assignments = get_new_assignments(result_monitor[:], input_numbers[j-update_interval : j])
     
     # update weights every 'weight_update_interval'
-    if j % weight_update_interval == 0 and not test_mode:
+    if j % weight_update_interval == 0 and not test_mode and do_plot:
         update_2d_input_weights(input_weight_monitor, fig_weights)
     
     # get count of spikes over the past iteration
@@ -751,17 +762,25 @@ while j < (int(num_examples)):
         outputNumbers[j,:] = get_recognized_number_ranking(assignments, result_monitor[j%update_interval,:])
         
         # print progress
-        if j % 100 == 0 and j > 0:
-            print 'runs done:', j, 'of', int(num_examples)
+        if j % print_progress_interval == 0 and j > 0:
+            print 'runs done:', j, 'of', int(num_examples), '(time taken for past', print_progress_interval, 'runs:', str(timeit.default_timer() - start_time) + ')'
+            start_time = timeit.default_timer()
         
         # plot performance if appropriate
         if j % update_interval == 0 and j > 0:
-            if do_plot_performance:
+            if do_plot_performance and do_plot:
                 # updating the performance plot
                 perf_plot, performance = update_performance_plot(performance_monitor, performance, j, fig_performance)
-                # printing out classification performance results so far
-                print 'Classification performance', performance[:int(j / float(update_interval)) + 1]
-                
+            else:
+                performance = get_current_performance(performance, j)
+            # printing out classification performance results so far
+            print '\nClassification performance', performance[:int(j / float(update_interval)) + 1], '\n'
+            target = open('../performance/eth_model_performance/' + weights_name + '_' + stdp_input + '.txt', 'w')
+            target.truncate()
+            target.write('Iteration ' + str(j) + '\n')
+            target.write(str(performance[:int(j / float(update_interval)) + 1]))
+            target.close()
+
         # set input firing rates back to zero
         for name in input_population_names:
             input_groups[name + 'e'].rate = 0
@@ -785,41 +804,39 @@ if not test_mode:
 if not test_mode:
     save_connections()
 else:
-    np.save(data_path + 'activity/resultPopVecs' + str(num_examples) + '_' + stdp_input, result_monitor)
-    np.save(data_path + 'activity/inputNumbers' + str(num_examples) + '_' + stdp_input, input_numbers)
+    np.save(data_path + 'activity/eth_model_activity/resultPopVecs' + str(num_examples) + '_' + stdp_input, result_monitor)
+    np.save(data_path + 'activity/eth_model_activity/inputNumbers' + str(num_examples) + '_' + stdp_input, input_numbers)
 
 ################ 
 # PLOT RESULTS #
 ################
 
-if rate_monitors:
-    b.figure(fig_num)
-    fig_num += 1
-    for i, name in enumerate(rate_monitors):
-        b.subplot(len(rate_monitors), 1, i + 1)
-        b.plot(rate_monitors[name].times / b.second, rate_monitors[name].rate, '.')
-        b.title('Rates of population ' + name)
-    
-if spike_monitors:
-    b.figure(fig_num)
-    fig_num += 1
-    for i, name in enumerate(spike_monitors):
-        b.subplot(len(spike_monitors), 1, i + 1)
-        b.raster_plot(spike_monitors[name])
-        b.title('Spikes of population ' + name)
+if do_plot:
+    if rate_monitors:
+        b.figure(fig_num)
+        fig_num += 1
+        for i, name in enumerate(rate_monitors):
+            b.subplot(len(rate_monitors), 1, i + 1)
+            b.plot(rate_monitors[name].times / b.second, rate_monitors[name].rate, '.')
+            b.title('Rates of population ' + name)
         
-if spike_counters:
-    b.figure(fig_num)
-    fig_num += 1
-    for i, name in enumerate(spike_counters):
-        b.subplot(len(spike_counters), 1, i + 1)
-        b.plot(spike_counters['Ae'].count[:])
-        b.title('Spike count of population ' + name)
+    if spike_monitors:
+        b.figure(fig_num)
+        fig_num += 1
+        for i, name in enumerate(spike_monitors):
+            b.subplot(len(spike_monitors), 1, i + 1)
+            b.raster_plot(spike_monitors[name])
+            b.title('Spikes of population ' + name)
+            
+    if spike_counters:
+        b.figure(fig_num)
+        fig_num += 1
+        for i, name in enumerate(spike_counters):
+            b.subplot(len(spike_counters), 1, i + 1)
+            b.plot(spike_counters['Ae'].count[:])
+            b.title('Spike count of population ' + name)
 
-plot_2d_input_weights()
+    plot_2d_input_weights()
 
-b.ioff()
-b.show()
-
-
-
+    b.ioff()
+    b.show()

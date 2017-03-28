@@ -7,32 +7,29 @@ import os
 
 perf_dir = '../performance/'
 
-perfs = {}
-for file_name in os.listdir(perf_dir):
-    if '59900' in file_name:
-        perf_text = open(perf_dir + file_name, 'r').readlines()
-        perfs[file_name] = [ float(token) for token in ''.join(perf_text).replace('\n', '').replace('[', '').replace(']', '').split()  ]
+file_name = 'XeAe100_weight_dependence_postpre_iter_59900' # raw_input('Enter in name of performance file to plot: ')
 
-plots = []
-for perf in sorted(perfs.keys()):
-    # plots.append(plt.plot(perfs[perf]), label=perf[5:perf.index('weight') - 1])[0])
-    perf_plot, = plt.plot(perfs[perf], label='performance')
-    average_plot, = plt.plot([ np.mean(perfs[perf]) ] * len(perfs[perf]), label='average: ' + str(np.mean(perfs[perf])))
-    upper_std_plot, = plt.plot([ np.mean(perfs[perf]) + np.std(perfs[perf]) ] * len(perfs[perf]), label='plus one standard deviation: ' + str(np.mean(perfs[perf]) + np.std(perfs[perf])))
-    lower_std_plot, = plt.plot([ np.mean(perfs[perf]) - np.std(perfs[perf]) ] * len(perfs[perf]), label='minus one standard deviation: ' + str(np.mean(perfs[perf]) - np.std(perfs[perf])))
-    
-    plt.legend(handles=[perf_plot, average_plot, upper_std_plot, lower_std_plot])
-    
-    fig = plt.gcf()
-    fig.set_size_inches(16, 12)
+perf_text = open(perf_dir + file_name, 'r').readlines()
+perf = [ float(token) for token in ''.join(perf_text).replace('\n', '').replace('[', '').replace(']', '').split()  ]
 
-    plt.xlabel('Iteration number (1 through 60,000)')
-    plt.ylabel('Classification accuracy (out of 100%)')
+# plots.append(plt.plot(perfs[perf]), label=perf[5:perf.index('weight') - 1])[0])
+perf_plot, = plt.plot(perf, label='performance')
+average_plot, = plt.plot([ np.mean(perf) ] * len(perf), label='average: ' + str(np.mean(perf)))
+upper_std_plot, = plt.plot([ np.mean(perf) + np.std(perf) ] * len(perf), label='plus one standard deviation: ' + str(np.mean(perf) + np.std(perf)))
+lower_std_plot, = plt.plot([ np.mean(perf) - np.std(perf) ] * len(perf), label='minus one standard deviation: ' + str(np.mean(perf) - np.std(perf)))
 
-    title_strs = perf[5:perf.index('weight') - 1].split('_')
+plt.legend(handles=[perf_plot, average_plot, upper_std_plot, lower_std_plot])
 
-    plt.title('Classification accuracy by iteration number (' + title_strs[0] + 'x' + title_strs[0] + ' convolution, stride ' + title_strs[1] + ', ' + title_strs[2] + ' convolution features, gving ' + title_strs[3] + ' excitatory neurons per convolutional patch')
-    plt.savefig(perf_dir + 'performance_plots/Classification accuracy by iteration number (' + title_strs[0] + 'x' + title_strs[0] + ' convolution, stride ' + title_strs[1] + ', ' + title_strs[2] + ' convolution features, gving ' + title_strs[3] + ' excitatory neurons per convolutional patch')
-    plt.show()
+fig = plt.gcf()
+fig.set_size_inches(16, 12)
+
+plt.xlabel('Iteration number (1 through 60,000)')
+plt.ylabel('Classification accuracy (out of 100%)')
+
+n_e = file_name[file_name.index('Ae') + 2 : file_name.index('_')]
+
+plt.title('Classification accuracy by iteration number (' + n_e + ' excitatory, inhibitory neurons)')
+plt.savefig(perf_dir + 'performance_plots/Classification accuracy by iteration number (' + n_e + ' excitatory, inhibitory neurons)')
+plt.show()
 
 # plt.legend(handles=[ plot for plot in plots ])

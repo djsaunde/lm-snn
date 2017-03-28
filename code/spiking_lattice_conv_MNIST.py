@@ -91,7 +91,7 @@ def save_connections():
     '''
 
     # print out saved connections
-    print '...saving connections: weights/conv_weights' + save_conns[0] + '_' + stdp_input
+    print '...saving connections: weights/lattice_weights/' + save_conns[0] + '_' + stdp_input
 
     # iterate over all connections to save
     for conn_name in save_conns:
@@ -100,7 +100,7 @@ def save_connections():
         # sparsify it into (row, column, entry) tuples
         conn_list_sparse = ([(i, j, conn_matrix[i, j]) for i in xrange(conn_matrix.shape[0]) for j in xrange(conn_matrix.shape[1]) ])
         # save it out to disk
-        np.save(data_path + 'weights/conv_weights/' + conn_name + '_' + stdp_input, conn_list_sparse)
+        np.save(data_path + 'weights/lattice_weights/' + conn_name + '_' + stdp_input, conn_list_sparse)
 
 
 def save_theta():
@@ -111,16 +111,29 @@ def save_theta():
     # iterate over population for which to save theta parameters
     for pop_name in population_names:
     	# print out saved theta populations
-        print '...saving theta: weights/conv_weights/theta_' + pop_name + '_' + ending + '_' + stdp_input
+        print '...saving theta: weights/lattice_weights/theta_' + pop_name + '_' + ending + '_' + stdp_input
 
         # save out the theta parameters to file
-        np.save(data_path + 'weights/conv_weights/theta_' + pop_name + '_' + ending + '_' + stdp_input, neuron_groups[pop_name + 'e'].theta)
+        np.save(data_path + 'weights/lattice_weights/theta_' + pop_name + '_' + ending + '_' + stdp_input, neuron_groups[pop_name + 'e'].theta)
+
+
+def is_lattice_connection(i, j):
+    '''
+    Boolean method which checks if two indices in a network correspond to neighboring nodes in a lattice.
+
+    i: First neuron's index
+    k: Second neuron's index
+    '''
+    return i + 1 == j and j % n_e_sqrt != 0 or i - 1 == j and i % n_e_sqrt != 0 or i + n_e_sqrt == j or i - n_e_sqrt == j
 
 
 def set_weights_most_fired():
     '''
     For each convolutional patch, set the weights to those of the neuron which
     fired the most in the last iteration.
+
+    In this version of the convolutional network, we average the weights of the most fired neuron in the patch
+    with the average of the sum of the weights of its neighbors in the lattice (i.e., 1/2 * most_spiked + 1/2 * (average(neighbors))).
     '''
     for conn_name in input_connections:
     	for feature in xrange(conv_features):
@@ -133,11 +146,23 @@ def set_weights_most_fired():
             # create a "dense" version of the most spiked excitatory neuron's weight
             most_spiked_dense = input_connections[conn_name][:, feature * n_e + most_spiked].todense()
 
+            # get dense version of all neighboring weight matrices
+            neighbors_dense = []
+            for neighbor in lattice_neighbors[most_spiked]:
+                neighbors_dense.append(input_connections[conn_name][:, feature * n_e + most_spiked].todense()[convolution_locations[neighbor]])
+
+            # get average of all neighboring weights
+            neighbors_sum = np.zeros(conv_size **2)
+            for neighbor in neighbors_dense:
+                neighbors_sum += neighbor
+
+            neighbors_average = neighbors_sum / float(len(neighbors_dense))
+
             # set all other neurons' (in the same convolution patch) weights the same as the most-spiked neuron in the patch
             for n in xrange(n_e):
                 if n != most_spiked:
                     other_dense = input_connections[conn_name][:, feature * n_e + n].todense()
-                    other_dense[convolution_locations[n]] = most_spiked_dense[convolution_locations[most_spiked]]
+                    other_dense[convolution_locations[n]] = 0.5 * most_spiked_dense[convolution_locations[most_spiked]] + 0.5 * neighbors_average
                     input_connections[conn_name][:, feature * n_e + n] = other_dense
 
 
@@ -350,14 +375,14 @@ data_path = '../'
 
 # set parameters for simulation based on train / test mode
 if test_mode:
-    weight_path = data_path + 'weights/conv_weights/'
+    weight_path = data_path + 'weights/lattice_weights/'
     num_examples = 10000 * 1
     use_testing_set = True
     do_plot_performance = False
     record_spikes = True
     ee_STDP_on = False
 else:
-    weight_path = data_path + 'random/conv_random/'
+    weight_path = data_path + 'random/lattice_random/'
     num_examples = 60000 * 1
     use_testing_set = False
     do_plot_performance = True
@@ -365,7 +390,7 @@ else:
     ee_STDP_on = True
 
 # plotting or not
-do_plot = True
+do_plot = False
 
 # number of inputs to the network
 n_input = 784
@@ -420,9 +445,17 @@ else:
 
 # number of excitatory neurons (number output from convolutional layer)
 n_e = ((n_input_sqrt - conv_size) / conv_stride + 1) ** 2
-
 n_e_total = n_e * conv_features
 n_e_sqrt = int(math.sqrt(n_e))
+
+# calculate neighbors in the lattice for excitatory patches
+lattice_neighbors = {}
+for i in xrange(n_e):
+    lattice_neighbors[i] = []
+    for j in xrange(n_e):
+        if i != j:
+            if is_lattice_connection(i, j):
+                lattice_neighbors[i].append(j)
 
 # number of inhibitory neurons (number of convolutational features (for now))
 n_i = n_e
@@ -446,7 +479,7 @@ else:
     update_interval = 100
 
 # set weight update interval (plotting)
-weight_update_interval = 10
+weight_update_interval = 1
 
 # set progress printing interval
 print_progress_interval = 10
@@ -601,7 +634,7 @@ print '...creating recurrent connections'
 
 for name in population_names:
     # if we're in test mode / using some stored weights
-    if test_mode or weight_path[-8:] == 'weights/conv_weights/':
+    if test_mode or weight_path[-8:] == 'weights/lattice_weights/':
         # load up adaptive threshold parameters
         neuron_groups['e'].theta = np.load(weight_path + 'theta_A' + '_' + ending + '_' + stdp_input + '.npy')
     else:
@@ -613,7 +646,7 @@ for name in population_names:
             # create connection name (composed of population and connections types)
             conn_name = name + conn_type[0] + name + conn_type[1] + '_' + ending
             # get the corresponding stored weights from file
-            weight_matrix = get_matrix_from_file(data_path + 'random/conv_random/' + conn_name + '.npy', n_src=conv_features * n_e, n_tgt=conv_features)
+            weight_matrix = get_matrix_from_file(data_path + 'random/lattice_random/' + conn_name + '.npy', n_src=conv_features * n_e, n_tgt=conv_features)
             # create a connection from the first group in conn_name with the second group
             connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
             # instantiate the created connection with the 'weightMatrix' loaded from file
@@ -625,7 +658,7 @@ for name in population_names:
             # create connection name (composed of population and connections types)
             conn_name = name + conn_type[0] + name + conn_type[1] + '_' + ending
             # get the corresponding stored weights from file
-            weight_matrix = get_matrix_from_file(data_path + 'random/conv_random/' + conn_name + '.npy', n_src=conv_features, n_tgt=(conv_features ** 2) * n_e)
+            weight_matrix = get_matrix_from_file(data_path + 'random/lattice_random/' + conn_name + '.npy', n_src=conv_features, n_tgt=(conv_features ** 2) * n_e)
             # create a connection from the first group in conn_name with the second group
             connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
             # instantiate the created connection with the 'weightMatrix' loaded from file
@@ -832,7 +865,7 @@ while j < num_examples:
                 performance = get_current_performance(performance, j)
             # printing out classification performance results so far
             print '\nClassification performance', performance[:int(j / float(update_interval)) + 1], '\n'
-            target = open('../performance/conv_performance/' + weights_name + '_' + stdp_input + '.txt', 'w')
+            target = open('../performance/lattice_performance/' + weights_name + '_' + stdp_input + '.txt', 'w')
             target.truncate()
             target.write('Iteration ' + str(j) + '\n')
             target.write(str(performance[:int(j / float(update_interval)) + 1]))
@@ -864,8 +897,8 @@ if not test_mode:
 if not test_mode:
     save_connections()
 else:
-    np.save(data_path + 'activity/conv_activity/resultPopVecs' + str(num_examples) + '_' + stdp_input + '_' + ending, result_monitor)
-    np.save(data_path + 'activity/conv_activity/inputNumbers' + str(num_examples) + '_' + stdp_input + '_' + ending, input_numbers)
+    np.save(data_path + 'activity/lattice_activity/resultPopVecs' + str(num_examples) + '_' + stdp_input + '_' + ending, result_monitor)
+    np.save(data_path + 'activity/lattice_activity/inputNumbers' + str(num_examples) + '_' + stdp_input + '_' + ending, input_numbers)
 
 ################ 
 # PLOT RESULTS #
