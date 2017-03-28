@@ -68,10 +68,24 @@ def get_recognized_number_ranking(assignments, spike_rates):
     '''
     summed_rates = [0] * 10
     num_assignments = [0] * 10
+
+    most_spiked_array = np.array(np.zeros((conv_features, n_e)), dtype=bool)
+
+    for feature in xrange(conv_features):
+        # count up the spikes for the neurons in this convolution patch
+        column_sums = np.sum(spike_rates[feature : feature + 1, :], axis=0)
+
+        # find the excitatory neuron which spiked the most
+        most_spiked_array[feature, np.argmax(column_sums)] = True
+
+    # for each label
     for i in xrange(10):
-        num_assignments[i] = len(np.where(assignments == i)[0])
+        # get the number of label assignments of this type
+        num_assignments[i] = len(np.where(assignments[most_spiked_array] == i))
         if num_assignments[i] > 0:
-            summed_rates[i] = np.sum(spike_rates[assignments == i]) / num_assignments[i]
+            # sum the spike rates of all excitatory neurons with this label, which fired the most in its patch
+            summed_rates[i] = np.sum(spike_rates[np.where(assignments[most_spiked_array] == i)]) / num_assignments[i]
+
     return np.argsort(summed_rates)[::-1]
 
 
