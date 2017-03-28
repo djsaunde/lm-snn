@@ -77,24 +77,6 @@ def is_lattice_connection(sqrt, i, j):
     return i + 1 == j and j % sqrt != 0 or i - 1 == j and i % sqrt != 0 or i + sqrt == j or i - sqrt == j
 
 
-def get_matrix_from_file(file_name, n_src, n_tgt):
-    '''
-    Given the name of a file pointing to a .npy ndarray object, load it into
-    'weight_matrix' and return it
-    '''
-
-    # load the stored ndarray into 'readout', instantiate 'weight_matrix' as 
-    # correctly-shaped zeros matrix
-    readout = np.load(file_name)
-    weight_matrix = np.zeros((n_src, n_tgt))
-
-    # read the 'readout' ndarray values into weight_matrix by (row, column) indices
-    weight_matrix[np.int32(readout[:,0]), np.int32(readout[:,1])] = readout[:,2]
-
-    # return the weight matrix read from file
-    return weight_matrix
-
-
 def save_connections():
     '''
     Save all connections in 'save_conns'; ending may be set to the index of the last
@@ -443,7 +425,7 @@ else:
     ee_STDP_on = True
 
 # plotting or not
-do_plot = True
+do_plot = False
 
 # number of inputs to the network
 n_input = 784
@@ -700,19 +682,20 @@ for name in population_names:
                             for this_n in xrange(n_e):
                                 for other_n in xrange(n_e):
                                     if is_lattice_connection(n_e_sqrt, this_n, other_n):
-                                        connections[conn_name][feature * n_e + this_n, other_feature * n_e + other_n] = b.random() * 0.3 + 0.01
+                                        connections[conn_name][feature * n_e + this_n, other_feature * n_e + other_n] = (b.random() + 0.01) * 0.3
+
             elif connectivity == 'pairs':
                 for feature in xrange(conv_features):
                     if feature % 2 == 0:
                         for this_n in xrange(n_e):
                             for other_n in xrange(n_e):
                                 if is_lattice_connection(n_e_sqrt, this_n, other_n):
-                                    connections[conn_name][feature * n_e + this_n, (feature + 1) * n_e + other_n] = b.random() * 0.3 + 0.01
+                                    connections[conn_name][feature * n_e + this_n, (feature + 1) * n_e + other_n] = (b.random() + 0.01) * 0.3
                     elif feature % 2 == 1:
                         for this_n in xrange(n_e):
                             for other_n in xrange(n_e):
                                 if is_lattice_connection(n_e_sqrt, this_n, other_n):
-                                    connections[conn_name][feature * n_e + this_n, (feature - 1) * n_e + other_n] = b.random() * 0.3 + 0.01
+                                    connections[conn_name][feature * n_e + this_n, (feature - 1) * n_e + other_n] = (b.random() + 0.01) * 0.3
 
 
     # if STDP from excitatory -> excitatory is on and this connection is excitatory -> excitatory
@@ -782,13 +765,7 @@ for name in input_connection_names:
     # for each of the input connection types (in this case, excitatory -> excitatory)
     for conn_type in input_conn_names:
         # saved connection name
-        conn_name = name[0] + conn_type[0] + name[1] + conn_type[1] + '_' + ending
-        
-        # get weight matrix depending on training or test phase
-        if test_mode:
-            weight_matrix = get_matrix_from_file(weight_path + conn_name + '_' + stdp_input + '.npy', n_input, conv_features * n_e)
-        else:
-            weight_matrix = get_matrix_from_file(weight_path + conn_name + '.npy', n_input, conv_features * n_e)	
+        conn_name = name[0] + conn_type[0] + name[1] + conn_type[1] + '_' + ending	
 
         # create connections from the windows of the input group to the neuron population
         input_connections[conn_name] = b.Connection(input_groups['Xe'], neuron_groups[name[1] + conn_type[1]], structure='sparse', state='g' + conn_type[0], delay=True, max_delay=delay[conn_type][1])
@@ -796,7 +773,7 @@ for name in input_connection_names:
         for feature in xrange(conv_features):
             for n in xrange(n_e):
                 for idx in xrange(conv_size ** 2):
-                    input_connections[conn_name][convolution_locations[n][idx], feature * n_e + n] = weight_matrix[convolution_locations[n][idx], feature * n_e + n]
+                    input_connections[conn_name][convolution_locations[n][idx], feature * n_e + n] = (b.random() + 0.01) * 0.3
 
     # if excitatory -> excitatory STDP is specified, add it here (input to excitatory populations)
     if ee_STDP_on:
