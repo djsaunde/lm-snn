@@ -102,12 +102,14 @@ def save_connections():
     '''
 
     # print out saved connections
-    print '...saving connections: weights/conv_patch_connectivity_weights/' + save_conns[0] + '_' + stdp_input
+    print '...saving connections: weights/conv_patch_connectivity_weights/' + save_conns[0] + '_' + stdp_input + ' and ' + 'weights/conv_patch_connectivity_weights/' + save_conns[1] + '_' + stdp_input
 
     # iterate over all connections to save
     for conn_name in save_conns:
-        # get the connection matrix for this connection
-        conn_matrix = input_connections[conn_name][:]
+        if conn_name == 'AeAe_' + ending:
+            conn_matrix = connections[conn_name][:]
+        else:
+            conn_matrix = input_connections[conn_name][:]
         # sparsify it into (row, column, entry) tuples
         conn_list_sparse = ([(i, j, conn_matrix[i, j]) for i in xrange(conn_matrix.shape[0]) for j in xrange(conn_matrix.shape[1]) ])
         # save it out to disk
@@ -525,7 +527,7 @@ delay = {}
 input_population_names = [ 'X' ]
 population_names = [ 'A' ]
 input_connection_names = [ 'XA' ]
-save_conns = [ 'XeAe' + '_' + ending ]
+save_conns = [ 'XeAe_' + ending, 'AeAe_' + ending ]
 input_conn_names = [ 'ee_input' ]
 recurrent_conn_names = [ 'ei', 'ie', 'ee' ]
 weight['ee_input'] = (conv_size ** 2) * 0.15
@@ -690,7 +692,10 @@ for name in population_names:
         elif conn_type == 'ee':
             # create connection name (composed of population and connection types)
             conn_name = name + conn_type[0] + name + conn_type[1] + '_' + ending
-            #create a connection from the first group in conn_name with the second group
+            # get weights from file if we are in test mode
+            if test_mode:
+                weight_matrix = get_matrix_from_file(weight_path + conn_name + '_' + stdp_input + '.npy', conv_features * n_e, conv_features * n_e)
+            # create a connection from the first group in conn_name with the second group
             connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
             # instantiate the created connection
             if connectivity == 'all':
@@ -700,7 +705,10 @@ for name in population_names:
                             for this_n in xrange(n_e):
                                 for other_n in xrange(n_e):
                                     if is_lattice_connection(n_e_sqrt, this_n, other_n):
-                                        connections[conn_name][feature * n_e + this_n, other_feature * n_e + other_n] = (b.random() + 0.01) * 0.3
+                                        if test_mode:
+                                            connections[conn_name][feature * n_e + this_n, other_feature * n_e + other_n] = weight_matrix[feature * n_e + this_n, other_feature * n_e + other_n]
+                                        else:
+                                            connections[conn_name][feature * n_e + this_n, other_feature * n_e + other_n] = (b.random() + 0.01) * 0.3
 
             elif connectivity == 'pairs':
                 for feature in xrange(conv_features):
@@ -708,12 +716,18 @@ for name in population_names:
                         for this_n in xrange(n_e):
                             for other_n in xrange(n_e):
                                 if is_lattice_connection(n_e_sqrt, this_n, other_n):
-                                    connections[conn_name][feature * n_e + this_n, (feature + 1) * n_e + other_n] = (b.random() + 0.01) * 0.3
+                                    if test_mode:
+                                        connections[conn_name][feature * n_e + this_n, (feature + 1) * n_e + other_n] = weight_matrix[feature * n_e + this_n, (feature + 1) * n_e + other_n]
+                                    else:
+                                        connections[conn_name][feature * n_e + this_n, (feature + 1) * n_e + other_n] = (b.random() + 0.01) * 0.3
                     elif feature % 2 == 1:
                         for this_n in xrange(n_e):
                             for other_n in xrange(n_e):
                                 if is_lattice_connection(n_e_sqrt, this_n, other_n):
-                                    connections[conn_name][feature * n_e + this_n, (feature - 1) * n_e + other_n] = (b.random() + 0.01) * 0.3
+                                    if test_mode:
+                                        connections[conn_name][feature * n_e + this_n, (feature - 1) * n_e + other_n] = weight_matrix[feature * n_e + this_n, (feature - 1) * n_e + other_n]
+                                    else:
+                                        connections[conn_name][feature * n_e + this_n, (feature - 1) * n_e + other_n] = (b.random() + 0.01) * 0.3
 
 
     # if STDP from excitatory -> excitatory is on and this connection is excitatory -> excitatory
@@ -911,7 +925,7 @@ while j < num_examples:
 
         # let the network relax back to equilibrium
         b.run(resting_time)
-    # otherwise, record results and confinue simulation
+    # otherwise, record results and continue simulation
     else:
         num_retries = 0
     	# record the current number of spikes

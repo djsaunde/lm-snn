@@ -168,7 +168,7 @@ else:
 print '\n'
 
 # set ending of filename saves
-ending = '_' + stdp_input + '__' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e)
+ending = '_' + stdp_input + '_' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e)
 
 
 print '...loading MNIST'
