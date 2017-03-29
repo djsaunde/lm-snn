@@ -445,7 +445,7 @@ else:
     ee_STDP_on = True
 
 # plotting or not
-do_plot = False
+do_plot = True
 
 # number of inputs to the network
 n_input = 784

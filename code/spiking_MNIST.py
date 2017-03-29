@@ -368,7 +368,7 @@ else:
     ee_STDP_on = True
 
 # plotting or not
-do_plot = False
+do_plot = True
 
 # number of inputs to the network
 n_input = 784
@@ -634,7 +634,7 @@ if record_spikes and do_plot:
 # CREATE INPUT POPULATION AND CONNECTIONS FROM INPUT POPULATION #
 #################################################################
 
-for i,name in enumerate(input_population_names):
+for name in input_population_names:
     input_groups[name + 'e'] = b.PoissonGroup(n_input, 0)
     rate_monitors[name + 'e'] = b.PopulationRateMonitor(input_groups[name + 'e'], bin=(single_example_time + resting_time) / b.second)
 
@@ -658,7 +658,6 @@ for name in input_connection_names:
     if ee_STDP_on:
         print 'create STDP for connection', name[0] + 'e' + name[1] + 'e'
         stdp_methods[name[0] + 'e' + name[1] + 'e'] = b.STDP(connections[name[0] + 'e' + name[1] + 'e' + ending], eqs=eqs_stdp_ee, pre=eqs_stdp_pre_ee, post=eqs_stdp_post_ee, wmin=0., wmax=wmax_ee)
-
 
 #################################
 # RUN SIMULATION AND SET INPUTS #
