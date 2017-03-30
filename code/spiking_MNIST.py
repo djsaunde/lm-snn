@@ -659,6 +659,14 @@ for name in input_connection_names:
         print 'create STDP for connection', name[0] + 'e' + name[1] + 'e'
         stdp_methods[name[0] + 'e' + name[1] + 'e'] = b.STDP(connections[name[0] + 'e' + name[1] + 'e' + ending], eqs=eqs_stdp_ee, pre=eqs_stdp_pre_ee, post=eqs_stdp_post_ee, wmin=0., wmax=wmax_ee)
 
+    # record (exc, inhib) network spikes if specified
+    if record_spikes and do_plot:
+        b.figure(fig_num)
+        fig_num += 1
+        b.ion()
+        b.subplot(221)
+        b.raster_plot(rate_monitors['Xe'], refresh=1000 * b.ms, showlast=1000 * b.ms)
+
 #################################
 # RUN SIMULATION AND SET INPUTS #
 #################################
