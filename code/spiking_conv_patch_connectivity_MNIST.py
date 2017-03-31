@@ -77,8 +77,8 @@ def is_lattice_connection(sqrt, i, j):
     if lattice_structure == '4':
         return i + 1 == j and j % sqrt != 0 or i - 1 == j and i % sqrt != 0 or i + sqrt == j or i - sqrt == j
     if lattice_structure == '8':
-
-    if lattice_strucutre == 'all':
+        return i + 1 == j and j % sqrt != 0 or i - 1 == j and i % sqrt != 0 or i + sqrt == j or i - sqrt == j or i + sqrt == j + 1 and j % sqrt != 0 or i + sqrt == j - 1 and i % sqrt != 0 or i - sqrt == j + 1 and i % sqrt != 0 or i - sqrt == j - 1 and j % sqrt != 0
+    if lattice_structure == 'all':
         return True
 
 def get_matrix_from_file(file_name, n_src, n_tgt):
@@ -449,7 +449,7 @@ else:
     ee_STDP_on = True
 
 # plotting or not
-do_plot = False
+do_plot = True
 
 # number of inputs to the network
 n_input = 784
