@@ -449,7 +449,7 @@ else:
     ee_STDP_on = True
 
 # plotting or not
-do_plot = True
+do_plot = False
 
 # number of inputs to the network
 n_input = 784
@@ -990,9 +990,9 @@ while j < num_examples:
 if not test_mode and weight_sharing:
     set_weights_most_fired()
 
-################ 
+################
 # SAVE RESULTS #
-################ 
+################
 
 print '...saving results'
 
@@ -1004,7 +1004,7 @@ else:
     np.save(data_path + 'activity/conv_patch_connectivity_activity/resultPopVecs' + str(num_examples) + '_' + stdp_input + '_' + ending, result_monitor)
     np.save(data_path + 'activity/conv_patch_connectivity_activity/inputNumbers' + str(num_examples) + '_' + stdp_input + '_' + ending, input_numbers)
 
-################ 
+################
 # PLOT RESULTS #
 ################
 
@@ -1024,7 +1024,7 @@ if do_plot:
             b.subplot(len(spike_monitors), 1, i + 1)
             b.raster_plot(spike_monitors[name])
             b.title('Spikes of population ' + name)
-            
+
     if spike_counters:
         b.figure(fig_num)
         fig_num += 1

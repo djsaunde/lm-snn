@@ -210,7 +210,7 @@ def plot_2d_input_weights():
     fig = b.figure(fig_num, figsize=(18, 18))
     im2 = b.imshow(weights, interpolation='nearest', vmin=0, vmax=wmax_ee, cmap=cmap.get_cmap('hot_r'))
     b.colorbar(im2)
-    b.title('Convolutional Connection Weights')
+    b.title('Reshaped weights from input -> excitatory layer')
     fig.canvas.draw()
     return im2, fig
 
@@ -273,10 +273,24 @@ def get_recognized_number_ranking(assignments, spike_rates):
     '''
     summed_rates = [0] * 10
     num_assignments = [0] * 10
+
+    most_spiked_array = np.array(np.zeros((conv_features, n_e)), dtype=bool)
+
+    for feature in xrange(conv_features):
+        # count up the spikes for the neurons in this convolution patch
+        column_sums = np.sum(spike_rates[feature : feature + 1, :], axis=0)
+
+        # find the excitatory neuron which spiked the most
+        most_spiked_array[feature, np.argmax(column_sums)] = True
+
+    # for each label
     for i in xrange(10):
-        num_assignments[i] = len(np.where(assignments == i)[0])
+        # get the number of label assignments of this type
+        num_assignments[i] = len(np.where(assignments[most_spiked_array] == i))
         if num_assignments[i] > 0:
-            summed_rates[i] = np.sum(spike_rates[assignments == i]) / num_assignments[i]
+            # sum the spike rates of all excitatory neurons with this label, which fired the most in its patch
+            summed_rates[i] = np.sum(spike_rates[np.where(assignments[most_spiked_array] == i)]) / num_assignments[i]
+
     return np.argsort(summed_rates)[::-1]
 
 
@@ -365,7 +379,7 @@ else:
     ee_STDP_on = True
 
 # plotting or not
-do_plot = False
+do_plot = True
 
 # number of inputs to the network
 n_input = 784
@@ -472,7 +486,7 @@ input_connection_names = [ 'XA' ]
 save_conns = [ 'XeAe' + '_' + ending ]
 input_conn_names = [ 'ee_input' ]
 recurrent_conn_names = [ 'ei', 'ie' ]
-weight['ee_input'] = (conv_size ** 2) / 7.0
+weight['ee_input'] = (conv_size ** 2) * 0.15
 delay['ee_input'] = (0 * b.ms, 10 * b.ms)
 delay['ei_input'] = (0 * b.ms, 5 * b.ms)
 input_intensity = start_input_intensity = 2.0
@@ -579,7 +593,7 @@ spike_counters = {}
 result_monitor = np.zeros((update_interval, conv_features, n_e))
 
 neuron_groups['e'] = b.NeuronGroup(n_e_total, neuron_eqs_e, threshold=v_thresh_e, refractory=refrac_e, reset=scr_e, compile=True, freeze=True)
-neuron_groups['i'] = b.NeuronGroup(n_e_total / n_e, neuron_eqs_i, threshold=v_thresh_i, refractory=refrac_i, reset=v_reset_i, compile=True, freeze=True)
+neuron_groups['i'] = b.NeuronGroup(n_e_total, neuron_eqs_i, threshold=v_thresh_i, refractory=refrac_i, reset=v_reset_i, compile=True, freeze=True)
 
 ########################################################
 # CREATE NETWORK POPULATIONS AND RECURRENT CONNECTIONS #
@@ -591,7 +605,7 @@ for name in population_names:
     # get a subgroup of size 'n_e' from all exc
     neuron_groups[name + 'e'] = neuron_groups['e'].subgroup(conv_features * n_e)
     # get a subgroup of size 'n_i' from the inhibitory layer
-    neuron_groups[name + 'i'] = neuron_groups['i'].subgroup(conv_features)
+    neuron_groups[name + 'i'] = neuron_groups['i'].subgroup(conv_features * n_e)
 
     # start the membrane potentials of these groups 40mV below their resting potentials
     neuron_groups[name + 'e'].v = v_rest_e - 40. * b.mV
@@ -612,20 +626,16 @@ for name in population_names:
         if conn_type == 'ei':
             # create connection name (composed of population and connections types)
             conn_name = name + conn_type[0] + name + conn_type[1] + '_' + ending
-            # get the corresponding stored weights from file
-            weight_matrix = get_matrix_from_file(data_path + 'random/conv_random/' + conn_name + '.npy', n_src=conv_features * n_e, n_tgt=conv_features)
             # create a connection from the first group in conn_name with the second group
             connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
             # instantiate the created connection with the 'weightMatrix' loaded from file
             for feature in xrange(conv_features):
                 for n in xrange(n_e):
-                    connections[conn_name][feature * n_e + n, feature] = weight_matrix[feature * n_e + n, feature]
+                    connections[conn_name][feature * n_e + n, feature * n_e + n] = 10.4
 
         elif conn_type == 'ie':
             # create connection name (composed of population and connections types)
             conn_name = name + conn_type[0] + name + conn_type[1] + '_' + ending
-            # get the corresponding stored weights from file
-            weight_matrix = get_matrix_from_file(data_path + 'random/conv_random/' + conn_name + '.npy', n_src=conv_features, n_tgt=(conv_features ** 2) * n_e)
             # create a connection from the first group in conn_name with the second group
             connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
             # instantiate the created connection with the 'weightMatrix' loaded from file
@@ -633,7 +643,7 @@ for name in population_names:
                 for other_feature in xrange(conv_features):
                     if feature != other_feature:
                         for n in xrange(n_e):
-                            connections[conn_name][feature, other_feature * n_e + n] = weight_matrix[feature, other_feature * n_e + n]
+                            connections[conn_name][feature * n_e + n, other_feature * n_e + n] = 17.4
 
 
     # if STDP from excitatory -> excitatory is on and this connection is excitatory -> excitatory
@@ -687,16 +697,20 @@ for name in input_connection_names:
         # get weight matrix depending on training or test phase
         if test_mode:
             weight_matrix = get_matrix_from_file(weight_path + conn_name + '_' + stdp_input + '.npy', n_input, conv_features * n_e)
-        else:
-            weight_matrix = get_matrix_from_file(weight_path + conn_name + '.npy', n_input, conv_features * n_e)	
 
         # create connections from the windows of the input group to the neuron population
         input_connections[conn_name] = b.Connection(input_groups['Xe'], neuron_groups[name[1] + conn_type[1]], structure='sparse', state='g' + conn_type[0], delay=True, max_delay=delay[conn_type][1])
         
-        for feature in xrange(conv_features):
-            for n in xrange(n_e):
-                for idx in xrange(conv_size ** 2):
-                    input_connections[conn_name][convolution_locations[n][idx], feature * n_e + n] = weight_matrix[convolution_locations[n][idx], feature * n_e + n]
+        if test_mode:
+            for feature in xrange(conv_features):
+                for n in xrange(n_e):
+                    for idx in xrange(conv_size ** 2):
+                        input_connections[conn_name][convolution_locations[n][idx], feature * n_e + n] = weight_matrix[convolution_locations[n][idx], feature * n_e + n]
+        else:
+            for feature in xrange(conv_features):
+                for n in xrange(n_e):
+                    for idx in xrange(conv_size ** 2):
+                        input_connections[conn_name][convolution_locations[n][idx], feature * n_e + n] = (b.random() + 0.01) * 0.3
 
     # if excitatory -> excitatory STDP is specified, add it here (input to excitatory populations)
     if ee_STDP_on:
@@ -784,8 +798,8 @@ while j < num_examples:
     previous_spike_count = np.copy(spike_counters['Ae'].count[:]).reshape((conv_features, n_e))
     
     # set weights to those of the most-fired neuron
-    if not test_mode:
-        set_weights_most_fired()
+    # if not test_mode:
+        # set_weights_most_fired()
 
     # update weights every 'weight_update_interval'
     if j % weight_update_interval == 0 and not test_mode and do_plot:
@@ -850,8 +864,8 @@ while j < num_examples:
         j += 1
 
 # set weights to those of the most-fired neuron
-if not test_mode:
-    set_weights_most_fired()
+# if not test_mode:
+    # set_weights_most_fired()
 
 ################ 
 # SAVE RESULTS #
