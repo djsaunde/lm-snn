@@ -192,10 +192,22 @@ voting_mechanism = raw_input('Enter "all" or "most-spiked" to choose voting mech
 if voting_mechanism == '':
     voting_mechanism = 'most-spiked'
 
-print '\n'
+# whether or not to use weight sharing
+weight_sharing = raw_input('Use weight sharing? (yes / no), default no): ')
+if weight_sharing in [ '', 'no' ]:
+    weight_sharing = 'no_weight_sharing'
+else:
+    weight_sharing = 'weight_sharing'
+
+# which type of lattice neighborhood to use
+lattice_structure = raw_input('Enter lattice structure (4, 8, all; default 4): ')
+if lattice_structure == '':
+    lattice_structure = '4'
 
 # set ending of filename saves
-ending = '_' + stdp_input + '_' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e)
+ending = str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e) + '_' + stdp_input + '_' + voting_mechanism + '_' + weight_sharing + '_' + lattice_structure
+
+print '\n'
 
 
 print '...loading MNIST'

@@ -7,11 +7,23 @@ import os
 
 perf_dir = '../performance/conv_patch_connectivity_performance/'
 
+
+print '\n'
+print '\n'.join([ str(idx) + ' | ' + file_name for idx, file_name in enumerate(os.listdir(perf_dir)) if '.txt' in file_name ])
+print '\n'
+
+to_plot = raw_input('Enter the index of the file from above which you\'d like to plot, or hit Enter to plot all: ')
+if to_plot == '':
+    file_names = [ file_name for file_name in os.listdir(perf_dir) if '.txt' in file_name ]
+else:
+    file_names = [[ file_name for file_name in os.listdir(perf_dir) if '.txt' in file_name ][int(to_plot)]]
+
+print file_names
+
 perfs = {}
-for file_name in os.listdir(perf_dir):
-    if '.txt' in file_name:
-        perf_text = open(perf_dir + file_name, 'r').readlines()[1:]
-        perfs[file_name] = [ float(token) for token in ''.join(perf_text).replace('\n', '').replace('[', '').replace(']', '').split()  ]
+for file_name in file_names:
+    perf_text = open(perf_dir + file_name, 'r').readlines()[1:]
+    perfs[file_name] = [ float(token) for token in ''.join(perf_text).replace('\n', '').replace('[', '').replace(']', '').split()  ]
 
 print '\n'
 

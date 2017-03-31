@@ -74,6 +74,8 @@ def is_lattice_connection(sqrt, i, j):
     i: First neuron's index
     k: Second neuron's index
     '''
+    if lattice_structure == 'none':
+        return False
     if lattice_structure == '4':
         return i + 1 == j and j % sqrt != 0 or i - 1 == j and i % sqrt != 0 or i + sqrt == j or i - sqrt == j
     if lattice_structure == '8':
@@ -106,18 +108,18 @@ def save_connections():
     '''
 
     # print out saved connections
-    print '...saving connections: weights/conv_patch_connectivity_weights/' + save_conns[0] + '_' + stdp_input + ' and ' + 'weights/conv_patch_connectivity_weights/' + save_conns[1] + '_' + stdp_input
+    print '...saving connections: weights/conv_patch_connectivity_weights/' + save_conns[0] + '_' + ending + ' and ' + 'weights/conv_patch_connectivity_weights/' + save_conns[1] + '_' + stdp_input
 
     # iterate over all connections to save
     for conn_name in save_conns:
-        if conn_name == 'AeAe_' + ending:
+        if conn_name == 'AeAe':
             conn_matrix = connections[conn_name][:]
         else:
             conn_matrix = input_connections[conn_name][:]
         # sparsify it into (row, column, entry) tuples
         conn_list_sparse = ([(i, j, conn_matrix[i, j]) for i in xrange(conn_matrix.shape[0]) for j in xrange(conn_matrix.shape[1]) ])
         # save it out to disk
-        np.save(data_path + 'weights/conv_patch_connectivity_weights/' + conn_name + '_' + stdp_input, conn_list_sparse)
+        np.save(data_path + 'weights/conv_patch_connectivity_weights/' + conn_name + '_' + ending, conn_list_sparse)
 
 
 def save_theta():
@@ -128,10 +130,10 @@ def save_theta():
     # iterate over population for which to save theta parameters
     for pop_name in population_names:
     	# print out saved theta populations
-        print '...saving theta: weights/conv_patch_connectivity_weights/theta_' + pop_name + '_' + ending + '_' + stdp_input
+        print '...saving theta: weights/conv_patch_connectivity_weights/theta_' + pop_name + '_' + ending
 
         # save out the theta parameters to file
-        np.save(data_path + 'weights/conv_patch_connectivity_weights/theta_' + pop_name + '_' + ending + '_' + stdp_input, neuron_groups[pop_name + 'e'].theta)
+        np.save(data_path + 'weights/conv_patch_connectivity_weights/theta_' + pop_name + '_' + ending, neuron_groups[pop_name + 'e'].theta)
 
 
 def set_weights_most_fired():
@@ -213,7 +215,7 @@ def get_2d_input_weights():
     dimensional and square.
     '''
     rearranged_weights = np.zeros((conv_features * conv_size, conv_size * n_e))
-    connection = input_connections['XeAe_' + ending][:]
+    connection = input_connections['XeAe'][:]
 
     # for each convolution feature
     for feature in xrange(conv_features):
@@ -239,6 +241,8 @@ def plot_2d_input_weights():
     b.title('Reshaped input -> convolution weights')
     b.xlabel('convolution patch')
     b.ylabel('neurons per patch')
+    b.xticks(xrange(0, conv_size * conv_features, conv_size))
+    b.yticks(xrange(0, conv_size * n_e, conv_size))
     fig.canvas.draw()
     return im, fig
 
@@ -258,7 +262,7 @@ def get_patch_weights():
     Get the weights from the input to excitatory layer and reshape them.
     '''
     rearranged_weights = np.zeros((conv_features * n_e, conv_features * n_e))
-    connection = connections['AeAe_' + ending][:]
+    connection = connections['AeAe'][:]
 
     for feature in xrange(conv_features):
         for other_feature in xrange(conv_features):
@@ -339,25 +343,34 @@ def get_recognized_number_ranking(assignments, spike_rates):
     Given the label assignments of the excitatory layer and their spike rates over
     the past 'update_interval', get the ranking of each of the categories of input.
     '''
-    summed_rates = [0] * 10
-    num_assignments = [0] * 10
+    if voting_mechanism == 'most-spiked':
+        summed_rates = [0] * 10
+        num_assignments = [0] * 10
 
-    most_spiked_array = np.array(np.zeros((conv_features, n_e)), dtype=bool)
+        most_spiked_array = np.array(np.zeros((conv_features, n_e)), dtype=bool)
 
-    for feature in xrange(conv_features):
-        # count up the spikes for the neurons in this convolution patch
-        column_sums = np.sum(spike_rates[feature : feature + 1, :], axis=0)
+        for feature in xrange(conv_features):
+            # count up the spikes for the neurons in this convolution patch
+            column_sums = np.sum(spike_rates[feature : feature + 1, :], axis=0)
 
-        # find the excitatory neuron which spiked the most
-        most_spiked_array[feature, np.argmax(column_sums)] = True
+            # find the excitatory neuron which spiked the most
+            most_spiked_array[feature, np.argmax(column_sums)] = True
 
-    # for each label
-    for i in xrange(10):
-        # get the number of label assignments of this type
-        num_assignments[i] = len(np.where(assignments[most_spiked_array] == i))
-        if num_assignments[i] > 0:
-            # sum the spike rates of all excitatory neurons with this label, which fired the most in its patch
-            summed_rates[i] = np.sum(spike_rates[np.where(assignments[most_spiked_array] == i)]) / num_assignments[i]
+        # for each label
+        for i in xrange(10):
+            # get the number of label assignments of this type
+            num_assignments[i] = len(np.where(assignments[most_spiked_array] == i))
+            if num_assignments[i] > 0:
+                # sum the spike rates of all excitatory neurons with this label, which fired the most in its patch
+                summed_rates[i] = np.sum(spike_rates[np.where(assignments[most_spiked_array] == i)]) / num_assignments[i]
+
+    elif voting_mechanism == 'all':
+        summed_rates = [0] * 10
+        num_assignments = [0] * 10
+        for i in xrange(10):
+            num_assignments[i] = len(np.where(assignments == i)[0])
+            if num_assignments[i] > 0:
+                summed_rates[i] = np.sum(spike_rates[assignments == i]) / num_assignments[i]
 
     return np.argsort(summed_rates)[::-1]
 
@@ -392,18 +405,6 @@ if raw_input('Enter "test" for testing mode, "train" for training mode (default 
     test_mode = True
 else:
     test_mode = False
-
-if not test_mode:
-    start = time.time()
-    training = get_labeled_data(MNIST_data_path + 'training')
-    end = time.time()
-    print 'time needed to load training set:', end - start
-
-else:
-    start = time.time()
-    testing = get_labeled_data(MNIST_data_path + 'testing', b_train = False)
-    end = time.time()
-    print 'time needed to load test set:', end - start
 
 ################################
 # SET PARAMETERS AND EQUATIONS #
@@ -489,9 +490,6 @@ n_e_sqrt = int(math.sqrt(n_e))
 # number of inhibitory neurons (number of convolutational features (for now))
 n_i = n_e
 
-# set ending of filename saves
-ending = str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e)
-
 # time (in seconds) per data example presentation
 single_example_time = 0.35 * b.second
 
@@ -531,13 +529,13 @@ delay = {}
 input_population_names = [ 'X' ]
 population_names = [ 'A' ]
 input_connection_names = [ 'XA' ]
-save_conns = [ 'XeAe_' + ending, 'AeAe_' + ending ]
+save_conns = [ 'XeAe', 'AeAe' ]
 input_conn_names = [ 'ee_input' ]
 recurrent_conn_names = [ 'ei', 'ie', 'ee' ]
 weight['ee_input'] = (conv_size ** 2) * 0.15
 delay['ee_input'] = (0 * b.ms, 10 * b.ms)
 delay['ei_input'] = (0 * b.ms, 5 * b.ms)
-input_intensity = start_input_intensity = 2.0
+input_intensity = start_input_intensity = 4.0
 
 # time constants, learning rates, max weights, weight dependence, etc.
 tc_pre_ee = 20 * b.ms
@@ -625,17 +623,41 @@ else:
         eqs_stdp_pre_ee = 'pre = 1.'
         eqs_stdp_post_ee = 'w += nu_ee_post * pre; post = 1.'
 
+# how to take "votes" from excitatory neurons to classify new data
+voting_mechanism = raw_input('Enter "all" or "most-spiked" to choose voting mechanism (default most-spiked): ')
+if voting_mechanism == '':
+    voting_mechanism = 'most-spiked'
+
 # whether or not to use weight sharing
-weight_sharing = raw_input('Use weight sharing? (default no): ')
-if weight_sharing == '':
-    weight_sharing = False
+weight_sharing = raw_input('Use weight sharing? ((yes / no), default no): ')
+if weight_sharing in [ '', 'no' ]:
+    weight_sharing = 'no_weight_sharing'
 else:
-    weight_sharing = True
+    weight_sharing = 'weight_sharing'
 
 # which type of lattice neighborhood to use
-lattice_structure = raw_input('Enter lattice structure (4, 8, all; default 4): ')
+lattice_structure = raw_input('Enter lattice structure (none, 4, 8, all; default 4): ')
 if lattice_structure == '':
     lattice_structure = '4'
+
+print '\n'
+
+if not test_mode:
+    start = time.time()
+    training = get_labeled_data(MNIST_data_path + 'training')
+    end = time.time()
+    print 'time needed to load training set:', end - start
+
+else:
+    start = time.time()
+    testing = get_labeled_data(MNIST_data_path + 'testing', b_train = False)
+    end = time.time()
+    print 'time needed to load test set:', end - start
+
+print '\n'
+
+# set ending of filename saves
+ending = str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e) + '_' + stdp_input + '_' + voting_mechanism + '_' + weight_sharing + '_' + lattice_structure
 
 b.ion()
 
@@ -676,7 +698,7 @@ for name in population_names:
     # if we're in test mode / using some stored weights
     if test_mode or weight_path[-8:] == 'weights/conv_patch_connectivity_weights/':
         # load up adaptive threshold parameters
-        neuron_groups['e'].theta = np.load(weight_path + 'theta_A' + '_' + ending + '_' + stdp_input + '.npy')
+        neuron_groups['e'].theta = np.load(weight_path + 'theta_A' + '_' + ending +'.npy')
     else:
         # otherwise, set the adaptive additive threshold parameter at 20mV
         neuron_groups['e'].theta = np.ones((n_e_total)) * 20.0 * b.mV
@@ -684,7 +706,7 @@ for name in population_names:
     for conn_type in recurrent_conn_names:
         if conn_type == 'ei':
             # create connection name (composed of population and connection types)
-            conn_name = name + conn_type[0] + name + conn_type[1] + '_' + ending
+            conn_name = name + conn_type[0] + name + conn_type[1]
             # create a connection from the first group in conn_name with the second group
             connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
             # instantiate the created connection
@@ -694,7 +716,7 @@ for name in population_names:
 
         elif conn_type == 'ie':
             # create connection name (composed of population and connection types)
-            conn_name = name + conn_type[0] + name + conn_type[1] + '_' + ending
+            conn_name = name + conn_type[0] + name + conn_type[1]
             # create a connection from the first group in conn_name with the second group
             connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
             # instantiate the created connection
@@ -706,7 +728,7 @@ for name in population_names:
 
         elif conn_type == 'ee':
             # create connection name (composed of population and connection types)
-            conn_name = name + conn_type[0] + name + conn_type[1] + '_' + ending
+            conn_name = name + conn_type[0] + name + conn_type[1]
             # get weights from file if we are in test mode
             if test_mode:
                 weight_matrix = get_matrix_from_file(weight_path + conn_name + '_' + stdp_input + '.npy', conv_features * n_e, conv_features * n_e)
@@ -747,7 +769,7 @@ for name in population_names:
 
     # if STDP from excitatory -> excitatory is on and this connection is excitatory -> excitatory
     if ee_STDP_on and 'ee' in recurrent_conn_names:
-        stdp_methods[name + 'e' + name + 'e'] = b.STDP(connections[name + 'e' + name + 'e' + '_' + ending], eqs=eqs_stdp_ee, pre=eqs_stdp_pre_ee, post=eqs_stdp_post_ee, wmin=0., wmax=wmax_ee)
+        stdp_methods[name + 'e' + name + 'e'] = b.STDP(connections[name + 'e' + name + 'e'], eqs=eqs_stdp_ee, pre=eqs_stdp_pre_ee, post=eqs_stdp_post_ee, wmin=0., wmax=wmax_ee)
 
     print '...creating monitors for:', name
 
@@ -812,7 +834,7 @@ for name in input_connection_names:
     # for each of the input connection types (in this case, excitatory -> excitatory)
     for conn_type in input_conn_names:
         # saved connection name
-        conn_name = name[0] + conn_type[0] + name[1] + conn_type[1] + '_' + ending	
+        conn_name = name[0] + conn_type[0] + name[1] + conn_type[1]
 
         # get weight matrix depending on training or test phase
         if test_mode:
@@ -837,7 +859,7 @@ for name in input_connection_names:
         print '...creating STDP for connection', name
         
         # STDP connection name
-        conn_name = name[0] + conn_type[0] + name[1] + conn_type[1] + '_' + ending
+        conn_name = name[0] + conn_type[0] + name[1] + conn_type[1]
         # create the STDP object
         stdp_methods[conn_name] = b.STDP(input_connections[conn_name], eqs=eqs_stdp_ee, pre=eqs_stdp_pre_ee, post=eqs_stdp_post_ee, wmin=0., wmax=wmax_ee)
 
@@ -881,7 +903,7 @@ j = 0
 num_retries = 0
 b.run(0)
 
-weights_name = 'XeAe' + '_' + ending
+weights_name = 'XeAe'
 
 # start recording time
 start_time = timeit.default_timer()
@@ -920,7 +942,7 @@ while j < num_examples:
     previous_spike_count = np.copy(spike_counters['Ae'].count[:]).reshape((conv_features, n_e))
     
     # set weights to those of the most-fired neuron
-    if not test_mode and weight_sharing:
+    if not test_mode and weight_sharing == 'weight_sharing':
         set_weights_most_fired()
 
     # update weights every 'weight_update_interval'
@@ -969,7 +991,7 @@ while j < num_examples:
                 performance = get_current_performance(performance, j)
             # printing out classification performance results so far
             print '\nClassification performance', performance[:int(j / float(update_interval)) + 1], '\n'
-            target = open('../performance/conv_patch_connectivity_performance/' + weights_name + '_' + stdp_input + '.txt', 'w')
+            target = open('../performance/conv_patch_connectivity_performance/' + ending + '.txt', 'w')
             target.truncate()
             target.write('Iteration ' + str(j) + '\n')
             target.write(str(performance[:int(j / float(update_interval)) + 1]))
@@ -987,7 +1009,7 @@ while j < num_examples:
         j += 1
 
 # set weights to those of the most-fired neuron
-if not test_mode and weight_sharing:
+if not test_mode and weight_sharing == 'weight_sharing':
     set_weights_most_fired()
 
 ################
@@ -1001,8 +1023,8 @@ if not test_mode:
 if not test_mode:
     save_connections()
 else:
-    np.save(data_path + 'activity/conv_patch_connectivity_activity/resultPopVecs' + str(num_examples) + '_' + stdp_input + '_' + ending, result_monitor)
-    np.save(data_path + 'activity/conv_patch_connectivity_activity/inputNumbers' + str(num_examples) + '_' + stdp_input + '_' + ending, input_numbers)
+    np.save(data_path + 'activity/conv_patch_connectivity_activity/results_' + str(num_examples) + '_' + ending, result_monitor)
+    np.save(data_path + 'activity/conv_patch_connectivity_activity/input_numbers_' + str(num_examples) + '_' + ending, input_numbers)
 
 ################
 # PLOT RESULTS #
