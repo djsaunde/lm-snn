@@ -68,14 +68,18 @@ def get_labeled_data(picklename, b_train=True):
 
 def is_lattice_connection(sqrt, i, j):
     '''
-    Boolean method which checks if two indices in a network correspond to neighboring nodes in a lattice.
+    Boolean method which checks if two indices in a network correspond to neighboring nodes in a 4-, 8-, or all-lattice.
 
     sqrt: square root of the number of nodes in population
     i: First neuron's index
     k: Second neuron's index
     '''
-    return i + 1 == j and j % sqrt != 0 or i - 1 == j and i % sqrt != 0 or i + sqrt == j or i - sqrt == j
+    if lattice_structure == '4':
+        return i + 1 == j and j % sqrt != 0 or i - 1 == j and i % sqrt != 0 or i + sqrt == j or i - sqrt == j
+    if lattice_structure == '8':
 
+    if lattice_strucutre == 'all':
+        return True
 
 def get_matrix_from_file(file_name, n_src, n_tgt):
     '''
@@ -584,10 +588,10 @@ stdp_input = ''
 
 if raw_input('Use weight dependence (default no)?: ') in [ 'no', '' ]:
 	use_weight_dependence = False
-	stdp_input += 'weight_dependence_'
+	stdp_input += 'no_weight_dependence_'
 else:
 	use_weight_dependence = True
-	stdp_input += 'no_weight_dependence_'
+	stdp_input += 'weight_dependence_'
 
 if raw_input('Enter (yes / no) for post-pre (default yes): ') in [ 'yes', '' ]:
 	post_pre = True
@@ -621,6 +625,17 @@ else:
         eqs_stdp_pre_ee = 'pre = 1.'
         eqs_stdp_post_ee = 'w += nu_ee_post * pre; post = 1.'
 
+# whether or not to use weight sharing
+weight_sharing = raw_input('Use weight sharing? (default no): ')
+if weight_sharing == '':
+    weight_sharing = False
+else:
+    weight_sharing = True
+
+# which type of lattice neighborhood to use
+lattice_structure = raw_input('Enter lattice structure (4, 8, all; default 4): ')
+if lattice_structure == '':
+    lattice_structure = '4'
 
 b.ion()
 
@@ -905,7 +920,7 @@ while j < num_examples:
     previous_spike_count = np.copy(spike_counters['Ae'].count[:]).reshape((conv_features, n_e))
     
     # set weights to those of the most-fired neuron
-    if not test_mode:
+    if not test_mode and weight_sharing:
         set_weights_most_fired()
 
     # update weights every 'weight_update_interval'
@@ -972,7 +987,7 @@ while j < num_examples:
         j += 1
 
 # set weights to those of the most-fired neuron
-if not test_mode:
+if not test_mode and weight_sharing:
     set_weights_most_fired()
 
 ################ 

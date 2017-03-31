@@ -153,10 +153,10 @@ stdp_input = ''
 
 if raw_input('Use weight dependence (default no)?: ') in [ 'no', '' ]:
     use_weight_dependence = False
-    stdp_input += 'weight_dependence_'
+    stdp_input += 'no_weight_dependence_'
 else:
     use_weight_dependence = True
-    stdp_input += 'no_weight_dependence_'
+    stdp_input += 'weight_dependence_'
 
 if raw_input('Enter (yes / no) for post-pre (default yes): ') in [ 'yes', '' ]:
     post_pre = True

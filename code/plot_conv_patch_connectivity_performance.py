@@ -9,7 +9,7 @@ perf_dir = '../performance/conv_patch_connectivity_performance/'
 
 perfs = {}
 for file_name in os.listdir(perf_dir):
-    if '.txt' in file_name and '27_1_50' in file_name:
+    if '.txt' in file_name:
         perf_text = open(perf_dir + file_name, 'r').readlines()[1:]
         perfs[file_name] = [ float(token) for token in ''.join(perf_text).replace('\n', '').replace('[', '').replace(']', '').split()  ]
 

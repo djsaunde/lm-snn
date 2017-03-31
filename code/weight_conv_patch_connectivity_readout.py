@@ -9,7 +9,7 @@ from scipy.sparse import coo_matrix
 from struct import unpack
 from brian import *
 
-weight_path = '../weights/conv_patch_connectivity/weights/'
+weight_path = '../weights/conv_patch_connectivity_weights/'
 
 fig_num = 0
 wmax_ee = 1.0
@@ -20,7 +20,7 @@ def get_matrix_from_file(file_name, n_src, n_tgt):
     'weight_matrix' and return it
     '''
 
-    # load the stored ndarray into 'readout', instantiate 'weight_matrix' as 
+    # load the stored ndarray into 'readout', instantiate 'weight_matrix' as
     # correctly-shaped zeros matrix
     readout = np.load(file_name)
     weight_matrix = np.zeros((n_src, n_tgt))
@@ -38,7 +38,7 @@ def get_2d_input_weights():
     dimensional and square.
     '''
     rearranged_weights = np.zeros(( conv_features * conv_size, conv_size * n_e ))
-    
+
     # counts number of input -> excitatory weights displayed so far
     connection = weight_matrix
 
@@ -114,7 +114,7 @@ if raw_input('Use weight dependence (default no)?: ') in [ 'no', '' ]:
     stdp_input += 'weight_dependence_'
 else:
     use_weight_dependence = True
-    stdp_input += 'no_weight_dependence_'
+    stdp_input += 'weight_dependence_'
 
 if raw_input('Enter (yes / no) for post-pre (default yes): ') in [ 'yes', '' ]:
     post_pre = True
