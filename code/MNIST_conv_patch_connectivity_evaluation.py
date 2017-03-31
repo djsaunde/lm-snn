@@ -66,25 +66,34 @@ def get_recognized_number_ranking(assignments, spike_rates):
     Given the label assignments of the excitatory layer and their spike rates over
     the past 'update_interval', get the ranking of each of the categories of input.
     '''
-    summed_rates = [0] * 10
-    num_assignments = [0] * 10
+    if voting_mechanism == 'most-spiked':
+        summed_rates = [0] * 10
+        num_assignments = [0] * 10
 
-    most_spiked_array = np.array(np.zeros((conv_features, n_e)), dtype=bool)
+        most_spiked_array = np.array(np.zeros((conv_features, n_e)), dtype=bool)
 
-    for feature in xrange(conv_features):
-        # count up the spikes for the neurons in this convolution patch
-        column_sums = np.sum(spike_rates[feature : feature + 1, :], axis=0)
+        for feature in xrange(conv_features):
+            # count up the spikes for the neurons in this convolution patch
+            column_sums = np.sum(spike_rates[feature : feature + 1, :], axis=0)
 
-        # find the excitatory neuron which spiked the most
-        most_spiked_array[feature, np.argmax(column_sums)] = True
+            # find the excitatory neuron which spiked the most
+            most_spiked_array[feature, np.argmax(column_sums)] = True
 
-    # for each label
-    for i in xrange(10):
-        # get the number of label assignments of this type
-        num_assignments[i] = len(np.where(assignments[most_spiked_array] == i))
-        if num_assignments[i] > 0:
-            # sum the spike rates of all excitatory neurons with this label, which fired the most in its patch
-            summed_rates[i] = np.sum(spike_rates[np.where(assignments[most_spiked_array] == i)]) / num_assignments[i]
+        # for each label
+        for i in xrange(10):
+            # get the number of label assignments of this type
+            num_assignments[i] = len(np.where(assignments[most_spiked_array] == i))
+            if num_assignments[i] > 0:
+                # sum the spike rates of all excitatory neurons with this label, which fired the most in its patch
+                summed_rates[i] = np.sum(spike_rates[np.where(assignments[most_spiked_array] == i)]) / num_assignments[i]
+
+    elif voting_mechanism == 'all':
+        summed_rates = [0] * 10
+        num_assignments = [0] * 10
+        for i in xrange(10):
+            num_assignments[i] = len(np.where(assignments == i)[0])
+            if num_assignments[i] > 0:
+                summed_rates[i] = np.sum(spike_rates[assignments == i]) / num_assignments[i]
 
     return np.argsort(summed_rates)[::-1]
 
@@ -179,10 +188,14 @@ else:
     post_pre = False
     stdp_input += 'no_postpre'
 
+voting_mechanism = raw_input('Enter "all" or "most-spiked" to choose voting mechanism (default most-spiked): ')
+if voting_mechanism == '':
+    voting_mechanism = 'most-spiked'
+
 print '\n'
 
 # set ending of filename saves
-ending = '_' + stdp_input + '__' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e)
+ending = '_' + stdp_input + '_' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e)
 
 
 print '...loading MNIST'
