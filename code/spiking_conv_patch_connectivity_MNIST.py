@@ -905,8 +905,8 @@ while j < num_examples:
     previous_spike_count = np.copy(spike_counters['Ae'].count[:]).reshape((conv_features, n_e))
     
     # set weights to those of the most-fired neuron
-    if not test_mode:
-        set_weights_most_fired()
+    # if not test_mode:
+        # set_weights_most_fired()
 
     # update weights every 'weight_update_interval'
     if j % weight_update_interval == 0 and not test_mode and do_plot:
@@ -972,8 +972,8 @@ while j < num_examples:
         j += 1
 
 # set weights to those of the most-fired neuron
-if not test_mode:
-    set_weights_most_fired()
+# if not test_mode:
+    # set_weights_most_fired()
 
 ################ 
 # SAVE RESULTS #
