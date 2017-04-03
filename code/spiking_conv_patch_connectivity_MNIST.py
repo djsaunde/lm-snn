@@ -372,6 +372,21 @@ def get_recognized_number_ranking(assignments, spike_rates):
             if num_assignments[i] > 0:
                 summed_rates[i] = np.sum(spike_rates[assignments == i]) / num_assignments[i]
 
+    elif voting_mechanism == 'top_percent':
+        summed_rates = [0] * 10
+        num_assignments = [0] * 10
+        
+        top_percent_array = np.array(np.zeros((conv_features, n_e)), dtype=bool)
+        top_percent_array[np.where(spike_rates > np.percentile(spike_rates, 100 - top_percent))] = True
+
+        # for each label
+        for i in xrange(10):
+            # get the number of label assignments of this type
+            num_assignments[i] = len(np.where(assignments[top_percent_array] == i))
+            if num_assignments[i] > 0:
+                # sum the spike rates of all excitatory neurons with this label, which fired the most in its patch
+                summed_rates[i] = np.sum(spike_rates[np.where(assignments[top_percent_array] == i)]) / num_assignments[i]
+
     return np.argsort(summed_rates)[::-1]
 
 
@@ -503,7 +518,7 @@ runtime = num_examples * (single_example_time + resting_time)
 if test_mode:
     update_interval = num_examples
 else:
-    update_interval = 100
+    update_interval = 1000
 
 # set weight update interval (plotting)
 weight_update_interval = 10
@@ -591,7 +606,7 @@ else:
 	use_weight_dependence = True
 	stdp_input += 'weight_dependence_'
 
-if raw_input('Enter (yes / no) for post-pre (default yes): ') in [ 'yes', '' ]:
+if raw_input('Use post-pre stdp_input (default yes)?: ') in [ 'yes', '' ]:
 	post_pre = True
 	stdp_input += 'postpre'
 else:
@@ -624,12 +639,20 @@ else:
         eqs_stdp_post_ee = 'w += nu_ee_post * pre; post = 1.'
 
 # how to take "votes" from excitatory neurons to classify new data
-voting_mechanism = raw_input('Enter "all" or "most-spiked" to choose voting mechanism (default most-spiked): ')
+voting_mechanism = raw_input('Enter "all", "top_percent", "most-spiked" to choose voting mechanism (default most-spiked): ')
 if voting_mechanism == '':
     voting_mechanism = 'most-spiked'
 
+if voting_mechanism == 'top_percent':
+    top_percent = raw_input('Enter percentage of most-spiked neurons\' votes to consider (default 10%): ')
+    if top_percent == '':
+        top_percent = 10
+    else:
+        top_percent = int(top_percent)
+
+
 # whether or not to use weight sharing
-weight_sharing = raw_input('Use weight sharing? ((yes / no), default no): ')
+weight_sharing = raw_input('Use weight sharing? (default no): ')
 if weight_sharing in [ '', 'no' ]:
     weight_sharing = 'no_weight_sharing'
 else:
@@ -657,7 +680,7 @@ else:
 print '\n'
 
 # set ending of filename saves
-ending = str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e) + '_' + stdp_input + '_' + voting_mechanism + '_' + weight_sharing + '_' + lattice_structure
+ending = connectivity + '_' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e) + '_' + stdp_input + '_' + weight_sharing + '_' + lattice_structure
 
 b.ion()
 
@@ -731,7 +754,7 @@ for name in population_names:
             conn_name = name + conn_type[0] + name + conn_type[1]
             # get weights from file if we are in test mode
             if test_mode:
-                weight_matrix = get_matrix_from_file(weight_path + conn_name + '_' + stdp_input + '.npy', conv_features * n_e, conv_features * n_e)
+                weight_matrix = get_matrix_from_file(weight_path + conn_name + '_' + ending + '.npy', conv_features * n_e, conv_features * n_e)
             # create a connection from the first group in conn_name with the second group
             connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
             # instantiate the created connection
@@ -838,7 +861,7 @@ for name in input_connection_names:
 
         # get weight matrix depending on training or test phase
         if test_mode:
-            weight_matrix = get_matrix_from_file(weight_path + conn_name + '_' + stdp_input + '.npy', n_input, conv_features * n_e)
+            weight_matrix = get_matrix_from_file(weight_path + conn_name + '_' + ending + '.npy', n_input, conv_features * n_e)
 
         # create connections from the windows of the input group to the neuron population
         input_connections[conn_name] = b.Connection(input_groups['Xe'], neuron_groups[name[1] + conn_type[1]], structure='sparse', state='g' + conn_type[0], delay=True, max_delay=delay[conn_type][1])

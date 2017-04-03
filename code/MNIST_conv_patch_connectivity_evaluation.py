@@ -205,7 +205,7 @@ if lattice_structure == '':
     lattice_structure = '4'
 
 # set ending of filename saves
-ending = str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e) + '_' + stdp_input + '_' + voting_mechanism + '_' + weight_sharing + '_' + lattice_structure
+ending = str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e) + '_' + stdp_input + '_' + weight_sharing + '_' + lattice_structure
 
 print '\n'
 

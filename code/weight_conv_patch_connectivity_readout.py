@@ -67,9 +67,17 @@ def plot_2d_input_weights():
     fig.canvas.draw()
     return im2, fig
 
+
+print '\n'
+
 # number of inputs to the network
 n_input = 784
 n_input_sqrt = int(math.sqrt(n_input))
+
+# type of patch connectivity
+connectivity = raw_input('Enter connectivity type ("pairs", "all") between patches (default all): ')
+if connectivity == '':
+    connectivity = 'all'
 
 # size of convolution windows
 conv_size = raw_input('Enter size of square side length of convolution window (default 27): ')
@@ -94,39 +102,57 @@ else:
 
 # number of excitatory neurons (number output from convolutional layer)
 n_e = ((n_input_sqrt - conv_size) / conv_stride + 1) ** 2
-
 n_e_total = n_e * conv_features
 n_e_sqrt = int(math.sqrt(n_e))
 
 # number of inhibitory neurons (number of convolutational features (for now))
 n_i = n_e
 
-# creating convolution locations inside the input image
-convolution_locations = {}
-for n in xrange(n_e):
-    convolution_locations[n] = [ ((n % n_e_sqrt) * conv_stride + (n // n_e_sqrt) * n_input_sqrt * conv_stride) + (x * n_input_sqrt) + y for y in xrange(conv_size) for x in xrange(conv_size) ]
-
 # determine STDP rule to use
 stdp_input = ''
 
 if raw_input('Use weight dependence (default no)?: ') in [ 'no', '' ]:
     use_weight_dependence = False
-    stdp_input += 'weight_dependence_'
+    stdp_input += 'no_weight_dependence_'
 else:
     use_weight_dependence = True
     stdp_input += 'weight_dependence_'
 
-if raw_input('Enter (yes / no) for post-pre (default yes): ') in [ 'yes', '' ]:
+if raw_input('Use post-pre stdp_input (default yes)?: ') in [ 'yes', '' ]:
     post_pre = True
     stdp_input += 'postpre'
 else:
     post_pre = False
     stdp_input += 'no_postpre'
 
-# set ending of filename saves
-ending = str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e)
+# how to take "votes" from excitatory neurons to classify new data
+voting_mechanism = raw_input('Enter "all" or "most-spiked" to choose voting mechanism (default most-spiked): ')
+if voting_mechanism == '':
+    voting_mechanism = 'most-spiked'
 
-weight_matrix = get_matrix_from_file(weight_path + 'XeAe_' + ending + '_' + stdp_input + '.npy', n_input, conv_features * n_e)
+# whether or not to use weight sharing
+weight_sharing = raw_input('Use weight sharing? (default no): ')
+if weight_sharing in [ '', 'no' ]:
+    weight_sharing = 'no_weight_sharing'
+else:
+    weight_sharing = 'weight_sharing'
+
+# which type of lattice neighborhood to use
+lattice_structure = raw_input('Enter lattice structure (none, 4, 8, all; default 4): ')
+if lattice_structure == '':
+    lattice_structure = '4'
+
+print '\n'
+
+# creating convolution locations inside the input image
+convolution_locations = {}
+for n in xrange(n_e):
+    convolution_locations[n] = [ ((n % n_e_sqrt) * conv_stride + (n // n_e_sqrt) * n_input_sqrt * conv_stride) + (x * n_input_sqrt) + y for y in xrange(conv_size) for x in xrange(conv_size) ]
+
+# set ending of filename saves
+ending = connectivity + '_' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e) + '_' + stdp_input + '_' + weight_sharing + '_' + lattice_structure
+
+weight_matrix = get_matrix_from_file(weight_path + 'XeAe_' + ending + '.npy', n_input, conv_features * n_e)
 
 plot_2d_input_weights()
 

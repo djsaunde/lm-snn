@@ -7,6 +7,8 @@ import os
 
 perf_dir = '../performance/conv_patch_connectivity_performance/'
 
+def window(size):
+    return np.ones(size) / float(size)
 
 print '\n'
 print '\n'.join([ str(idx) + ' | ' + file_name for idx, file_name in enumerate(os.listdir(perf_dir)) if '.txt' in file_name ])
@@ -29,17 +31,17 @@ print '\n'
 
 plots = []
 for perf in sorted(perfs.keys()):
-    perf_plot, = plt.plot(perfs[perf][:100], label='performance')
-    average_plot, = plt.plot([ np.mean(perfs[perf][:100]) ] * len(perfs[perf][:100]), label='average: ' + str(np.mean(perfs[perf][:100])))
-    upper_std_plot, = plt.plot([ np.mean(perfs[perf][:100]) + np.std(perfs[perf][:100]) ] * len(perfs[perf][:100]), label='plus one standard deviation: ' + str(np.mean(perfs[perf][:100]) + np.std(perfs[perf][:100])))
-    lower_std_plot, = plt.plot([ np.mean(perfs[perf][:100]) - np.std(perfs[perf][:100]) ] * len(perfs[perf][:100]), label='minus one standard deviation: ' + str(np.mean(perfs[perf][:100]) - np.std(perfs[perf][:100])))
+    perf_plot, = plt.plot(np.convolve(perfs[perf], window(10), 'same'), label='performance')
+    average_plot, = plt.plot([ np.mean(perfs[perf]) ] * len(perfs[perf]), label='average: ' + str(np.mean(perfs[perf])))
+    upper_std_plot, = plt.plot([ np.mean(perfs[perf]) + np.std(perfs[perf]) ] * len(perfs[perf]), label='plus one standard deviation: ' + str(np.mean(perfs[perf]) + np.std(perfs[perf])))
+    lower_std_plot, = plt.plot([ np.mean(perfs[perf]) - np.std(perfs[perf]) ] * len(perfs[perf]), label='minus one standard deviation: ' + str(np.mean(perfs[perf]) - np.std(perfs[perf])))
     
     plt.legend(handles=[perf_plot, average_plot, upper_std_plot, lower_std_plot])
     
     fig = plt.gcf()
     fig.set_size_inches(16, 12)
 
-    plt.xlabel('Iteration number (1 through ' + str(len(perfs[perf][:100])) + ')')
+    plt.xlabel('Iteration number (1 through ' + str(len(perfs[perf])) + ')')
     plt.ylabel('Classification accuracy (out of 100%)')
 
     title_strs = perf[:perf.index('weight') - 1].split('_')
