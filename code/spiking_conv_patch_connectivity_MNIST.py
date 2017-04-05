@@ -214,17 +214,18 @@ def get_2d_input_weights():
     Get the weights from the input to excitatory layer and reshape it to be two
     dimensional and square.
     '''
-    rearranged_weights = np.zeros((conv_features * conv_size, conv_size * n_e))
+    rearranged_weights = np.zeros((conv_features_sqrt * conv_size * n_e_sqrt, conv_features_sqrt * conv_size * n_e_sqrt))
     connection = input_connections['XeAe'][:]
 
     # for each convolution feature
     for feature in xrange(conv_features):
         # for each excitatory neuron in this convolution feature
         for n in xrange(n_e):
-            # get the connection weights from the input to this neuron
-            temp = connection[:, feature * n_e + n].todense()
-            # add it to the rearranged weights for displaying to the user
-            rearranged_weights[feature * conv_size : (feature + 1) * conv_size, n * conv_size : (n + 1) * conv_size] = temp[convolution_locations[n]].reshape((conv_size, conv_size))
+            temp = connection[:, feature * n_e + (n // n_e_sqrt) * n_e_sqrt + (n % n_e_sqrt)].todense()
+
+            # print ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * conv_size), ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * conv_size) + conv_size, ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * (conv_size)), ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * (conv_size)) + conv_size
+
+            rearranged_weights[ ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * conv_size) : ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * conv_size) + conv_size, ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * (conv_size)) : ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * (conv_size)) + conv_size ] = temp[convolution_locations[n]].reshape((conv_size, conv_size))
 
     # return the rearranged weights to display to the user
     return rearranged_weights.T
@@ -237,12 +238,13 @@ def plot_2d_input_weights():
     weights = get_2d_input_weights()
     fig = b.figure(fig_num, figsize=(18, 18))
     im = b.imshow(weights, interpolation='nearest', vmin=0, vmax=wmax_ee, cmap=cmap.get_cmap('hot_r'))
+    for idx in xrange(conv_size * n_e_sqrt, conv_size * conv_features_sqrt * n_e_sqrt, conv_size * n_e_sqrt):
+        b.axvline(idx, ls='--', lw=1)
+        b.axhline(idx, ls='--', lw=1)
     b.colorbar(im)
     b.title('Reshaped input -> convolution weights')
-    b.xlabel('convolution patch')
-    b.ylabel('neurons per patch')
-    b.xticks(xrange(0, conv_size * conv_features, conv_size))
-    b.yticks(xrange(0, conv_size * n_e, conv_size))
+    b.xticks(xrange(0, conv_size * conv_features_sqrt * n_e_sqrt, conv_size * n_e_sqrt))
+    b.yticks(xrange(0, conv_size * conv_features_sqrt * n_e_sqrt, conv_size * n_e_sqrt))
     fig.canvas.draw()
     return im, fig
 
@@ -283,7 +285,7 @@ def plot_patch_weights():
     fig = b.figure(fig_num, figsize=(8,8))
     im = b.imshow(weights, interpolation='nearest', vmin=0, vmax=wmax_ee, cmap=cmap.get_cmap('hot_r'))
     b.colorbar(im)
-    b.title('Between patch connectivity')
+    b.title('Between-patch connectivity')
     fig.canvas.draw()
     return im, fig
 
@@ -318,7 +320,7 @@ def plot_performance(fig_num):
     num_evaluations = int(num_examples / update_interval)
     time_steps = range(0, num_evaluations)
     performance = np.zeros(num_evaluations)
-    fig = b.figure(fig_num, figsize = (5, 5))
+    fig = b.figure(fig_num, figsize = (15, 5))
     fig_num += 1
     ax = fig.add_subplot(111)
     im2, = ax.plot(time_steps, performance) #my_cmap
@@ -383,9 +385,10 @@ def get_recognized_number_ranking(assignments, spike_rates):
         for i in xrange(10):
             # get the number of label assignments of this type
             num_assignments[i] = len(np.where(assignments[top_percent_array] == i))
+
             if num_assignments[i] > 0:
                 # sum the spike rates of all excitatory neurons with this label, which fired the most in its patch
-                summed_rates[i] = np.sum(spike_rates[np.where(assignments[top_percent_array] == i)]) / num_assignments[i]
+                summed_rates[i] = np.sum(spike_rates[top_percent_array][np.where(assignments == i)]) / num_assignments[i]
 
     return np.argsort(summed_rates)[::-1]
 
@@ -472,7 +475,7 @@ n_input = 784
 n_input_sqrt = int(math.sqrt(n_input))
 
 # type of patch connectivity
-connectivity = raw_input('Enter connectivity type ("pairs", "all") between patches (default all): ')
+connectivity = raw_input('Enter connectivity type ("none", "pairs", "all") between patches (default all): ')
 if connectivity == '':
     connectivity = 'all'
 
@@ -491,9 +494,9 @@ else:
     conv_stride = int(conv_stride)
 
 # number of convolution features
-conv_features = raw_input('Enter number of convolution features to learn (default 10): ')
+conv_features = raw_input('Enter number of convolution features to learn (default 25): ')
 if conv_features == '':
-    conv_features = 10
+    conv_features = 25
 else:
     conv_features = int(conv_features)
 
@@ -504,6 +507,8 @@ n_e_sqrt = int(math.sqrt(n_e))
 
 # number of inhibitory neurons (number of convolutational features (for now))
 n_i = n_e
+
+conv_features_sqrt = int(math.sqrt(conv_features))
 
 # time (in seconds) per data example presentation
 single_example_time = 0.35 * b.second
@@ -518,7 +523,7 @@ runtime = num_examples * (single_example_time + resting_time)
 if test_mode:
     update_interval = num_examples
 else:
-    update_interval = 1000
+    update_interval = 100
 
 # set weight update interval (plotting)
 weight_update_interval = 10
@@ -550,7 +555,7 @@ recurrent_conn_names = [ 'ei', 'ie', 'ee' ]
 weight['ee_input'] = (conv_size ** 2) * 0.15
 delay['ee_input'] = (0 * b.ms, 10 * b.ms)
 delay['ei_input'] = (0 * b.ms, 5 * b.ms)
-input_intensity = start_input_intensity = 4.0
+input_intensity = start_input_intensity = 2.0
 
 # time constants, learning rates, max weights, weight dependence, etc.
 tc_pre_ee = 20 * b.ms
@@ -606,7 +611,7 @@ else:
 	use_weight_dependence = True
 	stdp_input += 'weight_dependence_'
 
-if raw_input('Use post-pre stdp_input (default yes)?: ') in [ 'yes', '' ]:
+if raw_input('Use post-pre STDP (default yes)?: ') in [ 'yes', '' ]:
 	post_pre = True
 	stdp_input += 'postpre'
 else:
@@ -642,14 +647,12 @@ else:
 voting_mechanism = raw_input('Enter "all", "top_percent", "most-spiked" to choose voting mechanism (default most-spiked): ')
 if voting_mechanism == '':
     voting_mechanism = 'most-spiked'
-
-if voting_mechanism == 'top_percent':
+elif voting_mechanism == 'top_percent':
     top_percent = raw_input('Enter percentage of most-spiked neurons\' votes to consider (default 10%): ')
     if top_percent == '':
         top_percent = 10
     else:
         top_percent = int(top_percent)
-
 
 # whether or not to use weight sharing
 weight_sharing = raw_input('Use weight sharing? (default no): ')
@@ -662,6 +665,13 @@ else:
 lattice_structure = raw_input('Enter lattice structure (none, 4, 8, all; default 4): ')
 if lattice_structure == '':
     lattice_structure = '4'
+
+# probability of random inhibitory edges
+random_inhibition_prob = raw_input('Enter probability with which to add random inhibitory synapses (default 0): ')
+if random_inhibition_prob == '':
+    random_inhibition_prob = 0.0
+else:
+    random_inhibition_prob = float(random_inhibition_prob)
 
 print '\n'
 
@@ -680,7 +690,7 @@ else:
 print '\n'
 
 # set ending of filename saves
-ending = connectivity + '_' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e) + '_' + stdp_input + '_' + weight_sharing + '_' + lattice_structure
+ending = connectivity + '_' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e) + '_' + stdp_input + '_' + weight_sharing + '_' + lattice_structure + '_' + str(random_inhibition_prob)
 
 b.ion()
 
@@ -749,6 +759,15 @@ for name in population_names:
                         for n in xrange(n_e):
                             connections[conn_name][feature * n_e + n, other_feature * n_e + n] = 17.4
 
+            if random_inhibition_prob != 0.0:
+                for other_feature in xrange(conv_features):
+                    for n_this in xrange(n_e):
+                        for n_other in xrange(n_e):
+                            if n_this != n_other:
+                                if b.random() < random_inhibition_prob:
+                                    connections[conn_name][feature * n_e + n_this, other_feature * n_e + n_other] = 17.4
+
+
         elif conn_type == 'ee':
             # create connection name (composed of population and connection types)
             conn_name = name + conn_type[0] + name + conn_type[1]
@@ -789,6 +808,8 @@ for name in population_names:
                                     else:
                                         connections[conn_name][feature * n_e + this_n, (feature - 1) * n_e + other_n] = (b.random() + 0.01) * 0.3
 
+            elif connectivity == 'none':
+                pass
 
     # if STDP from excitatory -> excitatory is on and this connection is excitatory -> excitatory
     if ee_STDP_on and 'ee' in recurrent_conn_names:
@@ -840,6 +861,8 @@ elif connectivity == 'pairs':
             elif this_n // n_e % 2 == 1:
                 if is_lattice_connection(n_e_sqrt, this_n % n_e, other_n % n_e) and other_n // n_e == this_n // n_e - 1:
                     lattice_locations[this_n].append(other_n)
+elif connectivity == 'none':
+    lattice_locations = {}
 
 # setting up parameters for weight normalization between patches
 num_lattice_connections = sum([ len(value) for value in lattice_locations.values() ])

@@ -142,6 +142,11 @@ end_time_testing = int(testing_ending)
 n_input = 784
 n_input_sqrt = int(math.sqrt(n_input))
 
+# type of patch connectivity
+connectivity = raw_input('Enter connectivity type ("none", "pairs", "all") between patches (default all): ')
+if connectivity == '':
+    connectivity = 'all'
+
 # size of convolution windows
 conv_size = raw_input('Enter size of square side length of convolution window (default 27): ')
 if conv_size == '':
@@ -188,12 +193,19 @@ else:
     post_pre = False
     stdp_input += 'no_postpre'
 
-voting_mechanism = raw_input('Enter "all" or "most-spiked" to choose voting mechanism (default most-spiked): ')
+# how to take "votes" from excitatory neurons to classify new data
+voting_mechanism = raw_input('Enter "all", "top_percent", "most-spiked" to choose voting mechanism (default most-spiked): ')
 if voting_mechanism == '':
     voting_mechanism = 'most-spiked'
+elif voting_mechanism == 'top_percent':
+    top_percent = raw_input('Enter percentage of most-spiked neurons\' votes to consider (default 10%): ')
+    if top_percent == '':
+        top_percent = 10
+    else:
+        top_percent = int(top_percent)
 
 # whether or not to use weight sharing
-weight_sharing = raw_input('Use weight sharing? (yes / no), default no): ')
+weight_sharing = raw_input('Use weight sharing? ((yes / no), default no): ')
 if weight_sharing in [ '', 'no' ]:
     weight_sharing = 'no_weight_sharing'
 else:
@@ -204,8 +216,15 @@ lattice_structure = raw_input('Enter lattice structure (4, 8, all; default 4): '
 if lattice_structure == '':
     lattice_structure = '4'
 
+# probability of random inhibitory edges
+random_inhibition_prob = raw_input('Enter probability with which to add random inhibitory synapses (default 0): ')
+if random_inhibition_prob == '':
+    random_inhibition_prob = 0.0
+else:
+    random_inhibition_prob = float(random_inhibition_prob)
+
 # set ending of filename saves
-ending = str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e) + '_' + stdp_input + '_' + weight_sharing + '_' + lattice_structure
+ending = connectivity + '_' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e) + '_' + stdp_input + '_' + weight_sharing + '_' + lattice_structure + '_' + str(random_inhibition_prob)
 
 print '\n'
 

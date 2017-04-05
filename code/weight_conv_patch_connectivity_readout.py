@@ -118,7 +118,7 @@ else:
     use_weight_dependence = True
     stdp_input += 'weight_dependence_'
 
-if raw_input('Use post-pre stdp_input (default yes)?: ') in [ 'yes', '' ]:
+if raw_input('Use post-pre STDP (default yes)?: ') in [ 'yes', '' ]:
     post_pre = True
     stdp_input += 'postpre'
 else:
