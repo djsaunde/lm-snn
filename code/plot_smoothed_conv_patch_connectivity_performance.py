@@ -11,7 +11,7 @@ def window(size):
     return np.ones(size) / float(size)
 
 print '\n'
-print '\n'.join([ str(idx) + ' | ' + file_name for idx, file_name in enumerate(os.listdir(perf_dir)) if '.txt' in file_name ])
+print '\n'.join([ str(idx) + ' | ' + file_name for idx, file_name in enumerate(sorted(os.listdir(perf_dir))) if '.txt' in file_name ])
 print '\n'
 
 to_plot = raw_input('Enter the index of the file from above which you\'d like to plot, or hit Enter to plot all: ')
@@ -47,8 +47,9 @@ for perf in sorted(perfs.keys()):
     title_strs = perf[:perf.index('weight') - 1].split('_')
     print perf
 
-    plt.title('Classification accuracy by iteration number (' + title_strs[0] + 'x' + title_strs[0] + ' convolution, stride ' + title_strs[1] + ', ' + title_strs[2] + ' convolution features, giving ' + title_strs[3] + ' excitatory neurons per convolutional patch')
-    plt.savefig(perf_dir + 'performance_plots/Classification accuracy by iteration number (' + title_strs[0] + 'x' + title_strs[0] + ' convolution, stride ' + title_strs[1] + ', ' + title_strs[2] + ' convolution features, gving ' + title_strs[3] + ' excitatory neurons per convolutional patch')
+    # plt.title('Classification accuracy by iteration number (' + title_strs[0] + 'x' + title_strs[0] + ' convolution, stride ' + title_strs[1] + ', ' + title_strs[2] + ' convolution features, giving ' + title_strs[3] + ' excitatory neurons per convolutional patch')
+    plt.title(perf[:perf.index('.')])
+    plt.savefig(perf_dir + 'performance_plots/' + perf[:perf.index('.')])
     plt.show()
 
 print '\n'
