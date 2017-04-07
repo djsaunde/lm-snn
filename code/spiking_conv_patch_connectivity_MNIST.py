@@ -282,7 +282,7 @@ def plot_patch_weights():
 	Plot the weights between convolution patches to view during training.
 	'''
 	weights = get_patch_weights()
-	fig = b.figure(fig_num, figsize=(8,8))
+	fig = b.figure(fig_num, figsize=(8, 8))
 	im = b.imshow(weights, interpolation='nearest', vmin=0, vmax=wmax_ee, cmap=cmap.get_cmap('hot_r'))
 	for idx in xrange(n_e, n_e * conv_features, n_e):
 		b.axvline(idx, ls='--', lw=1)
@@ -298,6 +298,41 @@ def update_patch_weights(im, fig):
 	'''
 	weights = get_patch_weights()
 	im.set_array(weights)
+	fig.canvas.draw()
+	return im
+
+def plot_neuron_votes(assignments, spike_rates):
+	'''
+	Plot the votes of the neurons per label.
+	'''
+	all_summed_rates = [0] * 10
+	num_assignments = [0] * 10
+
+	for i in xrange(10):
+		num_assignments[i] = len(np.where(assignments == i)[0])
+		if num_assignments[i] > 0:
+			all_summed_rates[i] = np.sum(spike_rates[assignments == i]) / num_assignments[i]
+
+	fig = b.figure(fig_num, figsize=(8, 8))
+	im = b.bar(xrange(10), all_summed_rates)
+	b.title('Votes per label')
+	fig.canvas.draw()
+	return im, fig
+
+
+def update_neuron_votes(im, fig):
+	'''
+	Update the plot of the votes of the neurons by label.
+	'''
+	all_summed_rates = [0] * 10
+	num_assignments = [0] * 10
+
+	for i in xrange(10):
+		num_assignments[i] = len(np.where(assignments == i)[0])
+		if num_assignments[i] > 0:
+			all_summed_rates[i] = np.sum(rates[assignments == i]) / num_assignments[i]
+
+	im.set_height(xrange(10), all_summed_rates)
 	fig.canvas.draw()
 	return im
 
@@ -325,31 +360,6 @@ def get_current_performance(all_performance, most_spiked_performance, top_percen
 	top_percent_performance[current_evaluation] = top_percent_correct / float(update_interval) * 100
 	
 	return all_performance, most_spiked_performance, top_percent_performance
-
-
-def update_patch_weights(im, fig):
-    '''
-    Update the plot of the weights between convolution patches to view during training.
-    '''
-    weights = get_patch_weights()
-    print len(weights[np.where(weights > 0.5)])
-    im.set_array(weights)
-    fig.canvas.draw()
-    return im
-
-
-def get_current_performance(performance, current_example_num):
-    '''
-    Evaluate the performance of the network on the past 'update_interval' training
-    examples.
-    '''
-    current_evaluation = int(current_example_num / update_interval)
-    start_num = current_example_num - update_interval
-    end_num = current_example_num
-    difference = outputNumbers[start_num:end_num, 0] - input_numbers[start_num:end_num]
-    correct = len(np.where(difference == 0)[0])
-    performance[current_evaluation] = correct / float(update_interval) * 100
-    return performance
 
 
 def plot_performance(fig_num):
@@ -602,7 +612,7 @@ input_connection_names = [ 'XA' ]
 save_conns = [ 'XeAe', 'AeAe' ]
 input_conn_names = [ 'ee_input' ]
 recurrent_conn_names = [ 'ei', 'ie', 'ee' ]
-weight['ee_input'] = (conv_size ** 2) * 0.15
+weight['ee_input'] = (conv_size ** 2) * 0.175
 delay['ee_input'] = (0 * b.ms, 10 * b.ms)
 delay['ei_input'] = (0 * b.ms, 5 * b.ms)
 input_intensity = start_input_intensity = 2.0
@@ -712,8 +722,8 @@ if random_inhibition_prob == '':
 else:
 	random_inhibition_prob = float(random_inhibition_prob)
 
-# top percentage of neurons from which to take votes from
-top_percent = raw_input('Enter percentage of most-spiked neurons from which to take votes from (default 10): ')
+# top percentile of neurons from which to take votes from
+top_percent = raw_input('Enter percentile of most-spiked neurons from which to take votes from (default 10): ')
 if top_percent == '':
 	top_percent = 10
 else:
@@ -968,6 +978,8 @@ input_numbers = [0] * num_examples
 all_output_numbers = np.zeros((num_examples, 10))
 most_spiked_output_numbers = np.zeros((num_examples, 10))
 top_percent_output_numbers = np.zeros((num_examples, 10))
+rates = np.zeros((n_input_sqrt, n_input_sqrt))
+
 
 # plot input weights
 if not test_mode and do_plot:
@@ -975,10 +987,11 @@ if not test_mode and do_plot:
 	fig_num += 1
 	patch_weight_monitor, fig2_weights = plot_patch_weights()
 	fig_num += 1
+	neuron_vote_monitor, fig_neuron_votes = plot_neuron_votes(assignments, rates)
+	fig_num += 1
 
 # plot input intensities
 if do_plot:
-	rates = np.zeros((n_input_sqrt, n_input_sqrt))
 	input_image_monitor, input_image = plot_input()
 	fig_num += 1
 
@@ -1041,6 +1054,7 @@ while j < num_examples:
 	if j % weight_update_interval == 0 and not test_mode and do_plot:
 		update_2d_input_weights(input_weight_monitor, fig_weights)
 		update_patch_weights(patch_weight_monitor, fig2_weights)
+		update_neuron_votes(neuron_vote_monitor, fig_neuron_votes)
 
 	# if the neurons in the network didn't spike more than four times
 	if np.sum(current_spike_count) < 5 and num_retries < 3:
@@ -1085,7 +1099,7 @@ while j < num_examples:
 			# printing out classification performance results so far
 			print '\nClassification performance (all vote): ', all_performance[:int(j / float(update_interval)) + 1], '\n', 'Average performance:', sum(all_performance[:int(j / float(update_interval)) + 1]) / float(len(all_performance[:int(j / float(update_interval)) + 1])), '\n'
 			print '\nClassification performance (most-spiked vote): ', most_spiked_performance[:int(j / float(update_interval)) + 1], '\n', 'Average performance:', sum(most_spiked_performance[:int(j / float(update_interval)) + 1]) / float(len(most_spiked_performance[:int(j / float(update_interval)) + 1])), '\n'
-			print '\nClassification performance (top percentage vote): ', top_percent_performance[:int(j / float(update_interval)) + 1], '\n', 'Average performance:', sum(top_percent_performance[:int(j / float(update_interval)) + 1]) / float(len(top_percent_performance[:int(j / float(update_interval)) + 1])), '\n'			
+			print '\nClassification performance (top', str(top_percent), 'percentile vote): ', top_percent_performance[:int(j / float(update_interval)) + 1], '\n', 'Average performance:', sum(top_percent_performance[:int(j / float(update_interval)) + 1]) / float(len(top_percent_performance[:int(j / float(update_interval)) + 1])), '\n'			
 
 			target = open('../performance/conv_patch_connectivity_performance/' + ending + '.txt', 'w')
 			target.truncate()
