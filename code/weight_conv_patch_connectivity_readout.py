@@ -37,22 +37,46 @@ def get_2d_input_weights():
     Get the weights from the input to excitatory layer and reshape it to be two
     dimensional and square.
     '''
-    rearranged_weights = np.zeros(( conv_features * conv_size, conv_size * n_e ))
-
+    rearranged_weights = np.zeros((conv_features_sqrt * conv_size * n_e_sqrt, conv_features_sqrt * conv_size * n_e_sqrt))
+    
     # counts number of input -> excitatory weights displayed so far
     connection = weight_matrix
+    print weight_matrix.shape
 
     # for each convolution feature
     for feature in xrange(conv_features):
         # for each excitatory neuron in this convolution feature
         for n in xrange(n_e):
-            # get the connection weights from the input to this neuron
-            temp = connection[:, feature * n_e + n]
-            # add it to the rearranged weights for displaying to the user
-            rearranged_weights[feature * conv_size : (feature + 1) * conv_size, n * conv_size : (n + 1) * conv_size] = temp[convolution_locations[n]].reshape((conv_size, conv_size))
+            temp = connection[:, feature * n_e + (n // n_e_sqrt) * n_e_sqrt + (n % n_e_sqrt)]
+
+            # print ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * conv_size), ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * conv_size) + conv_size, ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * (conv_size)), ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * (conv_size)) + conv_size
+            rearranged_weights[ ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * conv_size) : ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * conv_size) + conv_size, ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * (conv_size)) : ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * (conv_size)) + conv_size ] = temp[convolution_locations[n]].reshape((conv_size, conv_size))
 
     # return the rearranged weights to display to the user
     return rearranged_weights.T
+
+
+# def get_2d_input_weights():
+#     '''
+#     Get the weights from the input to excitatory layer and reshape it to be two
+#     dimensional and square.
+#     '''
+#     rearranged_weights = np.zeros(( conv_features * conv_size, conv_size * n_e ))
+
+#     # counts number of input -> excitatory weights displayed so far
+#     connection = weight_matrix
+
+#     # for each convolution feature
+#     for feature in xrange(conv_features):
+#         # for each excitatory neuron in this convolution feature
+#         for n in xrange(n_e):
+#             # get the connection weights from the input to this neuron
+#             temp = connection[:, feature * n_e + n]
+#             # add it to the rearranged weights for displaying to the user
+#             rearranged_weights[feature * conv_size : (feature + 1) * conv_size, n * conv_size : (n + 1) * conv_size] = temp[convolution_locations[n]].reshape((conv_size, conv_size))
+
+#     # return the rearranged weights to display to the user
+#     return rearranged_weights.T
 
 
 def plot_2d_input_weights():
@@ -75,7 +99,7 @@ n_input = 784
 n_input_sqrt = int(math.sqrt(n_input))
 
 # type of patch connectivity
-connectivity = raw_input('Enter connectivity type ("pairs", "all") between patches (default all): ')
+connectivity = raw_input('Enter connectivity type ("none", pairs", "all") between patches (default all): ')
 if connectivity == '':
     connectivity = 'all'
 
@@ -108,6 +132,8 @@ n_e_sqrt = int(math.sqrt(n_e))
 # number of inhibitory neurons (number of convolutational features (for now))
 n_i = n_e
 
+conv_features_sqrt = int(math.sqrt(conv_features))
+
 # determine STDP rule to use
 stdp_input = ''
 
@@ -138,9 +164,19 @@ else:
     weight_sharing = 'weight_sharing'
 
 # which type of lattice neighborhood to use
-lattice_structure = raw_input('Enter lattice structure (none, 4, 8, all; default 4): ')
+lattice_structure = raw_input('Enter lattice structure (4, 8, all; default 4): ')
 if lattice_structure == '':
     lattice_structure = '4'
+
+# probability of random inhibitory edges
+random_inhibition_prob = raw_input('Enter probability with which to add random inhibitory synapses (default 0): ')
+if random_inhibition_prob == '':
+    random_inhibition_prob = 0.0
+else:
+    random_inhibition_prob = float(random_inhibition_prob)
+
+# set ending of filename saves
+ending = connectivity + '_' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e) + '_' + stdp_input + '_' + weight_sharing + '_' + lattice_structure + '_' + str(random_inhibition_prob)
 
 print '\n'
 
@@ -148,9 +184,6 @@ print '\n'
 convolution_locations = {}
 for n in xrange(n_e):
     convolution_locations[n] = [ ((n % n_e_sqrt) * conv_stride + (n // n_e_sqrt) * n_input_sqrt * conv_stride) + (x * n_input_sqrt) + y for y in xrange(conv_size) for x in xrange(conv_size) ]
-
-# set ending of filename saves
-ending = connectivity + '_' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e) + '_' + stdp_input + '_' + weight_sharing + '_' + lattice_structure
 
 weight_matrix = get_matrix_from_file(weight_path + 'XeAe_' + ending + '.npy', n_input, conv_features * n_e)
 

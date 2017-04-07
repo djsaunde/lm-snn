@@ -16,9 +16,9 @@ print '\n'
 
 to_plot = raw_input('Enter the index of the file from above which you\'d like to plot, or hit Enter to plot all: ')
 if to_plot == '':
-    file_names = [ file_name for file_name in os.listdir(perf_dir) if '.txt' in file_name ]
+    file_names = [ file_name for file_name in sorted(os.listdir(perf_dir)) if '.txt' in file_name ]
 else:
-    file_names = [[ file_name for file_name in os.listdir(perf_dir) if '.txt' in file_name ][int(to_plot)]]
+    file_names = [[ file_name for file_name in sorted(os.listdir(perf_dir)) if '.txt' in file_name ][int(to_plot)]]
 
 print file_names
 
@@ -31,7 +31,7 @@ print '\n'
 
 plots = []
 for perf in sorted(perfs.keys()):
-    perf_plot, = plt.plot(np.convolve(perfs[perf], window(10), 'same'), label='performance')
+    perf_plot, = plt.plot(np.convolve(perfs[perf], window(50), 'same'), label='performance')
     average_plot, = plt.plot([ np.mean(perfs[perf]) ] * len(perfs[perf]), label='average: ' + str(np.mean(perfs[perf])))
     upper_std_plot, = plt.plot([ np.mean(perfs[perf]) + np.std(perfs[perf]) ] * len(perfs[perf]), label='plus one standard deviation: ' + str(np.mean(perfs[perf]) + np.std(perfs[perf])))
     lower_std_plot, = plt.plot([ np.mean(perfs[perf]) - np.std(perfs[perf]) ] * len(perfs[perf]), label='minus one standard deviation: ' + str(np.mean(perfs[perf]) - np.std(perfs[perf])))

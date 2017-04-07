@@ -284,6 +284,9 @@ def plot_patch_weights():
     weights = get_patch_weights()
     fig = b.figure(fig_num, figsize=(8,8))
     im = b.imshow(weights, interpolation='nearest', vmin=0, vmax=wmax_ee, cmap=cmap.get_cmap('hot_r'))
+    for idx in xrange(n_e, conv_features * n_e, n_e):
+        b.axvline(idx, ls='--', lw=1)
+        b.axhline(idx, ls='--', lw=1)
     b.colorbar(im)
     b.title('Between-patch connectivity')
     fig.canvas.draw()
@@ -294,6 +297,7 @@ def update_patch_weights(im, fig):
     Update the plot of the weights between convolution patches to view during training.
     '''
     weights = get_patch_weights()
+    print len(weights[np.where(weights > 0.5)])
     im.set_array(weights)
     fig.canvas.draw()
     return im
