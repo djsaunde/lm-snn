@@ -36,7 +36,10 @@ def get_2d_input_weights():
     dimensional and square.
     '''
     rearranged_weights = np.zeros((conv_features_sqrt * conv_size * n_e_sqrt, conv_features_sqrt * conv_size * n_e_sqrt))
+    
+    # counts number of input -> excitatory weights displayed so far
     connection = weight_matrix
+    print weight_matrix.shape
 
     # for each convolution feature
     for feature in xrange(conv_features):
@@ -45,11 +48,33 @@ def get_2d_input_weights():
             temp = connection[:, feature * n_e + (n // n_e_sqrt) * n_e_sqrt + (n % n_e_sqrt)]
 
             # print ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * conv_size), ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * conv_size) + conv_size, ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * (conv_size)), ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * (conv_size)) + conv_size
-
             rearranged_weights[ ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * conv_size) : ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * conv_size) + conv_size, ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * (conv_size)) : ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * (conv_size)) + conv_size ] = temp[convolution_locations[n]].reshape((conv_size, conv_size))
 
     # return the rearranged weights to display to the user
     return rearranged_weights.T
+
+
+# def get_2d_input_weights():
+#     '''
+#     Get the weights from the input to excitatory layer and reshape it to be two
+#     dimensional and square.
+#     '''
+#     rearranged_weights = np.zeros(( conv_features * conv_size, conv_size * n_e ))
+
+#     # counts number of input -> excitatory weights displayed so far
+#     connection = weight_matrix
+
+#     # for each convolution feature
+#     for feature in xrange(conv_features):
+#         # for each excitatory neuron in this convolution feature
+#         for n in xrange(n_e):
+#             # get the connection weights from the input to this neuron
+#             temp = connection[:, feature * n_e + n]
+#             # add it to the rearranged weights for displaying to the user
+#             rearranged_weights[feature * conv_size : (feature + 1) * conv_size, n * conv_size : (n + 1) * conv_size] = temp[convolution_locations[n]].reshape((conv_size, conv_size))
+
+#     # return the rearranged weights to display to the user
+#     return rearranged_weights.T
 
 
 def plot_2d_input_weights():
@@ -95,6 +120,7 @@ n_i = n_e
 
 conv_features_sqrt = int(math.sqrt(conv_features))
 
+print '\n'
 
 # creating convolution locations inside the input image
 convolution_locations = {}

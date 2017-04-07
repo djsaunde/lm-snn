@@ -327,6 +327,31 @@ def get_current_performance(all_performance, most_spiked_performance, top_percen
 	return all_performance, most_spiked_performance, top_percent_performance
 
 
+def update_patch_weights(im, fig):
+    '''
+    Update the plot of the weights between convolution patches to view during training.
+    '''
+    weights = get_patch_weights()
+    print len(weights[np.where(weights > 0.5)])
+    im.set_array(weights)
+    fig.canvas.draw()
+    return im
+
+
+def get_current_performance(performance, current_example_num):
+    '''
+    Evaluate the performance of the network on the past 'update_interval' training
+    examples.
+    '''
+    current_evaluation = int(current_example_num / update_interval)
+    start_num = current_example_num - update_interval
+    end_num = current_example_num
+    difference = outputNumbers[start_num:end_num, 0] - input_numbers[start_num:end_num]
+    correct = len(np.where(difference == 0)[0])
+    performance[current_evaluation] = correct / float(update_interval) * 100
+    return performance
+
+
 def plot_performance(fig_num):
 	'''
 	Set up the performance plot for the beginning of the simulation.
