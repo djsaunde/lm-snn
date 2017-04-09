@@ -332,7 +332,8 @@ def update_neuron_votes(im, fig):
 		if num_assignments[i] > 0:
 			all_summed_rates[i] = np.sum(rates[assignments == i]) / num_assignments[i]
 
-	im.set_height(xrange(10), all_summed_rates)
+	for rect, h in zip():
+		im.set_height(xrange(10), all_summed_rates)
 	fig.canvas.draw()
 	return im
 
@@ -434,7 +435,7 @@ def get_recognized_number_ranking(assignments, spike_rates):
 		if num_assignments[i] > 0:
 			all_summed_rates[i] = np.sum(spike_rates[assignments == i]) / num_assignments[i]
 
-	top_percent_summed_rates = [0] * 10
+	top_percent_votes = [0] * 10
 	num_assignments = [0] * 10
 	
 	top_percent_array = np.array(np.zeros((conv_features, n_e)), dtype=bool)
@@ -447,10 +448,10 @@ def get_recognized_number_ranking(assignments, spike_rates):
 
 		if len(np.where(assignments[top_percent_array] == i)) > 0:
 			# sum the spike rates of all excitatory neurons with this label, which fired the most in its patch
-			top_percent_summed_rates[i] = np.sum(spike_rates[np.where(np.logical_and(assignments == i, top_percent_array))]) / float(np.sum(spike_rates[top_percent_array]))
+			top_percent_votes[i] = len(spike_rates[np.where(np.logical_and(assignments == i, top_percent_array))])
 
 
-	return np.argsort(all_summed_rates)[::-1], np.argsort(most_spiked_summed_rates)[::-1], np.argsort(top_percent_summed_rates)[::-1]
+	return np.argsort(all_summed_rates)[::-1], np.argsort(most_spiked_summed_rates)[::-1], np.argsort(top_percent_votes)[::-1]
 
 
 def get_new_assignments(result_monitor, input_numbers):
@@ -521,7 +522,7 @@ if test_mode:
 	ee_STDP_on = False
 else:
 	weight_path = data_path + 'random/conv_patch_connectivity_random/'
-	num_examples = 60000 * 1
+	num_examples = 10000 * 1
 	use_testing_set = False
 	do_plot_performance = True
 	record_spikes = True
@@ -987,8 +988,8 @@ if not test_mode and do_plot:
 	fig_num += 1
 	patch_weight_monitor, fig2_weights = plot_patch_weights()
 	fig_num += 1
-	neuron_vote_monitor, fig_neuron_votes = plot_neuron_votes(assignments, rates)
-	fig_num += 1
+	# neuron_vote_monitor, fig_neuron_votes = plot_neuron_votes(assignments, rates)
+	# fig_num += 1
 
 # plot input intensities
 if do_plot:
@@ -1054,7 +1055,7 @@ while j < num_examples:
 	if j % weight_update_interval == 0 and not test_mode and do_plot:
 		update_2d_input_weights(input_weight_monitor, fig_weights)
 		update_patch_weights(patch_weight_monitor, fig2_weights)
-		update_neuron_votes(neuron_vote_monitor, fig_neuron_votes)
+		# update_neuron_votes(neuron_vote_monitor, fig_neuron_votes)
 
 	# if the neurons in the network didn't spike more than four times
 	if np.sum(current_spike_count) < 5 and num_retries < 3:

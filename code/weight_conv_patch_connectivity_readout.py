@@ -13,81 +13,62 @@ fig_num = 0
 wmax_ee = 1.0
 
 def get_matrix_from_file(file_name, n_src, n_tgt):
-    '''
-    Given the name of a file pointing to a .npy ndarray object, load it into
-    'weight_matrix' and return it
-    '''
+	'''
+	Given the name of a file pointing to a .npy ndarray object, load it into
+	'weight_matrix' and return it
+	'''
 
-    # load the stored ndarray into 'readout', instantiate 'weight_matrix' as
-    # correctly-shaped zeros matrix
-    readout = np.load(file_name)
-    weight_matrix = np.zeros((n_src, n_tgt))
+	# load the stored ndarray into 'readout', instantiate 'weight_matrix' as
+	# correctly-shaped zeros matrix
+	readout = np.load(file_name)
+	weight_matrix = np.zeros((n_src, n_tgt))
 
-    # read the 'readout' ndarray values into weight_matrix by (row, column) indices
-    weight_matrix[np.int32(readout[:,0]), np.int32(readout[:,1])] = readout[:,2]
+	# read the 'readout' ndarray values into weight_matrix by (row, column) indices
+	weight_matrix[np.int32(readout[:,0]), np.int32(readout[:,1])] = readout[:,2]
 
-    # return the weight matrix read from file
-    return weight_matrix
+	# return the weight matrix read from file
+	return weight_matrix
 
 
 def get_2d_input_weights():
-    '''
-    Get the weights from the input to excitatory layer and reshape it to be two
-    dimensional and square.
-    '''
-    rearranged_weights = np.zeros((conv_features_sqrt * conv_size * n_e_sqrt, conv_features_sqrt * conv_size * n_e_sqrt))
-    
-    # counts number of input -> excitatory weights displayed so far
-    connection = weight_matrix
-    print weight_matrix.shape
+	'''
+	Get the weights from the input to excitatory layer and reshape it to be two
+	dimensional and square.
+	'''
+	rearranged_weights = np.zeros((conv_features_sqrt * conv_size * n_e_sqrt, conv_features_sqrt * conv_size * n_e_sqrt))
+	
+	# counts number of input -> excitatory weights displayed so far
+	connection = weight_matrix
 
-    # for each convolution feature
-    for feature in xrange(conv_features):
-        # for each excitatory neuron in this convolution feature
-        for n in xrange(n_e):
-            temp = connection[:, feature * n_e + (n // n_e_sqrt) * n_e_sqrt + (n % n_e_sqrt)]
+	# for each convolution feature
+	for feature in xrange(conv_features):
+		# for each excitatory neuron in this convolution feature
+		for n in xrange(n_e):
+			temp = connection[:, feature * n_e + (n // n_e_sqrt) * n_e_sqrt + (n % n_e_sqrt)]
 
-            # print ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * conv_size), ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * conv_size) + conv_size, ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * (conv_size)), ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * (conv_size)) + conv_size
-            rearranged_weights[ ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * conv_size) : ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * conv_size) + conv_size, ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * (conv_size)) : ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * (conv_size)) + conv_size ] = temp[convolution_locations[n]].reshape((conv_size, conv_size))
+			# print ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * conv_size), ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * conv_size) + conv_size, ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * (conv_size)), ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * (conv_size)) + conv_size
+			rearranged_weights[ ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * conv_size) : ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * conv_size) + conv_size, ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * (conv_size)) : ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * (conv_size)) + conv_size ] = temp[convolution_locations[n]].reshape((conv_size, conv_size))
 
-    # return the rearranged weights to display to the user
-    return rearranged_weights.T
-
-
-# def get_2d_input_weights():
-#     '''
-#     Get the weights from the input to excitatory layer and reshape it to be two
-#     dimensional and square.
-#     '''
-#     rearranged_weights = np.zeros(( conv_features * conv_size, conv_size * n_e ))
-
-#     # counts number of input -> excitatory weights displayed so far
-#     connection = weight_matrix
-
-#     # for each convolution feature
-#     for feature in xrange(conv_features):
-#         # for each excitatory neuron in this convolution feature
-#         for n in xrange(n_e):
-#             # get the connection weights from the input to this neuron
-#             temp = connection[:, feature * n_e + n]
-#             # add it to the rearranged weights for displaying to the user
-#             rearranged_weights[feature * conv_size : (feature + 1) * conv_size, n * conv_size : (n + 1) * conv_size] = temp[convolution_locations[n]].reshape((conv_size, conv_size))
-
-#     # return the rearranged weights to display to the user
-#     return rearranged_weights.T
+	# return the rearranged weights to display to the user
+	return rearranged_weights.T
 
 
 def plot_2d_input_weights():
-    '''
-    Plot the weights from input to excitatory layer to view during training.
-    '''
-    weights = get_2d_input_weights()
-    fig = b.figure(fig_num, figsize=(18, 18))
-    im2 = b.imshow(weights, interpolation='nearest', vmin=0, vmax=wmax_ee, cmap=cmap.get_cmap('hot_r'))
-    b.colorbar(im2)
-    b.title('Convolutional Connection Weights')
-    fig.canvas.draw()
-    return im2, fig
+	'''
+	Plot the weights from input to excitatory layer to view during training.
+	'''
+	weights = get_2d_input_weights()
+	fig = b.figure(fig_num, figsize=(18, 18))
+	im = b.imshow(weights, interpolation='nearest', vmin=0, vmax=wmax_ee, cmap=cmap.get_cmap('hot_r'))
+	for idx in xrange(conv_size * n_e_sqrt, conv_size * conv_features_sqrt * n_e_sqrt, conv_size * n_e_sqrt):
+		b.axvline(idx, ls='--', lw=1)
+		b.axhline(idx, ls='--', lw=1)
+	b.colorbar(im)
+	b.title('Reshaped input -> convolution weights')
+	b.xticks(xrange(0, conv_size * conv_features_sqrt * n_e_sqrt, conv_size * n_e_sqrt))
+	b.yticks(xrange(0, conv_size * conv_features_sqrt * n_e_sqrt, conv_size * n_e_sqrt))
+	fig.canvas.draw()
+	return im, fig
 
 
 weight_dir = '../weights/conv_patch_connectivity_weights/'
@@ -98,9 +79,9 @@ print '\n'
 
 to_plot = raw_input('Enter the index of the file from above which you\'d like to plot: ')
 if to_plot == '':
-    file_name = [ file_name for file_name in sorted(os.listdir(weight_dir)) if 'XeAe' in file_name ][0]
+	file_name = [ file_name for file_name in sorted(os.listdir(weight_dir)) if 'XeAe' in file_name ][0]
 else:
-    file_name = [ file_name for file_name in sorted(os.listdir(weight_dir)) if 'XeAe' in file_name ][int(to_plot)]
+	file_name = [ file_name for file_name in sorted(os.listdir(weight_dir)) if 'XeAe' in file_name ][int(to_plot)]
 
 # number of inputs to the network
 n_input = 784
@@ -125,7 +106,7 @@ print '\n'
 # creating convolution locations inside the input image
 convolution_locations = {}
 for n in xrange(n_e):
-    convolution_locations[n] = [ ((n % n_e_sqrt) * conv_stride + (n // n_e_sqrt) * n_input_sqrt * conv_stride) + (x * n_input_sqrt) + y for y in xrange(conv_size) for x in xrange(conv_size) ]
+	convolution_locations[n] = [ ((n % n_e_sqrt) * conv_stride + (n // n_e_sqrt) * n_input_sqrt * conv_stride) + (x * n_input_sqrt) + y for y in xrange(conv_size) for x in xrange(conv_size) ]
 
 weight_matrix = get_matrix_from_file(weight_dir + file_name, n_input, conv_features * n_e)
 
