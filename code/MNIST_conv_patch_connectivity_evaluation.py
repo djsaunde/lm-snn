@@ -181,10 +181,10 @@ stdp_input = ''
 
 if raw_input('Use weight dependence (default no)?: ') in [ 'no', '' ]:
     use_weight_dependence = False
-    stdp_input += 'weight_dependence_'
+    stdp_input += 'no_weight_dependence_'
 else:
     use_weight_dependence = True
-    stdp_input += 'no_weight_dependence_'
+    stdp_input += 'weight_dependence_'
 
 if raw_input('Enter (yes / no) for post-pre (default yes): ') in [ 'yes', '' ]:
     post_pre = True
@@ -235,10 +235,10 @@ testing = get_labeled_data(MNIST_data_path + 'testing', b_train=False)
 
 
 print '...loading results'
-training_result_monitor = np.load(data_path + 'resultPopVecs' + training_ending + ending + '.npy')
-training_input_numbers = np.load(data_path + 'inputNumbers' + training_ending + ending + '.npy')
-testing_result_monitor = np.load(data_path + 'resultPopVecs' + testing_ending + ending + '.npy')
-testing_input_numbers = np.load(data_path + 'inputNumbers' + testing_ending + ending + '.npy')
+training_result_monitor = np.load(data_path + 'results_' + training_ending + '_' + ending + '.npy')
+training_input_numbers = np.load(data_path + 'input_numbers_' + training_ending + '_' + ending + '.npy')
+testing_result_monitor = np.load(data_path + 'results_' + testing_ending + '_' + ending + '.npy')
+testing_input_numbers = np.load(data_path + 'input_numbers_' + testing_ending + '_' + ending + '.npy')
 
 
 print '...getting assignments'
