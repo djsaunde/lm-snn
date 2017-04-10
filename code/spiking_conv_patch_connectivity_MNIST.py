@@ -945,7 +945,7 @@ if __name__ == '__main__':
 		ee_STDP_on = False
 	else:
 		weight_path = top_level_path + 'random/conv_patch_connectivity_random/'
-		num_examples = 100 * 1
+		num_examples = 20000 * 1
 		use_testing_set = False
 		do_plot_performance = True
 		record_spikes = True
