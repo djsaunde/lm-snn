@@ -9,96 +9,87 @@ from scipy.sparse import coo_matrix
 from struct import unpack
 from brian import *
 
-weight_path = '../weights/conv_patch_connectivity_weights/'
-
 fig_num = 0
 wmax_ee = 1.0
 
 def get_matrix_from_file(file_name, n_src, n_tgt):
-    '''
-    Given the name of a file pointing to a .npy ndarray object, load it into
-    'weight_matrix' and return it
-    '''
+	'''
+	Given the name of a file pointing to a .npy ndarray object, load it into
+	'weight_matrix' and return it
+	'''
 
-    # load the stored ndarray into 'readout', instantiate 'weight_matrix' as
-    # correctly-shaped zeros matrix
-    readout = np.load(file_name)
-    weight_matrix = np.zeros((n_src, n_tgt))
+	# load the stored ndarray into 'readout', instantiate 'weight_matrix' as
+	# correctly-shaped zeros matrix
+	readout = np.load(file_name)
+	weight_matrix = np.zeros((n_src, n_tgt))
 
-    # read the 'readout' ndarray values into weight_matrix by (row, column) indices
-    weight_matrix[np.int32(readout[:,0]), np.int32(readout[:,1])] = readout[:,2]
+	# read the 'readout' ndarray values into weight_matrix by (row, column) indices
+	weight_matrix[np.int32(readout[:,0]), np.int32(readout[:,1])] = readout[:,2]
 
-    # return the weight matrix read from file
-    return weight_matrix
+	# return the weight matrix read from file
+	return weight_matrix
 
 
 def get_2d_input_weights():
-    '''
-    Get the weights from the input to excitatory layer and reshape it to be two
-    dimensional and square.
-    '''
-    rearranged_weights = np.zeros(( conv_features * conv_size, conv_size * n_e ))
+	'''
+	Get the weights from the input to excitatory layer and reshape it to be two
+	dimensional and square.
+	'''
+	rearranged_weights = np.zeros((conv_features_sqrt * conv_size * n_e_sqrt, conv_features_sqrt * conv_size * n_e_sqrt))
+	
+	# counts number of input -> excitatory weights displayed so far
+	connection = weight_matrix
 
-    # counts number of input -> excitatory weights displayed so far
-    connection = weight_matrix
+	# for each convolution feature
+	for feature in xrange(conv_features):
+		# for each excitatory neuron in this convolution feature
+		for n in xrange(n_e):
+			temp = connection[:, feature * n_e + (n // n_e_sqrt) * n_e_sqrt + (n % n_e_sqrt)]
 
-    # for each convolution feature
-    for feature in xrange(conv_features):
-        # for each excitatory neuron in this convolution feature
-        for n in xrange(n_e):
-            # get the connection weights from the input to this neuron
-            temp = connection[:, feature * n_e + n]
-            # add it to the rearranged weights for displaying to the user
-            rearranged_weights[feature * conv_size : (feature + 1) * conv_size, n * conv_size : (n + 1) * conv_size] = temp[convolution_locations[n]].reshape((conv_size, conv_size))
+			# print ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * conv_size), ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * conv_size) + conv_size, ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * (conv_size)), ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * (conv_size)) + conv_size
+			rearranged_weights[ ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * conv_size) : ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * conv_size) + conv_size, ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * (conv_size)) : ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * (conv_size)) + conv_size ] = temp[convolution_locations[n]].reshape((conv_size, conv_size))
 
-    # return the rearranged weights to display to the user
-    return rearranged_weights.T
+	# return the rearranged weights to display to the user
+	return rearranged_weights.T
 
 
 def plot_2d_input_weights():
-    '''
-    Plot the weights from input to excitatory layer to view during training.
-    '''
-    weights = get_2d_input_weights()
-    fig = b.figure(fig_num, figsize=(18, 18))
-    im2 = b.imshow(weights, interpolation='nearest', vmin=0, vmax=wmax_ee, cmap=cmap.get_cmap('hot_r'))
-    b.colorbar(im2)
-    b.title('Convolutional Connection Weights')
-    fig.canvas.draw()
-    return im2, fig
+	'''
+	Plot the weights from input to excitatory layer to view during training.
+	'''
+	weights = get_2d_input_weights()
+	fig = b.figure(fig_num, figsize=(18, 18))
+	im = b.imshow(weights, interpolation='nearest', vmin=0, vmax=wmax_ee, cmap=cmap.get_cmap('hot_r'))
+	for idx in xrange(conv_size * n_e_sqrt, conv_size * conv_features_sqrt * n_e_sqrt, conv_size * n_e_sqrt):
+		b.axvline(idx, ls='--', lw=1)
+		b.axhline(idx, ls='--', lw=1)
+	b.colorbar(im)
+	b.title('Reshaped input -> convolution weights')
+	b.xticks(xrange(0, conv_size * conv_features_sqrt * n_e_sqrt, conv_size * n_e_sqrt))
+	b.yticks(xrange(0, conv_size * conv_features_sqrt * n_e_sqrt, conv_size * n_e_sqrt))
+	fig.canvas.draw()
+	return im, fig
 
+
+weight_dir = '../weights/conv_patch_connectivity_weights/'
 
 print '\n'
+print '\n'.join([ str(idx) + ' | ' + file_name for idx, file_name in enumerate([ file_name for file_name in sorted(os.listdir(weight_dir)) if 'XeAe' in file_name ]) ])
+print '\n'
+
+to_plot = raw_input('Enter the index of the file from above which you\'d like to plot: ')
+if to_plot == '':
+	file_name = [ file_name for file_name in sorted(os.listdir(weight_dir)) if 'XeAe' in file_name ][0]
+else:
+	file_name = [ file_name for file_name in sorted(os.listdir(weight_dir)) if 'XeAe' in file_name ][int(to_plot)]
 
 # number of inputs to the network
 n_input = 784
 n_input_sqrt = int(math.sqrt(n_input))
 
-# type of patch connectivity
-connectivity = raw_input('Enter connectivity type ("pairs", "all") between patches (default all): ')
-if connectivity == '':
-    connectivity = 'all'
-
-# size of convolution windows
-conv_size = raw_input('Enter size of square side length of convolution window (default 27): ')
-if conv_size == '':
-    conv_size = 27
-else:
-    conv_size = int(conv_size)
-
-# stride of convolution windows
-conv_stride = raw_input('Enter stride size of convolution window (default 1): ')
-if conv_stride == '':
-    conv_stride = 1
-else:
-    conv_stride = int(conv_stride)
-
-# number of convolution features
-conv_features = raw_input('Enter number of convolution features to learn (default 10): ')
-if conv_features == '':
-    conv_features = 10
-else:
-    conv_features = int(conv_features)
+conv_size = int(file_name.split('_')[2])
+conv_stride = int(file_name.split('_')[3])
+conv_features = int(file_name.split('_')[4])
 
 # number of excitatory neurons (number output from convolutional layer)
 n_e = ((n_input_sqrt - conv_size) / conv_stride + 1) ** 2
@@ -108,51 +99,16 @@ n_e_sqrt = int(math.sqrt(n_e))
 # number of inhibitory neurons (number of convolutational features (for now))
 n_i = n_e
 
-# determine STDP rule to use
-stdp_input = ''
-
-if raw_input('Use weight dependence (default no)?: ') in [ 'no', '' ]:
-    use_weight_dependence = False
-    stdp_input += 'no_weight_dependence_'
-else:
-    use_weight_dependence = True
-    stdp_input += 'weight_dependence_'
-
-if raw_input('Use post-pre STDP (default yes)?: ') in [ 'yes', '' ]:
-    post_pre = True
-    stdp_input += 'postpre'
-else:
-    post_pre = False
-    stdp_input += 'no_postpre'
-
-# how to take "votes" from excitatory neurons to classify new data
-voting_mechanism = raw_input('Enter "all" or "most-spiked" to choose voting mechanism (default most-spiked): ')
-if voting_mechanism == '':
-    voting_mechanism = 'most-spiked'
-
-# whether or not to use weight sharing
-weight_sharing = raw_input('Use weight sharing? (default no): ')
-if weight_sharing in [ '', 'no' ]:
-    weight_sharing = 'no_weight_sharing'
-else:
-    weight_sharing = 'weight_sharing'
-
-# which type of lattice neighborhood to use
-lattice_structure = raw_input('Enter lattice structure (none, 4, 8, all; default 4): ')
-if lattice_structure == '':
-    lattice_structure = '4'
+conv_features_sqrt = int(math.sqrt(conv_features))
 
 print '\n'
 
 # creating convolution locations inside the input image
 convolution_locations = {}
 for n in xrange(n_e):
-    convolution_locations[n] = [ ((n % n_e_sqrt) * conv_stride + (n // n_e_sqrt) * n_input_sqrt * conv_stride) + (x * n_input_sqrt) + y for y in xrange(conv_size) for x in xrange(conv_size) ]
+	convolution_locations[n] = [ ((n % n_e_sqrt) * conv_stride + (n // n_e_sqrt) * n_input_sqrt * conv_stride) + (x * n_input_sqrt) + y for y in xrange(conv_size) for x in xrange(conv_size) ]
 
-# set ending of filename saves
-ending = connectivity + '_' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e) + '_' + stdp_input + '_' + weight_sharing + '_' + lattice_structure
-
-weight_matrix = get_matrix_from_file(weight_path + 'XeAe_' + ending + '.npy', n_input, conv_features * n_e)
+weight_matrix = get_matrix_from_file(weight_dir + file_name, n_input, conv_features * n_e)
 
 plot_2d_input_weights()
 
