@@ -9,7 +9,7 @@ import brian as b
 from brian import *
 
 import numpy as np
-import matplotlib, time, scipy, math, sys
+import matplotlib, time, scipy, math, sys, argparse
 import matplotlib.cm as cmap
 import os.path
 import cPickle as pickle
@@ -122,51 +122,43 @@ def get_new_assignments(result_monitor, input_numbers):
 MNIST_data_path = '../data/'
 data_path = '../activity/conv_patch_connectivity_activity/'
 
-print '\n'
-
-training_ending = raw_input('Enter number of training samples: ')
-if training_ending == '':
-    training_ending = '10000'
-
-testing_ending = raw_input('Enter number of test examples: ')
-if testing_ending == '':
-    testing_ending = '10000'
+training_ending = '10000'
+testing_ending = '10000'
 
 start_time_training = 0
 end_time_training = int(training_ending)
 start_time_testing = 0
 end_time_testing = int(testing_ending)
 
+parser = argparse.ArgumentParser()
+
+parser.add_argument('-m',  '--mode', default='train')
+parser.add_argument('-c',  '--connectivity', default='all')
+parser.add_argument('-wd', '--weight_dependence', default='no_weight_dependence')
+parser.add_argument('-pp', '--post_pre', default='postpre')
+parser.add_argument('--conv_size', type=int, default=20)
+parser.add_argument('--conv_stride', type=int, default=2)
+parser.add_argument('--conv_features', type=int, default=25)
+parser.add_argument('--weight_sharing', default='no_weight_sharing')
+parser.add_argument('--lattice_structure', default='4')
+parser.add_argument('--random_inhibition_prob', type=float, default=0.0)
+parser.add_argument('--top_percent', type=int, default=10)
+
+args = parser.parse_args()
+mode, connectivity, weight_dependence, post_pre, conv_size, conv_stride, conv_features, weight_sharing, lattice_structure, random_inhibition_prob, top_percent = \
+    args.mode, args.connectivity, args.weight_dependence, args.post_pre, args.conv_size, args.conv_stride, args.conv_features, args.weight_sharing, \
+    args.lattice_structure, args.random_inhibition_prob, args.top_percent
+
+print '\n'
+
+print args.mode, args.connectivity, args.weight_dependence, args.post_pre, args.conv_size, args.conv_stride, args.conv_features, args.weight_sharing, \
+    args.lattice_structure, args.random_inhibition_prob, args.top_percent
+
+print '\n'
 
 # input and square root of input
 n_input = 784
 n_input_sqrt = int(math.sqrt(n_input))
-
-# type of patch connectivity
-connectivity = raw_input('Enter connectivity type ("none", "pairs", "all") between patches (default all): ')
-if connectivity == '':
-    connectivity = 'all'
-
-# size of convolution windows
-conv_size = raw_input('Enter size of square side length of convolution window (default 27): ')
-if conv_size == '':
-    conv_size = 27
-else:
-    conv_size = int(conv_size)
-
-# stride of convolution windows
-conv_stride = raw_input('Enter stride size of convolution window (default 1): ')
-if conv_stride == '':
-    conv_stride = 1
-else:
-    conv_stride = int(conv_stride)
-
-# number of convolution features
-conv_features = raw_input('Enter number of convolution features to learn (default 10): ')
-if conv_features == '':
-    conv_features = 10
-else:
-    conv_features = int(conv_features)
 
 # number of excitatory neurons (number output from convolutional layer)
 n_e = ((n_input_sqrt - conv_size) / conv_stride + 1) ** 2
@@ -176,70 +168,29 @@ n_e_sqrt = int(math.sqrt(n_e))
 # number of inhibitory neurons (number of convolutational features (for now))
 n_i = n_e
 
-# determine STDP rule to use
-stdp_input = ''
-
-if raw_input('Use weight dependence (default no)?: ') in [ 'no', '' ]:
-    use_weight_dependence = False
-    stdp_input += 'weight_dependence_'
-else:
+# STDP rule
+stdp_input = weight_dependence + '_' + post_pre
+if weight_dependence == 'weight_dependence':
     use_weight_dependence = True
-    stdp_input += 'no_weight_dependence_'
-
-if raw_input('Enter (yes / no) for post-pre (default yes): ') in [ 'yes', '' ]:
-    post_pre = True
-    stdp_input += 'postpre'
 else:
-    post_pre = False
-    stdp_input += 'no_postpre'
-
-# how to take "votes" from excitatory neurons to classify new data
-voting_mechanism = raw_input('Enter "all", "top_percent", "most-spiked" to choose voting mechanism (default most-spiked): ')
-if voting_mechanism == '':
-    voting_mechanism = 'most-spiked'
-elif voting_mechanism == 'top_percent':
-    top_percent = raw_input('Enter percentage of most-spiked neurons\' votes to consider (default 10%): ')
-    if top_percent == '':
-        top_percent = 10
-    else:
-        top_percent = int(top_percent)
-
-# whether or not to use weight sharing
-weight_sharing = raw_input('Use weight sharing? ((yes / no), default no): ')
-if weight_sharing in [ '', 'no' ]:
-    weight_sharing = 'no_weight_sharing'
+    use_weight_dependence = False
+if post_pre == 'postpre':
+    use_post_pre = True
 else:
-    weight_sharing = 'weight_sharing'
-
-# which type of lattice neighborhood to use
-lattice_structure = raw_input('Enter lattice structure (4, 8, all; default 4): ')
-if lattice_structure == '':
-    lattice_structure = '4'
-
-# probability of random inhibitory edges
-random_inhibition_prob = raw_input('Enter probability with which to add random inhibitory synapses (default 0): ')
-if random_inhibition_prob == '':
-    random_inhibition_prob = 0.0
-else:
-    random_inhibition_prob = float(random_inhibition_prob)
+    use_post_pre = False
 
 # set ending of filename saves
 ending = connectivity + '_' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e) + '_' + stdp_input + '_' + weight_sharing + '_' + lattice_structure + '_' + str(random_inhibition_prob)
-
-print '\n'
-
 
 print '...loading MNIST'
 training = get_labeled_data(MNIST_data_path + 'training', b_train=True)
 testing = get_labeled_data(MNIST_data_path + 'testing', b_train=False)
 
-
 print '...loading results'
-training_result_monitor = np.load(data_path + 'resultPopVecs' + training_ending + ending + '.npy')
-training_input_numbers = np.load(data_path + 'inputNumbers' + training_ending + ending + '.npy')
-testing_result_monitor = np.load(data_path + 'resultPopVecs' + testing_ending + ending + '.npy')
-testing_input_numbers = np.load(data_path + 'inputNumbers' + testing_ending + ending + '.npy')
-
+training_result_monitor = np.load(data_path + 'results_' + training_ending + '_' + ending + '.npy')
+training_input_numbers = np.load(data_path + 'input_numbers_' + training_ending + '_' + ending + '.npy')
+testing_result_monitor = np.load(data_path + 'results_' + testing_ending + '_' + ending + '.npy')
+testing_input_numbers = np.load(data_path + 'input_numbers_' + testing_ending + '_' + ending + '.npy')
 
 print '...getting assignments'
 test_results = np.zeros((10, end_time_testing - start_time_testing))
@@ -247,7 +198,6 @@ test_results_max = np.zeros((10, end_time_testing - start_time_testing))
 test_results_top = np.zeros((10, end_time_testing - start_time_testing))
 test_results_fixed = np.zeros((10, end_time_testing - start_time_testing))
 assignments = get_new_assignments(training_result_monitor[start_time_training : end_time_training], training_input_numbers[start_time_training : end_time_training])
-
 
 counter = 0
 num_tests = end_time_testing / 10000
