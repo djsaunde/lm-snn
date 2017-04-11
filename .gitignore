@@ -11,3 +11,4 @@ activity/*
 plots/*
 random/*
 time_series/*
+slurm*
