@@ -136,11 +136,12 @@ def save_theta():
 		np.save(top_level_path + 'weights/conv_patch_connectivity_weights/theta_' + pop_name + '_' + ending, neuron_groups[pop_name + 'e'].theta)
 
 
-def set_weights_most_fired():
+def set_weights_most_fired(current_spike_count):
 	'''
 	For each convolutional patch, set the weights to those of the neuron which
 	fired the most in the last iteration.
 	'''
+
 	for conn_name in input_connections:
 		for feature in xrange(conv_features):
 			# count up the spikes for the neurons in this convolution patch
@@ -225,7 +226,7 @@ def get_2d_input_weights():
 
 			# print ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * conv_size), ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * conv_size) + conv_size, ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * (conv_size)), ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * (conv_size)) + conv_size
 
-			rearranged_weights[ ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * conv_size) : ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * conv_size) + conv_size, ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * (conv_size)) : ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * (conv_size)) + conv_size ] = temp[convolution_locations[n]].reshape((conv_size, conv_size))
+			rearranged_weights[ ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * conv_size) : ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * conv_size) + conv_size, ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * (conv_size)) : ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * (conv_size)) + conv_size ] = temp[convolution_locations[n]].reshape((conv_size, conv_size))
 
 	# return the rearranged weights to display to the user
 	return rearranged_weights.T
@@ -752,7 +753,7 @@ def run_simulation():
 
 		# set weights to those of the most-fired neuron
 		if not test_mode and weight_sharing == 'weight_sharing':
-			set_weights_most_fired()
+			set_weights_most_fired(current_spike_count)
 
 		# update weights every 'weight_update_interval'
 		if j % weight_update_interval == 0 and not test_mode and do_plot:
@@ -834,7 +835,7 @@ def run_simulation():
 
 	# set weights to those of the most-fired neuron
 	if not test_mode and weight_sharing == 'weight_sharing':
-		set_weights_most_fired()
+		set_weights_most_fired(current_spike_count)
 
 
 def save_and_plot_results():
@@ -963,7 +964,7 @@ if __name__ == '__main__':
 	n_e_total = n_e * conv_features
 	n_e_sqrt = int(math.sqrt(n_e))
 	n_i = n_e
-	conv_features_sqrt = int(math.sqrt(conv_features))
+	conv_features_sqrt = int(math.ceil(math.sqrt(conv_features)))
 
 	# time (in seconds) per data example presentation and rest period in between, used to calculate total runtime
 	single_example_time = 0.35 * b.second

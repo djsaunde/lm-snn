@@ -45,7 +45,7 @@ for perf in sorted(perfs.keys()):
     title_strs = perf[:perf.index('weight') - 1].split('_')
     print perf
 
-    plt.title('Classification accuracy by iteration number (' + title_strs[0] + 'x' + title_strs[0] + ' convolution, stride ' + title_strs[1] + ', ' + title_strs[2] + ' convolution features, giving ' + title_strs[3] + ' excitatory neurons per convolutional patch')
+    plt.title('Classification accuracy by iteration number (' + title_strs[1] + 'x' + title_strs[1] + ' convolution, stride ' + title_strs[2] + ', ' + title_strs[3] + ' convolution features, giving ' + title_strs[4] + ' excitatory neurons per convolutional patch')
     plt.savefig(perf_dir + 'performance_plots/Classification accuracy by iteration number (' + title_strs[0] + 'x' + title_strs[0] + ' convolution, stride ' + title_strs[1] + ', ' + title_strs[2] + ' convolution features, gving ' + title_strs[3] + ' excitatory neurons per convolutional patch')
     plt.show()
 

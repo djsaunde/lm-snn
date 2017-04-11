@@ -667,7 +667,7 @@ def build_network():
 							targets.append(feature * n_e + n)
 
 				input_connections[conn_name].connect(i=sources, j=targets)
-				input_connections[conn_name].w[sources, targets] = weight_matrix[sources, targets]
+				input_connections[conn_name].w[np.array(sources), np.array(targets)] = weight_matrix[sources, targets]
 			else:
 				for feature in xrange(conv_features):
 					for n in xrange(n_e):
@@ -677,8 +677,8 @@ def build_network():
 
 				input_connections[conn_name].connect(i=sources, j=targets)
 				print len(sources), len(targets), len([ (b.random() + 0.01) * 0.3 for _ in xrange(len(sources)) ])
-				print input_connections[conn_name].w[sources, targets]
-				input_connections[conn_name].w[sources, targets] = [ (b.random() + 0.01) * 0.3 for _ in xrange(len(sources)) ]
+				print input_connections[conn_name].w[np.array(sources), np.array(targets)].shape
+				input_connections[conn_name].w[np.array(sources), np.array(targets)] = [ (b.random() + 0.01) * 0.3 for _ in xrange(len(sources)) ]
 
 	print input_connections[conn_name].w.shape
 
