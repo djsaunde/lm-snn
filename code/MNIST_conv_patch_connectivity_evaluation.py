@@ -256,3 +256,5 @@ while (counter < num_tests):
     counter += 1
 
 b.show()
+
+print '\n'
