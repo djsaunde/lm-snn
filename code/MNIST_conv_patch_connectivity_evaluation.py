@@ -66,36 +66,52 @@ def get_recognized_number_ranking(assignments, spike_rates):
     Given the label assignments of the excitatory layer and their spike rates over
     the past 'update_interval', get the ranking of each of the categories of input.
     '''
-    if voting_mechanism == 'most-spiked':
-        summed_rates = [0] * 10
-        num_assignments = [0] * 10
+    most_spiked_summed_rates = [0] * 10
+    num_assignments = [0] * 10
 
-        most_spiked_array = np.array(np.zeros((conv_features, n_e)), dtype=bool)
+    most_spiked_array = np.array(np.zeros((conv_features, n_e)), dtype=bool)
 
-        for feature in xrange(conv_features):
-            # count up the spikes for the neurons in this convolution patch
-            column_sums = np.sum(spike_rates[feature : feature + 1, :], axis=0)
+    for feature in xrange(conv_features):
+        # count up the spikes for the neurons in this convolution patch
+        column_sums = np.sum(spike_rates[feature : feature + 1, :], axis=0)
 
-            # find the excitatory neuron which spiked the most
-            most_spiked_array[feature, np.argmax(column_sums)] = True
+        # find the excitatory neuron which spiked the most
+        most_spiked_array[feature, np.argmax(column_sums)] = True
 
-        # for each label
-        for i in xrange(10):
-            # get the number of label assignments of this type
-            num_assignments[i] = len(np.where(assignments[most_spiked_array] == i))
-            if num_assignments[i] > 0:
-                # sum the spike rates of all excitatory neurons with this label, which fired the most in its patch
-                summed_rates[i] = np.sum(spike_rates[np.where(assignments[most_spiked_array] == i)]) / num_assignments[i]
+    # for each label
+    for i in xrange(10):
+        # get the number of label assignments of this type
+        num_assignments[i] = len(np.where(assignments[most_spiked_array] == i)[0])
 
-    elif voting_mechanism == 'all':
-        summed_rates = [0] * 10
-        num_assignments = [0] * 10
-        for i in xrange(10):
-            num_assignments[i] = len(np.where(assignments == i)[0])
-            if num_assignments[i] > 0:
-                summed_rates[i] = np.sum(spike_rates[assignments == i]) / num_assignments[i]
+        if len(spike_rates[np.where(assignments[most_spiked_array] == i)]) > 0:
+            # sum the spike rates of all excitatory neurons with this label, which fired the most in its patch
+            most_spiked_summed_rates[i] = np.sum(spike_rates[np.where(np.logical_and(assignments == i, most_spiked_array))]) / float(np.sum(spike_rates[most_spiked_array]))
 
-    return np.argsort(summed_rates)[::-1]
+    all_summed_rates = [0] * 10
+    num_assignments = [0] * 10
+
+    for i in xrange(10):
+        num_assignments[i] = len(np.where(assignments == i)[0])
+        if num_assignments[i] > 0:
+            all_summed_rates[i] = np.sum(spike_rates[assignments == i]) / num_assignments[i]
+
+    top_percent_votes = [0] * 10
+    num_assignments = [0] * 10
+    
+    top_percent_array = np.array(np.zeros((conv_features, n_e)), dtype=bool)
+    top_percent_array[np.where(spike_rates > np.percentile(spike_rates, 100 - top_percent))] = True
+
+    # for each label
+    for i in xrange(10):
+        # get the number of label assignments of this type
+        num_assignments[i] = len(np.where(assignments[top_percent_array] == i)[0])
+
+        if len(np.where(assignments[top_percent_array] == i)) > 0:
+            # sum the spike rates of all excitatory neurons with this label, which fired the most in its patch
+            top_percent_votes[i] = len(spike_rates[np.where(np.logical_and(assignments == i, top_percent_array))])
+
+
+    return np.argsort(all_summed_rates)[::-1], np.argsort(most_spiked_summed_rates)[::-1], np.argsort(top_percent_votes)[::-1]
 
 
 def get_new_assignments(result_monitor, input_numbers):
@@ -201,28 +217,42 @@ assignments = get_new_assignments(training_result_monitor[start_time_training : 
 
 counter = 0
 num_tests = end_time_testing / 10000
-sum_accurracy = [0] * num_tests
+sum_accurracy = [[0, 0, 0]] * num_tests
 
 
 while (counter < num_tests):
     end_time = min(end_time_testing, 10000 * (counter + 1))
     start_time = 10000 * counter
-    test_results = np.zeros((10, end_time - start_time))
+
+    test_results1 = np.zeros((10, end_time - start_time))
+    test_results2 = np.zeros((10, end_time - start_time))
+    test_results3 = np.zeros((10, end_time - start_time))
 
     print '...calculating accuracy for sum'
 
     for i in xrange(end_time - start_time):
-        test_results[:, i] = get_recognized_number_ranking(assignments, testing_result_monitor[i + start_time, :])
+        test_results1[:, i], test_results2[:, i], test_results3[:, i] = get_recognized_number_ranking(assignments, testing_result_monitor[i + start_time, :])
 
-    difference = test_results[0,:] - testing_input_numbers[start_time:end_time]
-    correct = len(np.where(difference == 0)[0])
-    incorrect = np.where(difference != 0)[0]
-    sum_accurracy[counter] = correct / float(end_time-start_time) * 100
+    difference1 = test_results1[0, :] - testing_input_numbers[start_time:end_time]
+    difference2 = test_results2[0, :] - testing_input_numbers[start_time:end_time]
+    difference3 = test_results3[0, :] - testing_input_numbers[start_time:end_time]
 
-    print 'Sum response - accuracy: ', sum_accurracy[counter], ' num incorrect: ', len(incorrect)
+    correct1 = len(np.where(difference1 == 0)[0])
+    correct2 = len(np.where(difference2 == 0)[0])
+    correct3 = len(np.where(difference3 == 0)[0])
+    
+    incorrect1 = np.where(difference1 != 0)[0]
+    incorrect2 = np.where(difference2 != 0)[0]
+    incorrect3 = np.where(difference3 != 0)[0]
+
+    sum_accurracy[counter][0] = correct1 / float(end_time - start_time) * 100
+    sum_accurracy[counter][1] = correct2 / float(end_time - start_time) * 100
+    sum_accurracy[counter][2] = correct3 / float(end_time - start_time) * 100
+
+    print 'All neurons response - accuracy:', sum_accurracy[counter][0], ' num incorrect: ', len(incorrect1)
+    print 'Most-spiked (per patch) neurons vote - accuracy:', sum_accurracy[counter][1], ' num incorrect: ', len(incorrect2)
+    print 'Most-spiked (overall) neurons vote - accuracy:', sum_accurracy[counter][2], ' num incorrect: ', len(incorrect3)
 
     counter += 1
-
-print 'Sum response - accuracy --> mean: ', np.mean(sum_accurracy), '\n'
 
 b.show()
