@@ -6,7 +6,11 @@ import brian_no_units
 import brian as b
 import networkx as nx
 
+sys.path.append('/home/dan/code/python_mcl/mcl')
+
+from hac import GreedyAgglomerativeClusterer
 from scipy.sparse import coo_matrix
+from mcl_clustering import networkx_mcl
 from struct import unpack
 from brian import *
 
@@ -89,14 +93,14 @@ def is_lattice_connection(sqrt, i, j):
 weight_dir = '../weights/conv_patch_connectivity_weights/'
 
 print '\n'
-print '\n'.join([ str(idx) + ' | ' + file_name for idx, file_name in enumerate([ file_name for file_name in sorted(os.listdir(weight_dir)) if 'AeAe' in file_name ]) ])
+print '\n'.join([ str(idx) + ' | ' + file_name for idx, file_name in enumerate([ file_name for file_name in sorted(os.listdir(weight_dir)) if 'AeAe' in file_name and 'all' in file_name ]) ])
 print '\n'
 
-to_plot = raw_input('Enter the index of the file from above which you\'d like to plot: ')
+to_plot = raw_input('Enter the index of the file from above which you\'d like to use: ')
 if to_plot == '':
-	file_name = [ file_name for file_name in sorted(os.listdir(weight_dir)) if 'AeAe' in file_name ][0]
+	file_name = [ file_name for file_name in sorted(os.listdir(weight_dir)) if 'AeAe' in file_name and 'all' in file_name ][0]
 else:
-	file_name = [ file_name for file_name in sorted(os.listdir(weight_dir)) if 'AeAe' in file_name ][int(to_plot)]
+	file_name = [ file_name for file_name in sorted(os.listdir(weight_dir)) if 'AeAe' in file_name and 'all' in file_name ][int(to_plot)]
 
 # number of inputs to the network
 n_input = 784
@@ -128,7 +132,7 @@ plot_patch_weights()
 b.show()
 
 nonzero = np.count_nonzero(weight_matrix)
-weight_matrix[weight_matrix < 0.995] = 0.0
+weight_matrix[weight_matrix < 0.99] = 0.0
 new_nonzero = np.count_nonzero(weight_matrix)
 
 print '\n'
@@ -137,10 +141,50 @@ print '\n'
 
 weight_matrix[weight_matrix > 0.0] = 1
 
-G = nx.DiGraph(weight_matrix)
+G = nx.DiGraph(weight_matrix).to_undirected()
 
 plt.figure(figsize=(18.5, 10))
 nx.draw_circular(G, node_color='g', edge_color='#909090', edge_size=1, node_size=10)
+plt.axis('equal')
+
+plt.show()
+
+# sparse_weights = ([(i, j, weight_matrix[i, j]) for i in xrange(weight_matrix.shape[0]) for j in xrange(weight_matrix.shape[1]) ])
+
+clusterer = GreedyAgglomerativeClusterer()
+clusters = clusterer.cluster(G)
+
+print clusters.clusters(), '\n'
+print len(clusters.clusters()), '\n'
+
+M, clusters = networkx_mcl(G, expand_factor=2, inflate_factor=2, mult_factor=2)
+
+print len(clusters.keys())
+print sum([ len(clusters[key]) for key in clusters.keys() ]) / float(len(clusters.keys()))
+print sum([ len(value) for value in clusters.values() ])
+
+print '\n'
+
+plt.figure(figsize=(18.5, 10))
+nx.draw_circular(nx.DiGraph(M).to_undirected(), node_color='g', edge_color='#909090', edge_size=1, node_size=10)
+plt.axis('equal')
+
+plt.show()
+
+plt.figure(figsize=(18.5, 10))
+nx.draw_spectral(nx.DiGraph(M).to_undirected(), node_color='g', edge_color='#909090', edge_size=1, node_size=10)
+plt.axis('equal')
+
+plt.show()
+
+plt.figure(figsize=(18.5, 10))
+nx.draw_spring(nx.DiGraph(M).to_undirected(), node_color='g', edge_color='#909090', edge_size=1, node_size=10)
+plt.axis('equal')
+
+plt.show()
+
+plt.figure(figsize=(18.5, 10))
+nx.draw_shell(nx.DiGraph(M).to_undirected(), node_color='g', edge_color='#909090', edge_size=1, node_size=10)
 plt.axis('equal')
 
 plt.show()

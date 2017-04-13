@@ -14,9 +14,13 @@ import matplotlib.cm as cmap
 import os.path
 import cPickle as pickle
 
+sys.path.append('/home/dan/code/python_mcl/mcl')
+
 from struct import unpack
+from mcl_clustering import networkx_mcl
 
 import brian.experimental.realtime_monitor as rltmMon
+import networkx as nx
 
 np.set_printoptions(threshold=np.nan)
 

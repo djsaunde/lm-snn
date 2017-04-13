@@ -8,8 +8,12 @@ import matplotlib.cm as cmap
 import cPickle as p
 import brian_no_units
 import brian as b
+import networkx as nx
 import time, os.path, scipy, math, sys, timeit, random, argparse
 
+sys.path.append('/home/dan/code/python_mcl/mcl')
+
+from mcl_clustering import networkx_mcl
 from scipy.sparse import coo_matrix
 from struct import unpack
 from brian import *
@@ -339,7 +343,7 @@ def update_neuron_votes(im, fig):
 	return im
 
 
-def get_current_performance(all_performance, most_spiked_performance, top_percent_performance, current_example_num):
+def get_current_performance(performances, current_example_num):
 	'''
 	Evaluate the performance of the network on the past 'update_interval' training
 	examples.
@@ -349,62 +353,45 @@ def get_current_performance(all_performance, most_spiked_performance, top_percen
 	current_evaluation = int(current_example_num / update_interval)
 	start_num = current_example_num - update_interval
 	end_num = current_example_num
-	
-	all_difference = all_output_numbers[start_num:end_num, 0] - input_numbers[start_num:end_num]
-	all_correct = len(np.where(all_difference == 0)[0])
-	
-	most_spiked_difference = most_spiked_output_numbers[start_num:end_num, 0] - input_numbers[start_num:end_num]
-	most_spiked_correct = len(np.where(most_spiked_difference == 0)[0])
 
-	top_percent_difference = top_percent_output_numbers[start_num:end_num, 0] - input_numbers[start_num:end_num]
-	top_percent_correct = len(np.where(top_percent_difference == 0)[0])
+	for performance in performances.keys():
+		difference = output_numbers[performance][start_num : end_num, 0] - input_numbers[start_num : end_num]
+		correct = len(np.where(difference == 0)[0])
+		performances[performance][current_evaluation] = correct / float(update_interval) * 100
 
-	all_performance[current_evaluation] = all_correct / float(update_interval) * 100
-	most_spiked_performance[current_evaluation] = most_spiked_correct / float(update_interval) * 100
-	top_percent_performance[current_evaluation] = top_percent_correct / float(update_interval) * 100
-	
-	return all_performance, most_spiked_performance, top_percent_performance
+	return performances
 
 
-def plot_performance(fig_num):
+def plot_performance(fig_num, performances, num_evaluations):
 	'''
 	Set up the performance plot for the beginning of the simulation.
 	'''
-	num_evaluations = int(num_examples / update_interval)
 	time_steps = range(0, num_evaluations)
-
-	all_performance = np.zeros(num_evaluations)
-	most_spiked_performance = np.zeros(num_evaluations)
-	top_percent_performance = np.zeros(num_evaluations)
 
 	fig = b.figure(fig_num, figsize = (15, 5))
 	fig_num += 1
-	ax = fig.add_subplot(111)
 
-	im, = ax.plot(time_steps, all_performance)
-	im, = ax.plot(time_steps, most_spiked_performance)
-	im, = ax.plot(time_steps, top_percent_performance)
+	for performance in performances.keys():
+		im, = plt.plot(time_steps, performances[performance])
 
 	b.ylim(ymax = 100)
 	b.title('Classification performance')
 	fig.canvas.draw()
 
-	return im, all_performance, most_spiked_performance, top_percent_performance, fig_num, fig
+	return im, fig_num, fig
 
 
-def update_performance_plot(im, all_performance, most_spiked_performance, top_percent_performance, current_example_num, fig):
+def update_performance_plot(im, performances, current_example_num, fig):
 	'''
 	Update the plot of the performance based on results thus far.
 	'''
-	all_performance, most_spiked_performance, top_percent_performance = get_current_performance(all_performance, most_spiked_performance, top_percent_performance, current_example_num)
-	im.set_ydata(all_performance)
-	im.set_ydata(most_spiked_performance)
-	im.set_ydata(top_percent_performance)
+	performances = get_current_performance(performances, current_example_num)
+	im.set_ydata(performances.values())
 	fig.canvas.draw()
-	return im, all_performance, most_spiked_performance, top_percent_performance
+	return im, performances
 
 
-def get_recognized_number_ranking(assignments, spike_rates):
+def get_recognized_number_ranking(assignments, cluster_assignments, clusters, spike_rates):
 	'''
 	Given the label assignments of the excitatory layer and their spike rates over
 	the past 'update_interval', get the ranking of each of the categories of input.
@@ -438,7 +425,7 @@ def get_recognized_number_ranking(assignments, spike_rates):
 		if num_assignments[i] > 0:
 			all_summed_rates[i] = np.sum(spike_rates[assignments == i]) / num_assignments[i]
 
-	top_percent_votes = [0] * 10
+	top_percent_summed_rates = [0] * 10
 	num_assignments = [0] * 10
 	
 	top_percent_array = np.array(np.zeros((conv_features, n_e)), dtype=bool)
@@ -451,10 +438,24 @@ def get_recognized_number_ranking(assignments, spike_rates):
 
 		if len(np.where(assignments[top_percent_array] == i)) > 0:
 			# sum the spike rates of all excitatory neurons with this label, which fired the most in its patch
-			top_percent_votes[i] = len(spike_rates[np.where(np.logical_and(assignments == i, top_percent_array))])
+			top_percent_summed_rates[i] = len(spike_rates[np.where(np.logical_and(assignments == i, top_percent_array))])
 
+	cluster_summed_rates = [0] * 10
+	num_assignments = [0] * 10
 
-	return np.argsort(all_summed_rates)[::-1], np.argsort(most_spiked_summed_rates)[::-1], np.argsort(top_percent_votes)[::-1]
+	spike_rates = np.copy(np.ravel(spike_rates))
+
+	for i in xrange(10):
+		num_assignments[i] = 0
+		for assignment in cluster_assignments.keys():
+			if cluster_assignments[assignment] == i and len(clusters[assignment]) > 1:
+				num_assignments[i] += 1
+		if num_assignments[i] > 0:
+			for assignment in cluster_assignments.keys():
+				if cluster_assignments[assignment] == i and len(clusters[assignment]) > 1:
+					cluster_summed_rates[i] += np.sum(spike_rates[clusters[assignment]]) / float(len(clusters[assignment]))
+
+	return np.argsort(all_summed_rates)[::-1], np.argsort(most_spiked_summed_rates)[::-1], np.argsort(top_percent_summed_rates)[::-1], np.argsort(cluster_summed_rates)[::-1]
 
 
 def get_new_assignments(result_monitor, input_numbers):
@@ -474,8 +475,66 @@ def get_new_assignments(result_monitor, input_numbers):
 				if rate[i // n_e, i % n_e] > maximum_rate[i]:
 					maximum_rate[i] = rate[i // n_e, i % n_e]
 					assignments[i // n_e, i % n_e] = j
+
+	weight_matrix = np.copy(np.array(connections['AeAe'][:].todense()))
 	
-	return assignments
+	print '\n'
+	print 'Maximum between-patch edge weight:', np.max(weight_matrix)
+	print '\n'
+	
+	print '99-th percentile:', np.percentile(weight_matrix[np.where(weight_matrix != 0)], 99)
+	print '99.5-th percentile:', np.percentile(weight_matrix[np.where(weight_matrix != 0)], 99.5)
+	print '99.9-th percentile:', np.percentile(weight_matrix[np.where(weight_matrix != 0)], 99.9)
+
+	weight_matrix[weight_matrix < np.percentile(weight_matrix[np.where(weight_matrix != 0)], 99)] = 0.0
+	weight_matrix[weight_matrix > 0.0] = 1
+
+	recurrent_graph = nx.Graph(weight_matrix)
+
+	# plt.figure(figsize=(18.5, 10))
+	# nx.draw_circular(recurrent_graph, node_color='g', edge_color='#909090', edge_size=1, node_size=10)
+	# plt.axis('equal')
+
+	# plt.show()
+
+	_, temp = networkx_mcl(recurrent_graph, expand_factor=2, inflate_factor=2, mult_factor=2)
+
+	clusters = {}
+	for key, value in temp.items():
+		if value not in clusters.values():
+			clusters[key] = value
+
+	print '\n'
+	print 'Number of qualifying clusters:', len([ cluster for cluster in clusters.values() if len(cluster) > 1 ])
+	print 'Average size of qualifying clusters:', sum([ len(cluster) for cluster in clusters.values() if len(cluster) > 1 ]) / float(len(clusters))
+	print '\n'
+
+	cluster_assignments = {}
+	maximum_rate = {}
+
+	# print len(clusters)
+
+	for cluster in clusters.keys():
+		cluster_assignments[cluster] = -1
+		maximum_rate[cluster] = 0
+
+	for j in xrange(10):
+		num_assignments = len(np.where(input_nums == j)[0])
+		if num_assignments > 0:
+			rate = np.sum(result_monitor[input_nums == j], axis=0) / float(num_assignments)
+			rate = np.ravel(rate)
+			for cluster in clusters.keys():
+				if np.sum(rate[clusters[cluster]]) / float(rate[clusters[cluster]].size) > maximum_rate[cluster] and len(clusters[cluster]) > 1:
+					maximum_rate[cluster] = np.sum(rate[clusters[cluster]]) / float(rate[clusters[cluster]].size)
+					cluster_assignments[cluster] = j
+
+	print 'Maximum (non-zero) rates per cluster:', sorted([ value for value in maximum_rate.values() if value != 0 ], reverse=True), '\n'
+	print 'Cluster assignments (in order of label):', sorted([ value for value in cluster_assignments.values() if value != -1 ]), '\n'
+
+	# print len(cluster_assignments)
+	# print len(clusters.keys())
+	
+	return assignments, clusters, cluster_assignments
 
 
 def build_network():
@@ -683,8 +742,10 @@ def build_network():
 
 
 def run_simulation():
-	global fig_num, input_intensity, previous_spike_count, rates, assignments
-
+	'''
+	Logic for running the simulation itself.
+	'''
+	global fig_num, input_intensity, previous_spike_count, rates, assignments, clusters, cluster_assignments
 
 	# plot input weights
 	if not test_mode and do_plot:
@@ -701,10 +762,13 @@ def run_simulation():
 		fig_num += 1
 
 	# plot performance
+	num_evaluations = int(num_examples / update_interval)
+	performances = {}
+	performances['all'], performances['most_spiked'], performances['top_percent'], performances['clusters'] = np.zeros(num_evaluations), np.zeros(num_evaluations), np.zeros(num_evaluations), np.zeros(num_evaluations)
 	if do_plot_performance and do_plot:
-		performance_monitor, all_performance, most_spiked_performance, top_percent_performance, fig_num, fig_performance = plot_performance(fig_num)
+		performance_monitor, fig_num, fig_performance = plot_performance(fig_num, performances, num_evaluations)
 	else:
-		all_performance, most_spiked_performance, top_percent_performance = get_current_performance(np.zeros(int(num_examples / update_interval)), np.zeros(int(num_examples / update_interval)), np.zeros(int(num_examples / update_interval)), 0)
+		performances = get_current_performance(performances, 0)
 
 	# set firing rates to zero initially
 	for name in input_population_names:
@@ -745,7 +809,7 @@ def run_simulation():
 		
 		# get new neuron label assignments every 'update_interval'
 		if j % update_interval == 0 and j > 0:
-			assignments = get_new_assignments(result_monitor[:], input_numbers[j - update_interval : j])
+			assignments, clusters, cluster_assignments = get_new_assignments(result_monitor[:], input_numbers[j - update_interval : j])
 		
 		# get count of spikes over the past iteration
 		current_spike_count = np.copy(spike_counters['Ae'].count[:]).reshape((conv_features, n_e)) - previous_spike_count
@@ -786,7 +850,7 @@ def run_simulation():
 				input_numbers[j] = training['y'][j % 60000][0]
 			
 			# get the output classifications of the network
-			all_output_numbers[j, :], most_spiked_output_numbers[j, :], top_percent_output_numbers[j, :] = get_recognized_number_ranking(assignments, result_monitor[j % update_interval, :])
+			output_numbers['all'][j, :], output_numbers['most_spiked'][j, :], output_numbers['top_percent'][j, :], output_numbers['clusters'][j, :] = get_recognized_number_ranking(assignments, cluster_assignments, clusters, result_monitor[j % update_interval, :])
 			
 			# print progress
 			if j % print_progress_interval == 0 and j > 0:
@@ -797,29 +861,30 @@ def run_simulation():
 			if j % update_interval == 0 and j > 0:
 				if do_plot_performance and do_plot:
 					# updating the performance plot
-					perf_plot, all_performance, most_spiked_performance, top_percent_performance = update_performance_plot(performance_monitor, all_performance, most_spiked_performance, top_percent_performance, j, fig_performance)
+					perf_plot, performances = update_performance_plot(performance_monitor, performances, j, fig_performance)
 				else:
-					all_performance, most_spiked_performance, top_percent_performance = get_current_performance(all_performance, most_spiked_performance, top_percent_performance, j)
+					performances = get_current_performance(performances, j)
 
 				# printing out classification performance results so far
-				print '\nClassification performance (all vote): ', all_performance[:int(j / float(update_interval)) + 1], '\n', 'Average performance:', sum(all_performance[:int(j / float(update_interval)) + 1]) / float(len(all_performance[:int(j / float(update_interval)) + 1])), '\n'
-				print '\nClassification performance (most-spiked vote): ', most_spiked_performance[:int(j / float(update_interval)) + 1], '\n', 'Average performance:', sum(most_spiked_performance[:int(j / float(update_interval)) + 1]) / float(len(most_spiked_performance[:int(j / float(update_interval)) + 1])), '\n'
-				print '\nClassification performance (top', str(top_percent), 'percentile vote): ', top_percent_performance[:int(j / float(update_interval)) + 1], '\n', 'Average performance:', sum(top_percent_performance[:int(j / float(update_interval)) + 1]) / float(len(top_percent_performance[:int(j / float(update_interval)) + 1])), '\n'			
+				print '\nClassification performance (all vote): ', performances['all'][:int(j / float(update_interval)) + 1], '\n', 'Average performance:', sum(performances['all'][:int(j / float(update_interval)) + 1]) / float(len(performances['all'][:int(j / float(update_interval)) + 1])), '\n'
+				print '\nClassification performance (most-spiked vote): ', performances['most_spiked'][:int(j / float(update_interval)) + 1], '\n', 'Average performance:', sum(performances['most_spiked'][:int(j / float(update_interval)) + 1]) / float(len(performances['most_spiked'][:int(j / float(update_interval)) + 1])), '\n'
+				print '\nClassification performance (top', str(top_percent), 'percentile vote): ', performances['top_percent'][:int(j / float(update_interval)) + 1], '\n', 'Average performance:', sum(performances['top_percent'][:int(j / float(update_interval)) + 1]) / float(len(performances['top_percent'][:int(j / float(update_interval)) + 1])), '\n'
+				print '\nClassification performance (cluster votes): ', performances['clusters'][:int(j / float(update_interval)) + 1], '\n', 'Average performance:', sum(performances['clusters'][:int(j / float(update_interval)) + 1]) / float(len(performances['clusters'][:int(j / float(update_interval)) + 1])), '\n'			
 
 				target = open('../performance/conv_patch_connectivity_performance/' + ending + '.txt', 'w')
 				target.truncate()
 				target.write('Iteration ' + str(j) + '\n')
-				target.write(str(all_performance[:int(j / float(update_interval)) + 1]))
+				target.write(str(performances['all'][:int(j / float(update_interval)) + 1]))
 				target.write('\n')
-				target.write(str(sum(all_performance[:int(j / float(update_interval)) + 1]) / float(len(all_performance[:int(j / float(update_interval)) + 1]))))
+				target.write(str(sum(performances['all'][:int(j / float(update_interval)) + 1]) / float(len(performances['all'][:int(j / float(update_interval)) + 1]))))
 				target.write('\n')
-				target.write(str(most_spiked_performance[:int(j / float(update_interval)) + 1]))
+				target.write(str(performances['most_spiked'][:int(j / float(update_interval)) + 1]))
 				target.write('\n')
-				target.write(str(sum(most_spiked_performance[:int(j / float(update_interval)) + 1]) / float(len(most_spiked_performance[:int(j / float(update_interval)) + 1]))))
+				target.write(str(sum(performances['most_spiked'][:int(j / float(update_interval)) + 1]) / float(len(performances['most_spiked'][:int(j / float(update_interval)) + 1]))))
 				target.write('\n')
-				target.write(str(top_percent_performance[:int(j / float(update_interval)) + 1]))
+				target.write(str(performances['top_percent'][:int(j / float(update_interval)) + 1]))
 				target.write('\n')
-				target.write(str(sum(top_percent_performance[:int(j / float(update_interval)) + 1]) / float(len(top_percent_performance[:int(j / float(update_interval)) + 1]))))
+				target.write(str(sum(performances['top_percent'][:int(j / float(update_interval)) + 1]) / float(len(performances['top_percent'][:int(j / float(update_interval)) + 1]))))
 				target.close()
 					
 			# set input firing rates back to zero
@@ -839,6 +904,9 @@ def run_simulation():
 
 
 def save_and_plot_results():
+	'''
+	Logic for saving and plotting results of the simulation.
+	'''
 	global fig_num
 	
 	print '...saving results'
@@ -948,7 +1016,7 @@ if __name__ == '__main__':
 		weight_path = top_level_path + 'random/conv_patch_connectivity_random/'
 		num_examples = 60000 * 1
 		use_testing_set = False
-		do_plot_performance = True
+		do_plot_performance = False
 		record_spikes = True
 		ee_STDP_on = True
 
@@ -1093,7 +1161,7 @@ if __name__ == '__main__':
 	
 	# creating dictionaries for various objects
 	neuron_groups, input_groups, connections, input_connections, stdp_methods, \
-		rate_monitors, spike_monitors, spike_counters = {}, {}, {}, {}, {}, {}, {}, {}
+		rate_monitors, spike_monitors, spike_counters, output_numbers = {}, {}, {}, {}, {}, {}, {}, {}, {}
 
 	# creating convolution locations inside the input image
 	convolution_locations = {}
@@ -1109,10 +1177,13 @@ if __name__ == '__main__':
 	# bookkeeping variables
 	previous_spike_count = np.zeros((conv_features, n_e))
 	assignments = np.zeros((conv_features, n_e))
+	clusters = {}
+	cluster_assignments = {}
 	input_numbers = [0] * num_examples
-	all_output_numbers = np.zeros((num_examples, 10))
-	most_spiked_output_numbers = np.zeros((num_examples, 10))
-	top_percent_output_numbers = np.zeros((num_examples, 10))
+	output_numbers['all'] = np.zeros((num_examples, 10))
+	output_numbers['most_spiked'] = np.zeros((num_examples, 10))
+	output_numbers['top_percent'] = np.zeros((num_examples, 10))
+	output_numbers['clusters'] = np.zeros((num_examples, 10))
 	rates = np.zeros((n_input_sqrt, n_input_sqrt))
 
 	# run the simulation of the network
