@@ -1,7 +1,7 @@
 '''
 Created on 15.12.2014
 
-@author: Peter U. Diehl
+@author: Dan Saunders
 '''
 
 import brian as b
