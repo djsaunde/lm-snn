@@ -440,8 +440,7 @@ def update_performance_plot(im, performances, current_example_num, fig):
 	return im, performances
 
 
-def get_recognized_number_ranking(assignments, cluster_assignments, clusters, kmeans_assignments, kmeans, 
-										simple_clusters, spike_rates, average_firing_rate):
+def get_recognized_number_ranking(assignments, kmeans_assignments, kmeans, simple_clusters, spike_rates, average_firing_rate):
 	'''
 	Given the label assignments of the excitatory layer and their spike rates over
 	the past 'update_interval', get the ranking of each of the categories of input.
@@ -490,20 +489,22 @@ def get_recognized_number_ranking(assignments, cluster_assignments, clusters, km
 			# sum the spike rates of all excitatory neurons with this label, which fired the most in its patch
 			top_percent_summed_rates[i] = len(spike_rates[np.where(np.logical_and(assignments == i, top_percent_array))])
 
-	cluster_summed_rates = [0] * 10
-	num_assignments = [0] * 10
+	# cluster_summed_rates = [0] * 10
+	# num_assignments = [0] * 10
+
+	# spike_rates_flat = np.copy(np.ravel(spike_rates))
+
+	# for i in xrange(10):
+	# 	num_assignments[i] = 0
+	# 	for assignment in cluster_assignments.keys():
+	# 		if cluster_assignments[assignment] == i and len(clusters[assignment]) > 1:
+	# 			num_assignments[i] += 1
+	# 	if num_assignments[i] > 0:
+	# 		for assignment in cluster_assignments.keys():
+	# 			if cluster_assignments[assignment] == i and len(clusters[assignment]) > 1:
+	# 				cluster_summed_rates[i] += np.sum(spike_rates_flat[clusters[assignment]]) / float(len(clusters[assignment]))
 
 	spike_rates_flat = np.copy(np.ravel(spike_rates))
-
-	for i in xrange(10):
-		num_assignments[i] = 0
-		for assignment in cluster_assignments.keys():
-			if cluster_assignments[assignment] == i and len(clusters[assignment]) > 1:
-				num_assignments[i] += 1
-		if num_assignments[i] > 0:
-			for assignment in cluster_assignments.keys():
-				if cluster_assignments[assignment] == i and len(clusters[assignment]) > 1:
-					cluster_summed_rates[i] += np.sum(spike_rates_flat[clusters[assignment]]) / float(len(clusters[assignment]))
 
 	kmeans_summed_rates = [0] * 10
 	num_assignments = [0] * 10
@@ -525,13 +526,13 @@ def get_recognized_number_ranking(assignments, cluster_assignments, clusters, km
 		if i in simple_clusters.keys() and len(simple_clusters[i]) > 1:
 			# simple_cluster_summed_rates[i] = np.sum(spike_rates_flat[simple_clusters[i]]) / float(len(simple_clusters[i]))
 			this_spike_rates = spike_rates_flat[simple_clusters[i]]
-			simple_cluster_summed_rates[i] = np.sum(this_spike_rates[np.argpartition(this_spike_rates, -5)][-5:])
+			simple_cluster_summed_rates[i] = np.sum(this_spike_rates[np.argpartition(this_spike_rates, -5)][-10:])
 
 	# print simple_cluster_summed_rates
 
 	# simple_cluster_summed_rates = simple_cluster_summed_rates / average_firing_rate
 
-	return ( np.argsort(summed_rates)[::-1] for summed_rates in (all_summed_rates, most_spiked_summed_rates, top_percent_summed_rates, cluster_summed_rates, kmeans_summed_rates, simple_cluster_summed_rates) )
+	return ( np.argsort(summed_rates)[::-1] for summed_rates in (all_summed_rates, most_spiked_summed_rates, top_percent_summed_rates, kmeans_summed_rates, simple_cluster_summed_rates) )
 
 
 def get_new_assignments(result_monitor, input_numbers):
@@ -562,10 +563,10 @@ def get_new_assignments(result_monitor, input_numbers):
 	# print '99.5-th percentile:', np.percentile(weight_matrix[np.where(weight_matrix != 0)], 99.5)
 	# print '99.9-th percentile:', np.percentile(weight_matrix[np.where(weight_matrix != 0)], 99.9)
 
-	weight_matrix[weight_matrix < np.percentile(weight_matrix[np.where(weight_matrix != 0)], 99)] = 0.0
-	weight_matrix[weight_matrix > 0.0] = 1
+	# weight_matrix[weight_matrix < np.percentile(weight_matrix[np.where(weight_matrix != 0)], 99)] = 0.0
+	# weight_matrix[weight_matrix > 0.0] = 1
 
-	recurrent_graph = nx.Graph(weight_matrix)
+	# recurrent_graph = nx.Graph(weight_matrix)
 
 	# plt.figure(figsize=(18.5, 10))
 	# nx.draw_circular(recurrent_graph, node_color='g', edge_color='#909090', edge_size=1, node_size=10)
@@ -573,38 +574,38 @@ def get_new_assignments(result_monitor, input_numbers):
 
 	# plt.show()
 
-	_, temp = networkx_mcl(recurrent_graph, expand_factor=2, inflate_factor=2, mult_factor=2)
+	# _, temp = networkx_mcl(recurrent_graph, expand_factor=2, inflate_factor=2, mult_factor=2)
 
-	clusters = {}
-	for key, value in temp.items():
-		if value not in clusters.values():
-			clusters[key] = value
+	# clusters = {}
+	# for key, value in temp.items():
+	# 	if value not in clusters.values():
+	# 		clusters[key] = value
 
-	# print '\n'
-	# print 'Number of qualifying clusters:', len([ cluster for cluster in clusters.values() if len(cluster) > 1 ])
-	# print 'Average size of qualifying clusters:', sum([ len(cluster) for cluster in clusters.values() if len(cluster) > 1 ]) / float(len(clusters))
-	# print 'Nodes per cluster:', sorted([ len(cluster) for cluster in clusters.values() ], reverse=True)
+	# # print '\n'
+	# # print 'Number of qualifying clusters:', len([ cluster for cluster in clusters.values() if len(cluster) > 1 ])
+	# # print 'Average size of qualifying clusters:', sum([ len(cluster) for cluster in clusters.values() if len(cluster) > 1 ]) / float(len(clusters))
+	# # print 'Nodes per cluster:', sorted([ len(cluster) for cluster in clusters.values() ], reverse=True)
 
-	cluster_assignments = {}
-	votes_vector = {}
+	# cluster_assignments = {}
+	# votes_vector = {}
 
-	for cluster in clusters.keys():
-		cluster_assignments[cluster] = -1
-		votes_vector[cluster] = np.zeros(10)
+	# for cluster in clusters.keys():
+	# 	cluster_assignments[cluster] = -1
+	# 	votes_vector[cluster] = np.zeros(10)
 
-	for j in xrange(10):
-		num_assignments = len(np.where(input_nums == j)[0])
-		if num_assignments > 0:
-			rate = np.sum(result_monitor[input_nums == j], axis=0) / float(num_assignments)
-			rate = np.ravel(rate)
-			for cluster in clusters.keys():
-				if len(clusters[cluster]) > 1:
-					votes_vector[cluster][j] += np.sum(rate[clusters[cluster]]) / float(rate[clusters[cluster]].size)
-			if j in cluster_assignments.values():
-				votes_vector[j] / float(len([ value for value in cluster_assignments.values() if value == j ]))
+	# for j in xrange(10):
+	# 	num_assignments = len(np.where(input_nums == j)[0])
+	# 	if num_assignments > 0:
+	# 		rate = np.sum(result_monitor[input_nums == j], axis=0) / float(num_assignments)
+	# 		rate = np.ravel(rate)
+	# 		for cluster in clusters.keys():
+	# 			if len(clusters[cluster]) > 1:
+	# 				votes_vector[cluster][j] += np.sum(rate[clusters[cluster]]) / float(rate[clusters[cluster]].size)
+	# 		if j in cluster_assignments.values():
+	# 			votes_vector[j] / float(len([ value for value in cluster_assignments.values() if value == j ]))
 	
-	for cluster in clusters.keys():
-		cluster_assignments[cluster] = np.argmax(votes_vector[cluster])
+	# for cluster in clusters.keys():
+	# 	cluster_assignments[cluster] = np.argmax(votes_vector[cluster])
 
 	# print 'Qualifying cluster assignments (in order of label):', sorted([ value for key, value in cluster_assignments.items() if value != -1 and len(clusters[key]) > 1 ]), '\n'
 	# for idx in xrange(10):
@@ -612,7 +613,7 @@ def get_new_assignments(result_monitor, input_numbers):
 	# print '\n'
 
 	kmeans_assignments = {}
-	kmeans_votes = {}
+	votes_vector = {}
 
 	# get the list of flattened input weights per neuron per feature
 	weights = get_input_weights(np.copy(input_connections['XeAe'][:].todense()))
@@ -663,18 +664,19 @@ def get_new_assignments(result_monitor, input_numbers):
 			# simple_clusters[j] = np.argwhere(np.sum(result_monitor[input_nums == j], axis=0) > np.percentile(this_result_monitor[np.nonzero(this_result_monitor)], 99))
 			# simple_clusters[j] = np.array([ node[0] * n_e + node[1] for node in simple_clusters[j] ])
 			# print '99-th percentile for cluster', j, ':', np.percentile(this_result_monitor[np.nonzero(this_result_monitor)], 99)
-			simple_clusters[j] = this_result_monitor[np.argsort(np.ravel(np.sum(this_result_monitor, axis=0)))[::-1][:8]]
-			simple_clusters[j] = np.array([ node[0] * n_e + node[1] for node in simple_clusters[j] ])
-			print np.sum(this_result_monitor, axis=0)
+			simple_clusters[j] = np.argsort(np.ravel(np.sum(this_result_monitor, axis=0)))[::-1][:40]
+			# simple_clusters[j] = np.array([ node[0] * n_e + node[1] for node in simple_clusters[j] ])
+			print simple_clusters[j]
 
 	# np.savetxt('activity.txt', result_monitor[j])
 
 	print '\n'
 	for j in xrange(10):
-		print 'There are', len(simple_clusters[j]), 'neurons in the cluster for digit', j, '\n'
+		if j in simple_clusters.keys():
+			print 'There are', len(simple_clusters[j]), 'neurons in the cluster for digit', j, '\n'
 	print '\n'
 
-	return assignments, clusters, cluster_assignments, kmeans, kmeans_assignments, simple_clusters, weights, average_firing_rate
+	return assignments, kmeans, kmeans_assignments, simple_clusters, weights, average_firing_rate
 
 
 def build_network():
@@ -935,7 +937,7 @@ def run_simulation():
 	# plot performance
 	num_evaluations = int(num_examples / update_interval)
 	performances = {}
-	performances['all'], performances['most_spiked'], performances['top_percent'], performances['clusters'], performances['kmeans'], performances['simple_clusters'] = np.zeros(num_evaluations), np.zeros(num_evaluations), np.zeros(num_evaluations), np.zeros(num_evaluations), np.zeros(num_evaluations), np.zeros(num_evaluations)
+	performances['all'], performances['most_spiked'], performances['top_percent'], performances['kmeans'], performances['simple_clusters'] = np.zeros(num_evaluations), np.zeros(num_evaluations), np.zeros(num_evaluations), np.zeros(num_evaluations), np.zeros(num_evaluations)
 	if do_plot_performance and do_plot:
 		performance_monitor, fig_num, fig_performance = plot_performance(fig_num, performances, num_evaluations)
 	else:
@@ -980,7 +982,7 @@ def run_simulation():
 		
 		# get new neuron label assignments every 'update_interval'
 		if j % update_interval == 0 and j > 0:
-			assignments, clusters, cluster_assignments, kmeans, kmeans_assignments, simple_clusters, weights, average_firing_rate = get_new_assignments(result_monitor[:], input_numbers[j - update_interval : j])
+			assignments, kmeans, kmeans_assignments, simple_clusters, weights, average_firing_rate = get_new_assignments(result_monitor[:], input_numbers[j - update_interval : j])
 			update_cluster_centers(kmeans.cluster_centers_, cluster_monitor, cluster_fig)
 
 		# get count of spikes over the past iteration
@@ -1023,10 +1025,9 @@ def run_simulation():
 			
 			# get the output classifications of the network
 			output_numbers['all'][j, :], output_numbers['most_spiked'][j, :], output_numbers['top_percent'][j, :], \
-							output_numbers['clusters'][j, :], output_numbers['kmeans'][j, :], \
-							output_numbers['simple_clusters'][j, :] = get_recognized_number_ranking(assignments, 
-							cluster_assignments, clusters, kmeans_assignments, kmeans, 
-							simple_clusters, result_monitor[j % update_interval, :], average_firing_rate)
+							output_numbers['kmeans'][j, :], output_numbers['simple_clusters'][j, :] = \
+							get_recognized_number_ranking(assignments, kmeans_assignments, kmeans, simple_clusters, 
+							result_monitor[j % update_interval, :], average_firing_rate)
 			
 			# print progress
 			if j % print_progress_interval == 0 and j > 0:
@@ -1047,8 +1048,8 @@ def run_simulation():
 				target.write('Iteration ' + str(j) + '\n')
 
 				for performance in performances:
-					print '\nClassification performance (' + performance + ')', performances[performance][:int(j / float(update_interval)) + 1], '\nAverage performance:', sum(performances[performance][:int(j / float(update_interval)) + 1]) / float(len(performances[performance][:int(j / float(update_interval)) + 1])), '\n'		
-					target.write(str(performances[performance][:int(j / float(update_interval)) + 1]) + '\n')
+					print '\nClassification performance (' + performance + ')', performances[performance][1:int(j / float(update_interval)) + 1], '\nAverage performance:', sum(performances[performance][1:int(j / float(update_interval)) + 1]) / float(len(performances[performance][1:int(j / float(update_interval)) + 1])), '\n'		
+					target.write(performance + ' : ' + ' '.join([ str(item) for item in performances[performance][1:int(j / float(update_interval)) + 1] ]) + '\n')
 				
 				target.close()
 					
@@ -1066,6 +1067,9 @@ def run_simulation():
 	# set weights to those of the most-fired neuron
 	if not test_mode and weight_sharing == 'weight_sharing':
 		set_weights_most_fired(current_spike_count)
+
+	# ensure weights don't grow without bound
+	normalize_weights()
 
 
 def save_and_plot_results():
@@ -1173,14 +1177,14 @@ if __name__ == '__main__':
 	# set parameters for simulation based on train / test mode
 	if test_mode:
 		weight_path = top_level_path + 'weights/conv_patch_connectivity_weights/'
-		num_examples = 10000 * 1
+		num_examples = 100 * 1
 		use_testing_set = True
 		do_plot_performance = False
 		record_spikes = True
 		ee_STDP_on = False
 	else:
 		weight_path = top_level_path + 'random/conv_patch_connectivity_random/'
-		num_examples = 60000 * 1
+		num_examples = 100 * 1
 		use_testing_set = False
 		do_plot_performance = False
 		record_spikes = True
@@ -1235,7 +1239,7 @@ if __name__ == '__main__':
 	recurrent_conn_names = [ 'ei', 'ie', 'ee' ]
 	
 	# setting weight, delay, and intensity parameters
-	weight['ee_input'] = (conv_size ** 2) * 0.175
+	weight['ee_input'] = (conv_size ** 2) * 0.1625
 	delay['ee_input'] = (0 * b.ms, 10 * b.ms)
 	delay['ei_input'] = (0 * b.ms, 5 * b.ms)
 	input_intensity = start_input_intensity = 2.0
@@ -1343,8 +1347,6 @@ if __name__ == '__main__':
 	# bookkeeping variables
 	previous_spike_count = np.zeros((conv_features, n_e))
 	assignments = np.zeros((conv_features, n_e))
-	clusters = {}
-	cluster_assignments = {}
 	kmeans = KMeans()
 	kmeans_assignments = {}
 	simple_clusters = {}
@@ -1352,7 +1354,6 @@ if __name__ == '__main__':
 	output_numbers['all'] = np.zeros((num_examples, 10))
 	output_numbers['most_spiked'] = np.zeros((num_examples, 10))
 	output_numbers['top_percent'] = np.zeros((num_examples, 10))
-	output_numbers['clusters'] = np.zeros((num_examples, 10))
 	output_numbers['kmeans'] = np.zeros((num_examples, 10))
 	output_numbers['simple_clusters'] = np.zeros((num_examples, 10))
 	rates = np.zeros((n_input_sqrt, n_input_sqrt))
