@@ -321,60 +321,93 @@ parser.add_argument('--random_inhibition_prob', type=float, default=0.0)
 parser.add_argument('--top_percent', type=int, default=10)
 parser.add_argument('--training_ending', type=int, default=10000)
 parser.add_argument('--testing_ending', type=int, default=10000)
+parser.add_argument('--filename', type=bool, default=False)
 
 args = parser.parse_args()
-mode, connectivity, weight_dependence, post_pre, conv_size, conv_stride, conv_features, weight_sharing, lattice_structure, \
-    random_lattice_prob, random_inhibition_prob, top_percent, training_ending, testing_ending = args.mode, args.connectivity, \
-    args.weight_dependence, args.post_pre, args.conv_size, args.conv_stride, args.conv_features, args.weight_sharing, \
-    args.lattice_structure, args.random_lattice_prob, args.random_inhibition_prob, args.top_percent, args.training_ending, args.testing_ending
 
-print '\n'
+# input and square root of input
+n_input = 784
+n_input_sqrt = int(math.sqrt(n_input))
 
-print args.mode, args.connectivity, args.weight_dependence, args.post_pre, args.conv_size, args.conv_stride, args.conv_features, args.weight_sharing, \
-    args.lattice_structure, args.random_lattice_prob, args.random_inhibition_prob, args.top_percent, args.training_ending, args.testing_ending
+if args.filename == True:
+    print '\n'
+    print '\n'.join([ str(idx) + ' | ' + file_name for idx, file_name in enumerate([ file_name for file_name in sorted(os.listdir(data_path)) if 'results' in file_name ]) ])
+    print '\n'
 
-print '\n'
+    to_evaluate = raw_input('Enter the index of the file from above which you\'d like to plot: ')
+    file_name = [ file_name for file_name in sorted(os.listdir(data_path)) if 'results' in file_name ][int(to_evaluate)].split('results')[1]
+    
+    training_result_monitor = np.load(data_path + 'results' + file_name)
+    training_input_numbers = np.load(data_path + 'input_numbers' + file_name)
+    testing_result_monitor = np.load(data_path + 'results' + file_name)
+    testing_input_numbers = np.load(data_path + 'input_numbers' + file_name)
+
+    training_ending = args.training_ending
+    testing_ending = args.testing_ending
+
+    conv_size = int(file_name.split('_')[3])
+    conv_stride = int(file_name.split('_')[4])
+    conv_features = int(file_name.split('_')[5])
+
+    # number of excitatory neurons (number output from convolutional layer)
+    n_e = ((n_input_sqrt - conv_size) / conv_stride + 1) ** 2
+    n_e_total = n_e * conv_features
+    n_e_sqrt = int(math.sqrt(n_e))
+
+    # number of inhibitory neurons
+    n_i = n_e
+
+    top_percent = 10
+else:
+
+    mode, connectivity, weight_dependence, post_pre, conv_size, conv_stride, conv_features, weight_sharing, lattice_structure, \
+        random_lattice_prob, random_inhibition_prob, top_percent, training_ending, testing_ending = args.mode, args.connectivity, \
+        args.weight_dependence, args.post_pre, args.conv_size, args.conv_stride, args.conv_features, args.weight_sharing, \
+        args.lattice_structure, args.random_lattice_prob, args.random_inhibition_prob, args.top_percent, args.training_ending, args.testing_ending
+
+    print '\n'
+
+    print args.mode, args.connectivity, args.weight_dependence, args.post_pre, args.conv_size, args.conv_stride, args.conv_features, args.weight_sharing, \
+        args.lattice_structure, args.random_lattice_prob, args.random_inhibition_prob, args.top_percent, args.training_ending, args.testing_ending
+
+    print '\n'
+
+    # number of excitatory neurons (number output from convolutional layer)
+    n_e = ((n_input_sqrt - conv_size) / conv_stride + 1) ** 2
+    n_e_total = n_e * conv_features
+    n_e_sqrt = int(math.sqrt(n_e))
+
+    # number of inhibitory neurons
+    n_i = n_e
+
+    # STDP rule
+    stdp_input = weight_dependence + '_' + post_pre
+    if weight_dependence == 'weight_dependence':
+        use_weight_dependence = True
+    else:
+        use_weight_dependence = False
+    if post_pre == 'postpre':
+        use_post_pre = True
+    else:
+        use_post_pre = False
+
+    # set ending of filename saves
+    ending = connectivity + '_' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e) + '_' + weight_dependence + '_' + post_pre + '_' + weight_sharing + '_' + lattice_structure + '_' + str(random_lattice_prob) # + '_' + str(random_inhibition_prob)
+
+    print '...loading results'
+    training_result_monitor = np.load(data_path + 'results_' + str(training_ending) + '_' + ending + '.npy')
+    training_input_numbers = np.load(data_path + 'input_numbers_' + str(training_ending) + '_' + ending + '.npy')
+    testing_result_monitor = np.load(data_path + 'results_' + str(testing_ending) + '_' + ending + '.npy')
+    testing_input_numbers = np.load(data_path + 'input_numbers_' + str(testing_ending) + '_' + ending + '.npy')
 
 start_time_training = 0
 end_time_training = int(training_ending)
 start_time_testing = 0
 end_time_testing = int(testing_ending)
 
-# input and square root of input
-n_input = 784
-n_input_sqrt = int(math.sqrt(n_input))
-
-# number of excitatory neurons (number output from convolutional layer)
-n_e = ((n_input_sqrt - conv_size) / conv_stride + 1) ** 2
-n_e_total = n_e * conv_features
-n_e_sqrt = int(math.sqrt(n_e))
-
-# number of inhibitory neurons
-n_i = n_e
-
-# STDP rule
-stdp_input = weight_dependence + '_' + post_pre
-if weight_dependence == 'weight_dependence':
-    use_weight_dependence = True
-else:
-    use_weight_dependence = False
-if post_pre == 'postpre':
-    use_post_pre = True
-else:
-    use_post_pre = False
-
-# set ending of filename saves
-ending = connectivity + '_' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e) + '_' + weight_dependence + '_' + post_pre + '_' + weight_sharing + '_' + lattice_structure + '_' + str(random_lattice_prob) # + '_' + str(random_inhibition_prob)
-
 print '...loading MNIST'
 training = get_labeled_data(MNIST_data_path + 'training', b_train=True)
 testing = get_labeled_data(MNIST_data_path + 'testing', b_train=False)
-
-print '...loading results'
-training_result_monitor = np.load(data_path + 'results_' + str(training_ending) + '_' + ending + '.npy')
-training_input_numbers = np.load(data_path + 'input_numbers_' + str(training_ending) + '_' + ending + '.npy')
-testing_result_monitor = np.load(data_path + 'results_' + str(testing_ending) + '_' + ending + '.npy')
-testing_input_numbers = np.load(data_path + 'input_numbers_' + str(testing_ending) + '_' + ending + '.npy')
 
 print '...getting assignments'
 test_results = np.zeros((10, end_time_testing - start_time_testing))
