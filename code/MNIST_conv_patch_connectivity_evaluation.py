@@ -364,7 +364,7 @@ else:
     use_post_pre = False
 
 # set ending of filename saves
-ending = connectivity + '_' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e) + '_' + weight_dependence + '_' + post_pre + '_' + weight_sharing + '_' + lattice_structure + '_' + str(random_lattice_prob) + '_' + str(random_inhibition_prob)
+ending = connectivity + '_' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e) + '_' + weight_dependence + '_' + post_pre + '_' + weight_sharing + '_' + lattice_structure + '_' + str(random_lattice_prob) # + '_' + str(random_inhibition_prob)
 
 print '...loading MNIST'
 training = get_labeled_data(MNIST_data_path + 'training', b_train=True)

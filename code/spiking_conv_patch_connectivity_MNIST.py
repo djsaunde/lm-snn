@@ -367,14 +367,15 @@ def plot_neuron_votes(assignments, spike_rates):
 		if num_assignments[i] > 0:
 			all_summed_rates[i] = np.sum(spike_rates[assignments == i]) / num_assignments[i]
 
-	fig = b.figure(fig_num, figsize=(8, 8))
-	im = b.bar(xrange(10), all_summed_rates)
-	b.title('Votes per label')
+	fig = b.figure(fig_num, figsize=(6, 4))
+	rects = b.bar(xrange(10), [ 0.1 ] * 10)
+	b.ylim([0, 1])
+	b.title('Percentage votes per label')
 	fig.canvas.draw()
-	return im, fig
+	return rects, fig
 
 
-def update_neuron_votes(im, fig):
+def update_neuron_votes(rects, fig, spike_rates):
 	'''
 	Update the plot of the votes of the neurons by label.
 	'''
@@ -384,12 +385,16 @@ def update_neuron_votes(im, fig):
 	for i in xrange(10):
 		num_assignments[i] = len(np.where(assignments == i)[0])
 		if num_assignments[i] > 0:
-			all_summed_rates[i] = np.sum(rates[assignments == i]) / num_assignments[i]
+			all_summed_rates[i] = np.sum(spike_rates[assignments == i]) / num_assignments[i]
 
-	for rect, h in zip():
-		im.set_height(xrange(10), all_summed_rates)
+	total_votes = np.sum(all_summed_rates)
+
+	if total_votes != 0:
+		for rect, h in zip(rects, all_summed_rates):
+			rect.set_height(h / float(total_votes))
+
 	fig.canvas.draw()
-	return im
+	return rects
 
 
 def get_current_performance(performances, current_example_num):
@@ -543,6 +548,9 @@ def get_new_assignments(result_monitor, input_numbers):
 	assignments = np.ones((conv_features, n_e))
 	input_nums = np.asarray(input_numbers)
 	maximum_rate = np.zeros(conv_features * n_e)
+
+	print result_monitor.shape
+	print input_nums.shape
 	
 	for j in xrange(10):
 		num_assignments = len(np.where(input_nums == j)[0])
@@ -922,8 +930,8 @@ def run_simulation():
 		fig_num += 1
 		patch_weight_monitor, fig2_weights = plot_patch_weights()
 		fig_num += 1
-		# neuron_vote_monitor, fig_neuron_votes = plot_neuron_votes(assignments, rates)
-		# fig_num += 1
+		neuron_rects, fig_neuron_votes = plot_neuron_votes(assignments, result_monitor[:])
+		fig_num += 1
 
 	average_firing_rate = np.ones(10)
 	cluster_monitor, cluster_fig = plot_cluster_centers([ np.zeros((conv_size, conv_size)) ] * 25)
@@ -997,7 +1005,9 @@ def run_simulation():
 		if j % weight_update_interval == 0 and not test_mode and do_plot:
 			update_2d_input_weights(input_weight_monitor, fig_weights)
 			update_patch_weights(patch_weight_monitor, fig2_weights)
-			# update_neuron_votes(neuron_vote_monitor, fig_neuron_votes)
+			
+		if do_plot:
+			update_neuron_votes(neuron_rects, fig_neuron_votes, result_monitor[:])
 
 		# if the neurons in the network didn't spike more than four times
 		if np.sum(current_spike_count) < 5 and num_retries < 3:
@@ -1124,7 +1134,7 @@ if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
 
 	parser.add_argument('--mode', default='train')
-	parser.add_argument('--connectivity', default='all')
+	parser.add_argument('--connectivity', default='none')
 	parser.add_argument('--weight_dependence', default='no_weight_dependence')
 	parser.add_argument('--post_pre', default='postpre')
 	parser.add_argument('--conv_size', type=int, default=16)
@@ -1177,14 +1187,14 @@ if __name__ == '__main__':
 	# set parameters for simulation based on train / test mode
 	if test_mode:
 		weight_path = top_level_path + 'weights/conv_patch_connectivity_weights/'
-		num_examples = 100 * 1
+		num_examples = 10000 * 1
 		use_testing_set = True
 		do_plot_performance = False
 		record_spikes = True
 		ee_STDP_on = False
 	else:
 		weight_path = top_level_path + 'random/conv_patch_connectivity_random/'
-		num_examples = 100 * 1
+		num_examples = 60000 * 1
 		use_testing_set = False
 		do_plot_performance = False
 		record_spikes = True
@@ -1324,7 +1334,7 @@ if __name__ == '__main__':
 	print '\n'
 
 	# set ending of filename saves
-	ending = connectivity + '_' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e) + '_' + weight_dependence + '_' + post_pre + '_' + weight_sharing + '_' + lattice_structure + '_' + str(random_lattice_prob) + '_' + str(random_inhibition_prob)
+	ending = connectivity + '_' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e) + '_' + weight_dependence + '_' + post_pre + '_' + weight_sharing + '_' + lattice_structure + '_' + str(random_lattice_prob) # + '_' + str(random_inhibition_prob)
 
 	b.ion()
 	fig_num = 1
