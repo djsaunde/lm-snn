@@ -11,10 +11,7 @@ import brian as b
 import networkx as nx
 import time, os.path, scipy, math, sys, timeit, random, argparse
 
-sys.path.append('/home/dan/code/python_mcl/mcl')
-
 from sklearn.cluster import KMeans
-from mcl_clustering import networkx_mcl
 from scipy.sparse import coo_matrix
 from struct import unpack
 from brian import *

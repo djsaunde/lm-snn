@@ -8,7 +8,6 @@ import networkx as nx
 
 sys.path.append('/home/dan/code/python_mcl/mcl')
 
-from hac import GreedyAgglomerativeClusterer
 from scipy.sparse import coo_matrix
 from mcl_clustering import networkx_mcl
 from struct import unpack
@@ -141,7 +140,7 @@ print '\n'
 
 weight_matrix[weight_matrix > 0.0] = 1
 
-G = nx.DiGraph(weight_matrix).to_undirected()
+G = nx.Graph(weight_matrix)
 
 plt.figure(figsize=(18.5, 10))
 nx.draw_circular(G, node_color='g', edge_color='#909090', edge_size=1, node_size=10)
@@ -149,42 +148,26 @@ plt.axis('equal')
 
 plt.show()
 
-# sparse_weights = ([(i, j, weight_matrix[i, j]) for i in xrange(weight_matrix.shape[0]) for j in xrange(weight_matrix.shape[1]) ])
-
-clusterer = GreedyAgglomerativeClusterer()
-clusters = clusterer.cluster(G)
-
-print clusters.clusters(), '\n'
-print len(clusters.clusters()), '\n'
-
-M, clusters = networkx_mcl(G, expand_factor=2, inflate_factor=2, mult_factor=2)
-
-print len(clusters.keys())
-print sum([ len(clusters[key]) for key in clusters.keys() ]) / float(len(clusters.keys()))
-print sum([ len(value) for value in clusters.values() ])
-
-print '\n'
-
 plt.figure(figsize=(18.5, 10))
-nx.draw_circular(nx.DiGraph(M).to_undirected(), node_color='g', edge_color='#909090', edge_size=1, node_size=10)
+nx.draw_circular(G, node_color='g', edge_color='#909090', edge_size=1, node_size=10)
 plt.axis('equal')
 
 plt.show()
 
 plt.figure(figsize=(18.5, 10))
-nx.draw_spectral(nx.DiGraph(M).to_undirected(), node_color='g', edge_color='#909090', edge_size=1, node_size=10)
+nx.draw_spectral(G, node_color='g', edge_color='#909090', edge_size=1, node_size=10)
 plt.axis('equal')
 
 plt.show()
 
 plt.figure(figsize=(18.5, 10))
-nx.draw_spring(nx.DiGraph(M).to_undirected(), node_color='g', edge_color='#909090', edge_size=1, node_size=10)
+nx.draw_spring(G, node_color='g', edge_color='#909090', edge_size=1, node_size=10)
 plt.axis('equal')
 
 plt.show()
 
 plt.figure(figsize=(18.5, 10))
-nx.draw_shell(nx.DiGraph(M).to_undirected(), node_color='g', edge_color='#909090', edge_size=1, node_size=10)
+nx.draw_shell(G, node_color='g', edge_color='#909090', edge_size=1, node_size=10)
 plt.axis('equal')
 
 plt.show()
