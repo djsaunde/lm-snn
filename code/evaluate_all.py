@@ -64,6 +64,7 @@ def get_recognized_number_ranking(assignments, simple_clusters, spike_rates, ave
     Given the label assignments of the excitatory layer and their spike rates over
     the past 'update_interval', get the ranking of each of the categories of input.
     '''
+
     most_spiked_summed_rates = [0] * 10
     num_assignments = [0] * 10
 
@@ -153,7 +154,7 @@ def get_recognized_number_ranking(assignments, simple_clusters, spike_rates, ave
 
     # simple_cluster_summed_rates = simple_cluster_summed_rates / average_firing_rate
 
-    return ( np.argsort(summed_rates)[::-1] for summed_rates in (all_summed_rates, most_spiked_summed_rates, top_percent_summed_rates, simple_cluster_summed_rates) )
+    return [ np.argsort(summed_rates)[::-1] for summed_rates in (all_summed_rates, most_spiked_summed_rates, top_percent_summed_rates, simple_cluster_summed_rates) ]
 
 
 def get_new_assignments(result_monitor, input_numbers):
@@ -303,163 +304,56 @@ def get_new_assignments(result_monitor, input_numbers):
 MNIST_data_path = '../data/'
 data_path = '../activity/conv_patch_connectivity_activity/'
 
-parser = argparse.ArgumentParser()
-
-parser.add_argument('--mode', default='train')
-parser.add_argument('--connectivity', default='all')
-parser.add_argument('--weight_dependence', default='no_weight_dependence')
-parser.add_argument('--post_pre', default='postpre')
-parser.add_argument('--conv_size', type=int, default=16)
-parser.add_argument('--conv_stride', type=int, default=4)
-parser.add_argument('--conv_features', type=int, default=50)
-parser.add_argument('--weight_sharing', default='no_weight_sharing')
-parser.add_argument('--lattice_structure', default='4')
-parser.add_argument('--random_lattice_prob', type=float, default=0.0)
-parser.add_argument('--random_inhibition_prob', type=float, default=0.0)
-parser.add_argument('--top_percent', type=int, default=10)
-parser.add_argument('--training_ending', type=int, default=10000)
-parser.add_argument('--testing_ending', type=int, default=10000)
-parser.add_argument('--filename', type=bool, default=False)
-
-args = parser.parse_args()
+print '\n...Loading MNIST'
+training = get_labeled_data(MNIST_data_path + 'training', b_train=True)
+testing = get_labeled_data(MNIST_data_path + 'testing', b_train=False)
 
 # input and square root of input
 n_input = 784
 n_input_sqrt = int(math.sqrt(n_input))
 
-if args.filename == True:
-    print '\n'
-    print '\n'.join([ str(idx) + ' | ' + file_name for idx, file_name in enumerate([ file_name for file_name in sorted(os.listdir(data_path)) if 'results' in file_name ]) ])
-    print '\n'
+file_names = [ file_name.split('results')[1] for file_name in sorted(os.listdir(data_path)) if 'results' in file_name ]
 
-    to_evaluate = raw_input('Enter the index of the file from above which you\'d like to plot: ')
-    file_name = [ file_name for file_name in sorted(os.listdir(data_path)) if 'results' in file_name ][int(to_evaluate)].split('results')[1]
-    
+for file_name in file_names:
+    print '\n...Evaluating', file_name
+
     training_result_monitor = np.load(data_path + 'results' + file_name)
     training_input_numbers = np.load(data_path + 'input_numbers' + file_name)
     testing_result_monitor = np.load(data_path + 'results' + file_name)
     testing_input_numbers = np.load(data_path + 'input_numbers' + file_name)
 
-    training_ending = args.training_ending
-    testing_ending = args.testing_ending
+    training_ending = testing_ending = int(file_name.split('_')[1])
 
     conv_size = int(file_name.split('_')[3])
     conv_stride = int(file_name.split('_')[4])
     conv_features = int(file_name.split('_')[5])
 
-    # number of excitatory neurons (number output from convolutional layer)
     n_e = ((n_input_sqrt - conv_size) / conv_stride + 1) ** 2
     n_e_total = n_e * conv_features
     n_e_sqrt = int(math.sqrt(n_e))
-
-    # number of inhibitory neurons
     n_i = n_e
 
     top_percent = 10
-else:
 
-    mode, connectivity, weight_dependence, post_pre, conv_size, conv_stride, conv_features, weight_sharing, lattice_structure, \
-        random_lattice_prob, random_inhibition_prob, top_percent, training_ending, testing_ending = args.mode, args.connectivity, \
-        args.weight_dependence, args.post_pre, args.conv_size, args.conv_stride, args.conv_features, args.weight_sharing, \
-        args.lattice_structure, args.random_lattice_prob, args.random_inhibition_prob, args.top_percent, args.training_ending, args.testing_ending
+    print '\n...Getting assignments'
+    assignments, simple_clusters, average_firing_rate = get_new_assignments(training_result_monitor, training_input_numbers)
+
+    print '\n...Calculating accuracy for sum'
+
+    test_results = np.zeros((4, 10, testing_ending))
+    for j in xrange(testing_ending):
+        temp =  get_recognized_number_ranking(assignments, simple_clusters, testing_result_monitor[j, :], average_firing_rate)
+        for i in xrange(4):
+            test_results[i, :, j] = temp[i]
+
+    differences = [ test_results[i, 0, :] - testing_input_numbers for i in xrange(test_results.shape[0]) ]
+    corrects = [ len(np.where(difference == 0)[0]) for difference in differences ]
+    incorrects = [ np.where(difference != 0)[0] for difference in differences ]
+    accuracies = [ correct / float(testing_ending) * 100 for correct in corrects ]
 
     print '\n'
-
-    print args.mode, args.connectivity, args.weight_dependence, args.post_pre, args.conv_size, args.conv_stride, args.conv_features, args.weight_sharing, \
-        args.lattice_structure, args.random_lattice_prob, args.random_inhibition_prob, args.top_percent, args.training_ending, args.testing_ending
-
+    print 'All neurons response - accuracy:', accuracies[0], 'num incorrect:', len(incorrects[0])
+    print 'Most-spiked (per patch) neurons vote - accuracy:', accuracies[1], 'num incorrect:', len(incorrects[1])
+    print 'Most-spiked (overall) neurons vote - accuracy:', accuracies[2], 'num incorrect:', len(incorrects[2])
+    print 'Simple clusters vote - accuracy:', accuracies[3], 'num incorrect:', len(incorrects[3])
     print '\n'
-
-    # number of excitatory neurons (number output from convolutional layer)
-    n_e = ((n_input_sqrt - conv_size) / conv_stride + 1) ** 2
-    n_e_total = n_e * conv_features
-    n_e_sqrt = int(math.sqrt(n_e))
-
-    # number of inhibitory neurons
-    n_i = n_e
-
-    # STDP rule
-    stdp_input = weight_dependence + '_' + post_pre
-    if weight_dependence == 'weight_dependence':
-        use_weight_dependence = True
-    else:
-        use_weight_dependence = False
-    if post_pre == 'postpre':
-        use_post_pre = True
-    else:
-        use_post_pre = False
-
-    # set ending of filename saves
-    ending = connectivity + '_' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e) + '_' + weight_dependence + '_' + post_pre + '_' + weight_sharing + '_' + lattice_structure + '_' + str(random_lattice_prob) # + '_' + str(random_inhibition_prob)
-
-    print '...loading results'
-    training_result_monitor = np.load(data_path + 'results_' + str(training_ending) + '_' + ending + '.npy')
-    training_input_numbers = np.load(data_path + 'input_numbers_' + str(training_ending) + '_' + ending + '.npy')
-    testing_result_monitor = np.load(data_path + 'results_' + str(testing_ending) + '_' + ending + '.npy')
-    testing_input_numbers = np.load(data_path + 'input_numbers_' + str(testing_ending) + '_' + ending + '.npy')
-
-start_time_training = 0
-end_time_training = int(training_ending)
-start_time_testing = 0
-end_time_testing = int(testing_ending)
-
-print '...loading MNIST'
-training = get_labeled_data(MNIST_data_path + 'training', b_train=True)
-testing = get_labeled_data(MNIST_data_path + 'testing', b_train=False)
-
-print '...getting assignments'
-test_results = np.zeros((10, end_time_testing - start_time_testing))
-test_results_max = np.zeros((10, end_time_testing - start_time_testing))
-test_results_top = np.zeros((10, end_time_testing - start_time_testing))
-test_results_fixed = np.zeros((10, end_time_testing - start_time_testing))
-assignments, simple_clusters, average_firing_rate = get_new_assignments(training_result_monitor[start_time_training : end_time_training], training_input_numbers[start_time_training : end_time_training])
-
-counter = 0
-num_tests = end_time_testing / testing_ending
-sum_accurracy = [[0, 0, 0, 0]] * num_tests
-
-
-while (counter < num_tests):
-    end_time = min(end_time_testing, testing_ending * (counter + 1))
-    start_time = 10000 * counter
-
-    test_results1 = np.zeros((10, end_time - start_time))
-    test_results2 = np.zeros((10, end_time - start_time))
-    test_results3 = np.zeros((10, end_time - start_time))
-    test_results4 = np.zeros((10, end_time - start_time))
-
-    print '...calculating accuracy for sum'
-
-    for i in xrange(end_time - start_time):
-        test_results1[:, i], test_results2[:, i], test_results3[:, i], test_results4[:, i] = get_recognized_number_ranking(assignments, simple_clusters, testing_result_monitor[i + start_time, :], average_firing_rate)
-
-    difference1 = test_results1[0, :] - testing_input_numbers[start_time:end_time]
-    difference2 = test_results2[0, :] - testing_input_numbers[start_time:end_time]
-    difference3 = test_results3[0, :] - testing_input_numbers[start_time:end_time]
-    difference4 = test_results4[0, :] - testing_input_numbers[start_time:end_time]
-
-    correct1 = len(np.where(difference1 == 0)[0])
-    correct2 = len(np.where(difference2 == 0)[0])
-    correct3 = len(np.where(difference3 == 0)[0])
-    correct4 = len(np.where(difference4 == 0)[0])
-
-    incorrect1 = np.where(difference1 != 0)[0]
-    incorrect2 = np.where(difference2 != 0)[0]
-    incorrect3 = np.where(difference3 != 0)[0]
-    incorrect4 = np.where(difference4 != 0)[0]
-
-    sum_accurracy[counter][0] = correct1 / float(end_time - start_time) * 100
-    sum_accurracy[counter][1] = correct2 / float(end_time - start_time) * 100
-    sum_accurracy[counter][2] = correct3 / float(end_time - start_time) * 100
-    sum_accurracy[counter][3] = correct4 / float(end_time - start_time) * 100
-
-    print 'All neurons response - accuracy:', sum_accurracy[counter][0], 'num incorrect:', len(incorrect1)
-    print 'Most-spiked (per patch) neurons vote - accuracy:', sum_accurracy[counter][1], 'num incorrect:', len(incorrect2)
-    print 'Most-spiked (overall) neurons vote - accuracy:', sum_accurracy[counter][2], 'num incorrect:', len(incorrect3)
-    print 'Simple clusters vote - accuracy:', sum_accurracy[counter][3], 'num incorrect:', len(incorrect4)
-
-    counter += 1
-
-b.show()
-
-print '\n'
