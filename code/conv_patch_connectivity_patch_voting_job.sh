@@ -6,7 +6,7 @@
 #SBATCH --account=rkozma
 
 connectivity=none
-conv_size=16
+conv_size=12
 conv_stride=4
 conv_features=50
 weight_sharing=no_weight_sharing
