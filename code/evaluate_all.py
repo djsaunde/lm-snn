@@ -4,8 +4,9 @@
 
 import brian as b
 import numpy as np
-import networkx as nx
+import pandas as pd
 import cPickle as p
+import networkx as nx
 import matplotlib.cm as cmap
 import brian.experimental.realtime_monitor as rltmMon
 import matplotlib, time, scipy, math, sys, argparse, os
@@ -109,36 +110,6 @@ def get_recognized_number_ranking(assignments, simple_clusters, spike_rates, ave
             # sum the spike rates of all excitatory neurons with this label, which fired the most in its patch
             top_percent_summed_rates[i] = len(spike_rates[np.where(np.logical_and(assignments == i, top_percent_array))])
 
-    # cluster_summed_rates = [0] * 10
-    # num_assignments = [0] * 10
-
-    # spike_rates_flat = np.copy(np.ravel(spike_rates))
-
-    # for i in xrange(10):
-    #   num_assignments[i] = 0
-    #   for assignment in cluster_assignments.keys():
-    #       if cluster_assignments[assignment] == i and len(clusters[assignment]) > 1:
-    #           num_assignments[i] += 1
-    #   if num_assignments[i] > 0:
-    #       for assignment in cluster_assignments.keys():
-    #           if cluster_assignments[assignment] == i and len(clusters[assignment]) > 1:
-    #               cluster_summed_rates[i] += np.sum(spike_rates_flat[clusters[assignment]]) / float(len(clusters[assignment]))
-
-    # spike_rates_flat = np.copy(np.ravel(spike_rates))
-
-    # kmeans_summed_rates = [0] * 10
-    # num_assignments = [0] * 10
-
-    # for i in xrange(10):
-    #     num_assignments[i] = 0
-    #     for assignment in kmeans_assignments.keys():
-    #         if kmeans_assignments[assignment] == i:
-    #             num_assignments[i] += 1
-    #     if num_assignments[i] > 0:
-    #         for cluster, assignment in enumerate(kmeans_assignments.keys()):
-    #             if kmeans_assignments[assignment] == i:
-    #                 kmeans_summed_rates[i] += sum([ spike_rates_flat[idx] for idx, label in enumerate(kmeans.labels_) if label == cluster ]) / float(len([ label for label in kmeans.labels_ if label == i ]))
-
     spike_rates_flat = np.copy(np.ravel(spike_rates))
 
     simple_cluster_summed_rates = [0] * 10
@@ -148,11 +119,7 @@ def get_recognized_number_ranking(assignments, simple_clusters, spike_rates, ave
         if i in simple_clusters.keys() and len(simple_clusters[i]) > 1:
             # simple_cluster_summed_rates[i] = np.sum(spike_rates_flat[simple_clusters[i]]) / float(len(simple_clusters[i]))
             this_spike_rates = spike_rates_flat[simple_clusters[i]]
-            simple_cluster_summed_rates[i] = np.sum(this_spike_rates[np.argpartition(this_spike_rates, -5)][-10:])
-
-    # print simple_cluster_summed_rates
-
-    # simple_cluster_summed_rates = simple_cluster_summed_rates / average_firing_rate
+            simple_cluster_summed_rates[i] = np.sum(this_spike_rates[np.argpartition(this_spike_rates, -10)][-10:])
 
     return [ np.argsort(summed_rates)[::-1] for summed_rates in (all_summed_rates, most_spiked_summed_rates, top_percent_summed_rates, simple_cluster_summed_rates) ]
 
@@ -175,94 +142,6 @@ def get_new_assignments(result_monitor, input_numbers):
                     maximum_rate[i] = rate[i // n_e, i % n_e]
                     assignments[i // n_e, i % n_e] = j
 
-    # weight_matrix = np.copy(np.array(connections['AeAe'][:].todense()))
-    
-    # print '\n'
-    # print 'Maximum between-patch edge weight:', np.max(weight_matrix)
-    # print '\n'
-    
-    # print '99-th percentile:', np.percentile(weight_matrix[np.where(weight_matrix != 0)], 99)
-    # print '99.5-th percentile:', np.percentile(weight_matrix[np.where(weight_matrix != 0)], 99.5)
-    # print '99.9-th percentile:', np.percentile(weight_matrix[np.where(weight_matrix != 0)], 99.9)
-
-    # weight_matrix[weight_matrix < np.percentile(weight_matrix[np.where(weight_matrix != 0)], 99)] = 0.0
-    # weight_matrix[weight_matrix > 0.0] = 1
-
-    # recurrent_graph = nx.Graph(weight_matrix)
-
-    # plt.figure(figsize=(18.5, 10))
-    # nx.draw_circular(recurrent_graph, node_color='g', edge_color='#909090', edge_size=1, node_size=10)
-    # plt.axis('equal')
-
-    # plt.show()
-
-    # _, temp = networkx_mcl(recurrent_graph, expand_factor=2, inflate_factor=2, mult_factor=2)
-
-    # clusters = {}
-    # for key, value in temp.items():
-    #   if value not in clusters.values():
-    #       clusters[key] = value
-
-    # # print '\n'
-    # # print 'Number of qualifying clusters:', len([ cluster for cluster in clusters.values() if len(cluster) > 1 ])
-    # # print 'Average size of qualifying clusters:', sum([ len(cluster) for cluster in clusters.values() if len(cluster) > 1 ]) / float(len(clusters))
-    # # print 'Nodes per cluster:', sorted([ len(cluster) for cluster in clusters.values() ], reverse=True)
-
-    # cluster_assignments = {}
-    # votes_vector = {}
-
-    # for cluster in clusters.keys():
-    #   cluster_assignments[cluster] = -1
-    #   votes_vector[cluster] = np.zeros(10)
-
-    # for j in xrange(10):
-    #   num_assignments = len(np.where(input_nums == j)[0])
-    #   if num_assignments > 0:
-    #       rate = np.sum(result_monitor[input_nums == j], axis=0) / float(num_assignments)
-    #       rate = np.ravel(rate)
-    #       for cluster in clusters.keys():
-    #           if len(clusters[cluster]) > 1:
-    #               votes_vector[cluster][j] += np.sum(rate[clusters[cluster]]) / float(rate[clusters[cluster]].size)
-    #       if j in cluster_assignments.values():
-    #           votes_vector[j] / float(len([ value for value in cluster_assignments.values() if value == j ]))
-    
-    # for cluster in clusters.keys():
-    #   cluster_assignments[cluster] = np.argmax(votes_vector[cluster])
-
-    # print 'Qualifying cluster assignments (in order of label):', sorted([ value for key, value in cluster_assignments.items() if value != -1 and len(clusters[key]) > 1 ]), '\n'
-    # for idx in xrange(10):
-    #   print 'There are', len([ value for key, value in cluster_assignments.items() if value == idx and len(clusters[key]) > 1 ]), str(idx) + '-labeled qualifying clusters'
-    # print '\n'
-
-    # kmeans_assignments = {}
-    # votes_vector = {}
-
-    # # get the list of flattened input weights per neuron per feature
-    # weights = get_input_weights(np.copy(input_connections['XeAe'][:].todense()))
-
-    # # create and fit a KMeans model
-    # kmeans = KMeans(n_clusters=25).fit(weights)
-
-    # for cluster in xrange(kmeans.n_clusters):
-    #     kmeans_assignments[cluster] = -1
-    #     votes_vector[cluster] = np.zeros(10)
-
-    # for j in xrange(10):
-    #     num_assignments = len(np.where(input_nums == j)[0])
-    #     if num_assignments > 0:
-    #         rate = np.sum(result_monitor[input_nums == j], axis=0) / float(num_assignments)
-    #         rate = np.ravel(rate)
-    #         for cluster in xrange(kmeans.n_clusters):
-    #             votes_vector[cluster][j] += sum([ rate[idx] for idx, label in enumerate(kmeans.labels_) if label == cluster ]) / float(len([ label for label in kmeans.labels_ if label == j ]))
-
-    # for cluster in xrange(kmeans.n_clusters):
-    #     kmeans_assignments[cluster] = np.argmax(votes_vector[cluster])
-
-    # print 'kmeans cluster assignments (in order of label):', sorted([ value for key, value in kmeans_assignments.items() if value != -1 ]), '\n'
-    # for idx in xrange(10):
-    #   print 'There are', len([ value for key, value in kmeans_assignments.items() if value == idx ]), str(idx) + '-labeled KMeans clusters'
-    # print '\n'
-
     simple_clusters = {}
     votes_vector = {}
 
@@ -276,27 +155,12 @@ def get_new_assignments(result_monitor, input_numbers):
         average_firing_rate[j] = np.sum(this_result_monitor[np.nonzero(this_result_monitor)]) \
                             / float(np.size(this_result_monitor[np.nonzero(this_result_monitor)]))
 
-    # print '\n', average_firing_rate, '\n'
-
     for j in xrange(10):
         num_assignments = len(np.where(input_nums == j)[0])
         if num_assignments > 0:
             rate = np.sum(result_monitor[input_nums == j], axis=0) / float(num_assignments)
             this_result_monitor = result_monitor[input_nums == j]
-            # simple_clusters[j] = np.argwhere(np.sum(result_monitor[input_nums == j], axis=0) > np.percentile(this_result_monitor[np.nonzero(this_result_monitor)], 99))
-            # simple_clusters[j] = np.array([ node[0] * n_e + node[1] for node in simple_clusters[j] ])
-            # print '99-th percentile for cluster', j, ':', np.percentile(this_result_monitor[np.nonzero(this_result_monitor)], 99)
-            simple_clusters[j] = np.argsort(np.ravel(np.sum(this_result_monitor, axis=0)))[::-1][:40]
-            # simple_clusters[j] = np.array([ node[0] * n_e + node[1] for node in simple_clusters[j] ])
-            # print simple_clusters[j]
-
-    # np.savetxt('activity.txt', result_monitor[j])
-
-    # print '\n'
-    # for j in xrange(10):
-    #     if j in simple_clusters.keys():
-    #         print 'There are', len(simple_clusters[j]), 'neurons in the cluster for digit', j, '\n'
-    # print '\n'
+            simple_clusters[j] = np.argsort(np.ravel(np.sum(this_result_monitor, axis=0)))[::-1][:int(0.05 * (np.size(result_monitor) / 10000))]
 
     return assignments, simple_clusters, average_firing_rate
 
@@ -313,6 +177,8 @@ n_input = 784
 n_input_sqrt = int(math.sqrt(n_input))
 
 file_names = [ file_name.split('results')[1] for file_name in sorted(os.listdir(data_path)) if 'results' in file_name ]
+
+results = {}
 
 for file_name in file_names:
     print '\n...Evaluating', file_name
@@ -351,9 +217,14 @@ for file_name in file_names:
     incorrects = [ np.where(difference != 0)[0] for difference in differences ]
     accuracies = [ correct / float(testing_ending) * 100 for correct in corrects ]
 
+    results[file_name] = accuracies
+
     print '\n'
     print 'All neurons response - accuracy:', accuracies[0], 'num incorrect:', len(incorrects[0])
     print 'Most-spiked (per patch) neurons vote - accuracy:', accuracies[1], 'num incorrect:', len(incorrects[1])
     print 'Most-spiked (overall) neurons vote - accuracy:', accuracies[2], 'num incorrect:', len(incorrects[2])
     print 'Simple clusters vote - accuracy:', accuracies[3], 'num incorrect:', len(incorrects[3])
     print '\n'
+
+results_csv = pd.DataFrame([ [ accuracy for accuracy in result ] for result in results.values() ], index=results.keys(), columns=['All', 'Most-spiked per patch', 'Most-spiked overall', 'Correlation clustering']) # , columns=['All', 'Most-Spiked Per Patch', 'Most-Spiked Overall', 'Activity Correlation Clustering'])
+results_csv.to_csv('../data/all_accuracy_results.csv')

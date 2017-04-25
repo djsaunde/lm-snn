@@ -26,6 +26,7 @@ def get_matrix_from_file(file_name, n_src, n_tgt):
 	# return the weight matrix read from file
 	return weight_matrix
 
+
 def get_input_weights(weight_matrix):
 	'''
 	Get the weights from the input to excitatory layer and reshape it to be two
@@ -85,7 +86,7 @@ for n in xrange(n_e):
 weights = get_input_weights(get_matrix_from_file(weight_dir + file_name, n_input, conv_features * n_e))
 
 # create and fit a KMeans model
-kmeans = KMeans(n_clusters=20).fit(weights)
+kmeans = KMeans(n_clusters=10).fit(weights)
 
 print kmeans.labels_
 

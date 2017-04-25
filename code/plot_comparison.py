@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 performances = {}
 x_axes = {}
 
-x_axes['Convolutional neural network baseline'] = [ 784 * 100, 784 * 7000 ]
+x_axes['Convolutional neural network baseline'] = [ 784 * 100, 784 * 6400 ]
 performances['Convolutional neural network baseline'] = [ 99.0 ] * len(x_axes['Convolutional neural network baseline'])
 
 x_axes['Spiking neural network (Diehl & Cook 2015)'] = [ 784 * n_e for n_e in [ 100, 200, 400, 800, 1600, 3200, 6400 ]]
@@ -11,8 +11,8 @@ performances['Spiking neural network (Diehl & Cook 2015)'] = [ 78.16, 84.59, 90.
 
 # 51.86, 66.18,
 
-x_axes['Convolution spiking neural network (4 lattice, no connectivity, weight sharing, all voting)'] = [ 50 * n_e for n_e in [ 1024, 1600, 2304, 3600, 6084 ] ]
-performances['Convolution spiking neural network (4 lattice, no connectivity, weight sharing, all voting)'] = [ 54.18, 41.5, 55.22, 58.02, 63.72 ]
+# x_axes['Convolution spiking neural network (4 lattice, no connectivity, weight sharing, all voting)'] = [ 50 * n_e for n_e in [ 1024, 1600, 2304, 3600, 6084 ] ]
+# performances['Convolution spiking neural network (4 lattice, no connectivity, weight sharing, all voting)'] = [ 54.18, 41.5, 55.22, 58.02, 63.72 ]
 
 # x_axes['Convolution spiking neural network (4 lattice, pairs connectivity, weight sharing, all voting)'] = [ 50 * n_e for n_e in [ 1024, 1600, 2304, 3600, 6084 ] ]
 # performances['Convolution spiking neural network (4 lattice, pairs connectivity, weight sharing, all voting)'] = [ 54.18, 41.5, 55.22, 58.02, 63.72 ]

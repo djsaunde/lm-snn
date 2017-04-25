@@ -65,15 +65,6 @@ def get_recognized_number_ranking(assignments, simple_clusters, spike_rates, ave
     the past 'update_interval', get the ranking of each of the categories of input.
     '''
 
-    # for each label
-    for i in xrange(10):
-        # get the number of label assignments of this type
-        num_assignments[i] = len(np.where(assignments[most_spiked_array] == i)[0])
-
-        if len(spike_rates[np.where(assignments[most_spiked_array] == i)]) > 0:
-            # sum the spike rates of all excitatory neurons with this label, which fired the most in its patch
-            most_spiked_summed_rates[i] = np.sum(spike_rates[np.where(np.logical_and(assignments == i, most_spiked_array))]) / float(np.sum(spike_rates[most_spiked_array]))
-
     all_summed_rates = [0] * 10
     num_assignments = [0] * 10
 
@@ -91,7 +82,7 @@ def get_recognized_number_ranking(assignments, simple_clusters, spike_rates, ave
     for i in xrange(10):
         if i in simple_clusters.keys() and len(simple_clusters[i]) > 1:
             this_spike_rates = spike_rates_flat[simple_clusters[i]]
-            simple_cluster_summed_rates[i] = np.sum(this_spike_rates[np.argpartition(this_spike_rates, -5)][-10:])
+            simple_cluster_summed_rates[i] = np.sum(this_spike_rates[np.argpartition(this_spike_rates, -10)][-10:])
 
     return [ np.argsort(summed_rates)[::-1] for summed_rates in (all_summed_rates, simple_cluster_summed_rates) ]
 
@@ -121,10 +112,13 @@ def get_new_assignments(result_monitor, input_numbers):
         votes_vector[cluster] = np.zeros(10)
 
     average_firing_rate = np.zeros(10)
+    stddev_firing_rate = np.zeros(10)
 
     for j in xrange(10):
         this_result_monitor = result_monitor[input_nums == j]
         average_firing_rate[j] = np.sum(this_result_monitor[np.nonzero(this_result_monitor)]) \
+                            / float(np.size(this_result_monitor[np.nonzero(this_result_monitor)]))
+        stddev_firing_rate[j] = np.std(this_result_monitor[np.nonzero(this_result_monitor)]) \
                             / float(np.size(this_result_monitor[np.nonzero(this_result_monitor)]))
 
     for j in xrange(10):
@@ -134,35 +128,35 @@ def get_new_assignments(result_monitor, input_numbers):
             this_result_monitor = result_monitor[input_nums == j]
             simple_clusters[j] = np.argsort(np.ravel(np.sum(this_result_monitor, axis=0)))[::-1][:40]
 
-    return assignments, simple_clusters, average_firing_rate
+    return assignments, simple_clusters, average_firing_rate, stddev_firing_rate
 
 
 MNIST_data_path = '../data/'
 data_path = '../activity/conv_patch_connectivity_activity/'
-
-print '\n...Loading MNIST'
-
-training = get_labeled_data(MNIST_data_path + 'training', b_train=True)
-testing = get_labeled_data(MNIST_data_path + 'testing', b_train=False)
 
 # input and square root of input
 n_input = 784
 n_input_sqrt = int(math.sqrt(n_input))
 
 print '\n'
-print '\n'.join([ str(idx) + ' | ' + file_name for idx, file_name in enumerate([ file_name for file_name in sorted(os.listdir(data_path)) if 'results' in file_name ]) ])
+print '\n'.join([ str(idx + 1) + ' | ' + file_name for idx, file_name in enumerate([ file_name for file_name in sorted(os.listdir(data_path)) if 'results' in file_name and '10000' in file_name ]) ])
 print '\n'
 
 to_evaluate = raw_input('Enter the index of the file from above which you\'d like to plot: ')
-file_name = [ file_name for file_name in sorted(os.listdir(data_path)) if 'results' in file_name ][int(to_evaluate)].split('results')[1]
+file_name = [ file_name for file_name in sorted(os.listdir(data_path)) if 'results' in file_name and '10000' in file_name ][int(to_evaluate) - 1].split('results')[1]
+
+print '\n...Loading MNIST'
+
+training = get_labeled_data(MNIST_data_path + 'training', b_train=True)
+testing = get_labeled_data(MNIST_data_path + 'testing', b_train=False)
 
 training_result_monitor = np.load(data_path + 'results' + file_name)
 training_input_numbers = np.load(data_path + 'input_numbers' + file_name)
 testing_result_monitor = np.load(data_path + 'results' + file_name)
 testing_input_numbers = np.load(data_path + 'input_numbers' + file_name)
 
-training_ending = args.training_ending
-testing_ending = args.testing_ending
+training_ending = int(file_name.split('_')[1])
+testing_ending = int(file_name.split('_')[1])
 
 conv_size = int(file_name.split('_')[3])
 conv_stride = int(file_name.split('_')[4])
@@ -199,15 +193,20 @@ n_i = n_e
 top_percent = 10
 
 print '\n...Getting assignments'
-assignments, simple_clusters, average_firing_rate = get_new_assignments(training_result_monitor, training_input_numbers)
+assignments, simple_clusters, average_firing_rate, stddev_firing_rate = get_new_assignments(training_result_monitor, training_input_numbers)
 
 print '\n...Calculating accuracy for sum'
 
-test_results = np.zeros((4, 10, testing_ending))
+print '\n', average_firing_rate
+print '\n', stddev_firing_rate
+
+test_results = np.zeros((2, 10, testing_ending))
 for j in xrange(testing_ending):
     temp =  get_recognized_number_ranking(assignments, simple_clusters, testing_result_monitor[j, :], average_firing_rate)
-    for i in xrange(4):
+    for i in xrange(2):
         test_results[i, :, j] = temp[i]
+
+
 
 differences = [ test_results[i, 0, :] - testing_input_numbers for i in xrange(test_results.shape[0]) ]
 corrects = [ len(np.where(difference == 0)[0]) for difference in differences ]
@@ -216,7 +215,5 @@ accuracies = [ correct / float(testing_ending) * 100 for correct in corrects ]
 
 print '\n'
 print 'All neurons response - accuracy:', accuracies[0], 'num incorrect:', len(incorrects[0])
-print 'Most-spiked (per patch) neurons vote - accuracy:', accuracies[1], 'num incorrect:', len(incorrects[1])
-print 'Most-spiked (overall) neurons vote - accuracy:', accuracies[2], 'num incorrect:', len(incorrects[2])
-print 'Simple clusters vote - accuracy:', accuracies[3], 'num incorrect:', len(incorrects[3])
+print 'Simple clusters vote - accuracy:', accuracies[1], 'num incorrect:', len(incorrects[1])
 print '\n'

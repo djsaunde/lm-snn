@@ -110,7 +110,7 @@ def save_connections():
 	'''
 
 	# print out saved connections
-	print '...saving connections: weights/conv_patch_connectivity_weights/' + save_conns[0] + '_' + ending + ' and ' + 'weights/conv_patch_connectivity_weights/' + save_conns[1] + '_' + stdp_input
+	print '...saving connections: weights/conv_patch_connectivity_patch_voting_weights/' + save_conns[0] + '_' + ending + ' and ' + 'weights/conv_patch_connectivity_weights/' + save_conns[1] + '_' + stdp_input
 
 	# iterate over all connections to save
 	for conn_name in save_conns:
@@ -121,7 +121,7 @@ def save_connections():
 		# sparsify it into (row, column, entry) tuples
 		conn_list_sparse = ([(i, j, conn_matrix[i, j]) for i in xrange(conn_matrix.shape[0]) for j in xrange(conn_matrix.shape[1]) ])
 		# save it out to disk
-		np.save(top_level_path + 'weights/conv_patch_connectivity_weights/' + conn_name + '_' + ending, conn_list_sparse)
+		np.save(top_level_path + 'weights/conv_patch_connectivity_patch_voting_weights/' + conn_name + '_' + ending, conn_list_sparse)
 
 
 def save_theta():
@@ -132,10 +132,10 @@ def save_theta():
 	# iterate over population for which to save theta parameters
 	for pop_name in population_names:
 		# print out saved theta populations
-		print '...saving theta: weights/conv_patch_connectivity_weights/theta_' + pop_name + '_' + ending
+		print '...saving theta: weights/conv_patch_connectivity_patch_voting_weights/theta_' + pop_name + '_' + ending
 
 		# save out the theta parameters to file
-		np.save(top_level_path + 'weights/conv_patch_connectivity_weights/theta_' + pop_name + '_' + ending, neuron_groups[pop_name + 'e'].theta)
+		np.save(top_level_path + 'weights/conv_patch_connectivity_patch_voting_weights/theta_' + pop_name + '_' + ending, neuron_groups[pop_name + 'e'].theta)
 
 
 def set_weights_most_fired(current_spike_count):
@@ -248,34 +248,17 @@ def get_2d_input_weights():
 	Get the weights from the input to excitatory layer and reshape it to be two
 	dimensional and square.
 	'''
-	# rearranged_weights = np.zeros((conv_features_sqrt * conv_size * n_e_sqrt, conv_features_sqrt * conv_size * n_e_sqrt))
-	# connection = input_connections['XeAe'][:]
+	rearranged_weights = np.zeros((conv_features_sqrt * conv_size * n_e_sqrt, conv_features_sqrt * conv_size * n_e_sqrt))
+	connection = input_connections['XeAe'][:]
 
-	# # for each convolution feature
-	# for feature in xrange(conv_features):
-	# 	# for each excitatory neuron in this convolution feature
-	# 	for n in xrange(n_e):
-	# 		temp = connection[:, feature * n_e + (n // n_e_sqrt) * n_e_sqrt + (n % n_e_sqrt)].todense()
+	# for each convolution feature
+	for feature in xrange(conv_features):
+		# for each excitatory neuron in this convolution feature
+		for n in xrange(n_e):
+			temp = connection[:, feature * n_e + (n // n_e_sqrt) * n_e_sqrt + (n % n_e_sqrt)].todense()
 
-	# 		# print ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * conv_size), ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * conv_size) + conv_size, ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * (conv_size)), ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * (conv_size)) + conv_size
-
-	# 		rearranged_weights[ ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * conv_size) : ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * conv_size) + conv_size, ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * (conv_size)) : ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * (conv_size)) + conv_size ] = temp[convolution_locations[n]].reshape((conv_size, conv_size))
-
-	# # return the rearranged weights to display to the user
-	# return rearranged_weights.T
-
-	rearranged_weights = np.zeros((conv_features * conv_size, conv_size * n_e))
-	
-	# counts number of input -> excitatory weights displayed so far
-	connection = weight_matrix
-
-	# for each excitatory neuron in this convolution feature
-	for n in xrange(n_e):
-		# for each convolution feature
-		for feature in xrange(conv_features):
-			temp = connection[:, feature * n_e + (n // n_e_sqrt) * n_e_sqrt + (n % n_e_sqrt)]
-			rearranged_weights[ feature * conv_size : (feature + 1) * conv_size, n * conv_size : (n + 1) * conv_size ] = \
-																		temp[convolution_locations[n]].reshape((conv_size, conv_size))
+			# print ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * conv_size), ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * conv_size) + conv_size, ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * (conv_size)), ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * (conv_size)) + conv_size
+			rearranged_weights[ ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * conv_size) : ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * conv_size) + conv_size, ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * (conv_size)) : ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * (conv_size)) + conv_size ] = temp[convolution_locations[n]].reshape((conv_size, conv_size))
 
 	# return the rearranged weights to display to the user
 	return rearranged_weights.T
@@ -716,7 +699,7 @@ def build_network():
 		# get a subgroup of size 'n_e' from all exc
 		neuron_groups[name + 'e'] = neuron_groups['e'].subgroup(conv_features * n_e)
 		# get a subgroup of size 'n_i' from the inhibitory layer
-		neuron_groups[name + 'i'] = neuron_groups['i'].subgroup(conv_features * n_e)
+		neuron_groups[name + 'i'] = neuron_groups['i'].subgroup(conv_features)
 
 		# start the membrane potentials of these groups 40mV below their resting potentials
 		neuron_groups[name + 'e'].v = v_rest_e - 40. * b.mV
@@ -726,7 +709,7 @@ def build_network():
 
 	for name in population_names:
 		# if we're in test mode / using some stored weights
-		if test_mode or weight_path[-8:] == 'weights/conv_patch_connectivity_weights/':
+		if test_mode or weight_path[-8:] == 'weights/conv_patch_connectivity_patch_voting_weights/':
 			# load up adaptive threshold parameters
 			neuron_groups['e'].theta = np.load(weight_path + 'theta_A' + '_' + ending +'.npy')
 		else:
@@ -742,7 +725,7 @@ def build_network():
 				# instantiate the created connection
 				for feature in xrange(conv_features):
 					for n in xrange(n_e):
-						connections[conn_name][feature * n_e + n, feature * n_e + n] = 10.4
+						connections[conn_name][feature * n_e + n, feature] = 10.4 / ( n_e / 2.0 )
 
 			elif conn_type == 'ie':
 				# create connection name (composed of population and connection types)
@@ -754,7 +737,7 @@ def build_network():
 					for other_feature in xrange(conv_features):
 						if feature != other_feature:
 							for n in xrange(n_e):
-								connections[conn_name][feature * n_e + n, other_feature * n_e + n] = 17.4
+								connections[conn_name][feature, other_feature * n_e + n] = 17.4
 
 				if random_inhibition_prob != 0.0:
 					for feature in xrange(conv_features):
@@ -1066,7 +1049,7 @@ def run_simulation():
 					performances = get_current_performance(performances, j)
 
 				# printing out classification performance results so far
-				target = open('../performance/conv_patch_connectivity_performance/' + ending + '.txt', 'w')
+				target = open('../performance/conv_patch_connectivity_patch_voting_performance/' + ending + '.txt', 'w')
 				target.truncate()
 				target.write('Iteration ' + str(j) + '\n')
 
@@ -1108,8 +1091,8 @@ def save_and_plot_results():
 	if not test_mode:
 		save_connections()
 	else:
-		np.save(top_level_path + 'activity/conv_patch_connectivity_activity/results_' + str(num_examples) + '_' + ending, result_monitor)
-		np.save(top_level_path + 'activity/conv_patch_connectivity_activity/input_numbers_' + str(num_examples) + '_' + ending, input_numbers)
+		np.save(top_level_path + 'activity/conv_patch_connectivity_patch_voting_activity/results_' + str(num_examples) + '_' + ending, result_monitor)
+		np.save(top_level_path + 'activity/conv_patch_connectivity_patch_voting_activity/input_numbers_' + str(num_examples) + '_' + ending, input_numbers)
 
 	if do_plot:
 		if rate_monitors:
@@ -1199,14 +1182,14 @@ if __name__ == '__main__':
 
 	# set parameters for simulation based on train / test mode
 	if test_mode:
-		weight_path = top_level_path + 'weights/conv_patch_connectivity_weights/'
+		weight_path = top_level_path + 'weights/conv_patch_connectivity_patch_voting_weights/'
 		num_examples = 10000 * 1
 		use_testing_set = True
 		do_plot_performance = False
 		record_spikes = True
 		ee_STDP_on = False
 	else:
-		weight_path = top_level_path + 'random/conv_patch_connectivity_random/'
+		weight_path = top_level_path + 'random/conv_patch_connectivity_patch_voting_random/'
 		num_examples = 60000 * 1
 		use_testing_set = False
 		do_plot_performance = False
