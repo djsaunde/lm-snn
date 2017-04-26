@@ -1074,7 +1074,12 @@ def run_simulation():
 		set_weights_most_fired(current_spike_count)
 
 	# ensure weights don't grow without bound
-	normalize_weights()
+	if not test_mode:
+		normalize_weights()
+
+	# set weights to those of the most-fired neuron
+	if not test_mode and weight_sharing == 'weight_sharing':
+		set_weights_most_fired(current_spike_count)
 
 
 def save_and_plot_results():

@@ -534,16 +534,25 @@ def get_recognized_number_ranking(assignments, kmeans_assignments, kmeans, simpl
 	spatial_cluster_index_vector = np.empty(n_e)
 	spatial_cluster_index_vector[:] = np.nan
 
+	print np.percentile(spike_rates_flat, 99)
+
 	for idx in xrange(n_e):
 		this_spatial_location = spike_rates_flat[idx::n_e]
-		this_spatial_cluster = np.where(this_spatial_location > np.percentile(this_spatial_location, 90))
+		this_spatial_cluster = np.where(this_spatial_location > np.percentile(spike_rates_flat, 99))
+		# print np.size(this_spatial_cluster)
 		if np.size(this_spatial_cluster) > 0:
-			spatial_cluster_index_vector[idx] = np.max(this_spatial_cluster)
+			spatial_cluster_index_vector[idx] = np.argmax(this_spatial_location > np.percentile(spike_rates_flat, 99))
+			# print np.max(this_spatial_cluster)
+
+	print spatial_cluster_index_vector
 	
 	# equal_cols_idxs = []
 	# for idx in xrange(index_matrix.shape[0]):
 	# 	if all([ x == y for (x, y) in zip(np.isnan(spatial_cluster_index_vector), np.isnan(index_matrix[idx])) ]):
 	# 		equal_cols_idxs.append(idx)
+
+	# for idx in xrange(update_interval):
+	# 	print index_matrix[idx]
 
 	spatial_cluster_summed_rates = [0] * 10
 	if input_numbers != []:
@@ -551,11 +560,12 @@ def get_recognized_number_ranking(assignments, kmeans_assignments, kmeans, simpl
 			for i in xrange(10):
 	 			num_assignments[i] = len(np.where(assignments == i)[0])
 	 			if num_assignments[i] > 0:
-	 				spatial_cluster_summed_rates[i] = np.sum(spike_rates[assignments == i]) / num_assignments[i]
+	 				spatial_cluster_summed_rates[i] = float(np.size(spike_rates[assignments == i]))
 	 	else:
-	 		print 'No collision.'
 			best_col_idx = np.argmax([ sum([ 1.0 if x == y else 0.0 for (x, y) in zip(spatial_cluster_index_vector, index_matrix[idx]) ]) for idx in xrange(update_interval) ])
-			spatial_cluster_summed_rates[input_numbers[best_col_idx]] = 1.0
+			spatial_cluster_summed_rates[input_numbers[best_col_idx]] += 1.0
+
+	print spatial_cluster_summed_rates
 
 	# print '\n', spatial_cluster_summed_rates
 
@@ -656,11 +666,12 @@ def get_new_assignments(result_monitor, input_numbers):
 	spatial_cluster_index_vector[:] = np.nan
 
 	for idx in xrange(update_interval):
+		this_result_monitor_flat = np.ravel(result_monitor[idx, :])
 		for n in xrange(n_e):
-			this_result_monitor_flat = np.ravel(result_monitor[idx, :])
-			satisfying_neurons = np.where(this_result_monitor_flat[np.logical_and(this_result_monitor_flat == n % n_e, this_result_monitor_flat > np.percentile(this_result_monitor_flat, 90))])
+			this_spatial_result_monitor_flat = this_result_monitor_flat[n::n_e]
+			satisfying_neurons = np.where(this_result_monitor_flat > np.percentile(this_result_monitor_flat, 99))
 			if np.size(satisfying_neurons) > 0:
-				index_matrix[idx, n] = np.max(this_result_monitor_flat[satisfying_neurons])
+				index_matrix[idx, n] = np.argmax(this_spatial_result_monitor_flat[satisfying_neurons])
 
 	return assignments, kmeans, kmeans_assignments, simple_clusters, weights, average_firing_rate, index_matrix
 
@@ -912,8 +923,9 @@ def run_simulation():
 		fig_num += 1
 
 	average_firing_rate = np.ones(10)
-	cluster_monitor, cluster_fig = plot_cluster_centers([ np.zeros((conv_size, conv_size)) ] * 25)
-	fig_num += 1
+	if do_plot:
+		cluster_monitor, cluster_fig = plot_cluster_centers([ np.zeros((conv_size, conv_size)) ] * 25)
+		fig_num += 1
 
 	# plot input intensities
 	if do_plot:
@@ -970,7 +982,8 @@ def run_simulation():
 		# get new neuron label assignments every 'update_interval'
 		if j % update_interval == 0 and j > 0:
 			assignments, kmeans, kmeans_assignments, simple_clusters, weights, average_firing_rate, index_matrix = get_new_assignments(result_monitor[:], input_numbers[j - update_interval : j])
-			update_cluster_centers(kmeans.cluster_centers_, cluster_monitor, cluster_fig)
+			if do_plot:
+				update_cluster_centers(kmeans.cluster_centers_, cluster_monitor, cluster_fig)
 
 		# get count of spikes over the past iteration
 		current_spike_count = np.copy(spike_counters['Ae'].count[:]).reshape((conv_features, n_e)) - previous_spike_count
@@ -1182,7 +1195,7 @@ if __name__ == '__main__':
 		ee_STDP_on = True
 
 	# plotting or not
-	do_plot = True
+	do_plot = False
 
 	# number of inputs to the network
 	n_input = 784
@@ -1204,7 +1217,7 @@ if __name__ == '__main__':
 	if test_mode:
 		update_interval = num_examples
 	else:
-		update_interval = 100
+		update_interval = 50
 
 	# weight updates and progress printing intervals
 	weight_update_interval = 10

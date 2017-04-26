@@ -176,7 +176,7 @@ testing = get_labeled_data(MNIST_data_path + 'testing', b_train=False)
 n_input = 784
 n_input_sqrt = int(math.sqrt(n_input))
 
-file_names = [ file_name.split('results')[1] for file_name in sorted(os.listdir(data_path)) if 'results' in file_name ]
+file_names = [ file_name.split('results')[1] for file_name in sorted(os.listdir(data_path)) if 'results' in file_name and '10000' in file_name ]
 
 results = {}
 
