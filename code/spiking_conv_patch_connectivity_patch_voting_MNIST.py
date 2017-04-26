@@ -544,9 +544,6 @@ def get_new_assignments(result_monitor, input_numbers):
 	assignments = np.ones((conv_features, n_e))
 	input_nums = np.asarray(input_numbers)
 	maximum_rate = np.zeros(conv_features * n_e)
-
-	print result_monitor.shape
-	print input_nums.shape
 	
 	for j in xrange(10):
 		num_assignments = len(np.where(input_nums == j)[0])
@@ -988,7 +985,8 @@ def run_simulation():
 		# get new neuron label assignments every 'update_interval'
 		if j % update_interval == 0 and j > 0:
 			assignments, kmeans, kmeans_assignments, simple_clusters, weights, average_firing_rate = get_new_assignments(result_monitor[:], input_numbers[j - update_interval : j])
-			update_cluster_centers(kmeans.cluster_centers_, cluster_monitor, cluster_fig)
+			if do_plot:
+				update_cluster_centers(kmeans.cluster_centers_, cluster_monitor, cluster_fig)
 
 		# get count of spikes over the past iteration
 		current_spike_count = np.copy(spike_counters['Ae'].count[:]).reshape((conv_features, n_e)) - previous_spike_count
