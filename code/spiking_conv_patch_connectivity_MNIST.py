@@ -265,15 +265,15 @@ def get_2d_input_weights():
 	# return rearranged_weights.T
 
 	rearranged_weights = np.zeros((conv_features * conv_size, conv_size * n_e))
-	
+
 	# counts number of input -> excitatory weights displayed so far
-	connection = weight_matrix
+	connection = input_connections['XeAe'][:]
 
 	# for each excitatory neuron in this convolution feature
 	for n in xrange(n_e):
 		# for each convolution feature
 		for feature in xrange(conv_features):
-			temp = connection[:, feature * n_e + (n // n_e_sqrt) * n_e_sqrt + (n % n_e_sqrt)]
+			temp = connection[:, feature * n_e + (n // n_e_sqrt) * n_e_sqrt + (n % n_e_sqrt)].todense()
 			rearranged_weights[ feature * conv_size : (feature + 1) * conv_size, n * conv_size : (n + 1) * conv_size ] = \
 																		temp[convolution_locations[n]].reshape((conv_size, conv_size))
 
@@ -306,13 +306,12 @@ def plot_2d_input_weights():
 	weights = get_2d_input_weights()
 	fig = b.figure(fig_num, figsize=(18, 18))
 	im = b.imshow(weights, interpolation='nearest', vmin=0, vmax=wmax_ee, cmap=cmap.get_cmap('hot_r'))
-	for idx in xrange(conv_size * n_e_sqrt, conv_size * conv_features_sqrt * n_e_sqrt, conv_size * n_e_sqrt):
-		b.axvline(idx, ls='--', lw=1)
-		b.axhline(idx, ls='--', lw=1)
 	b.colorbar(im)
 	b.title('Reshaped input -> convolution weights')
-	b.xticks(xrange(0, conv_size * conv_features_sqrt * n_e_sqrt, conv_size * n_e_sqrt))
-	b.yticks(xrange(0, conv_size * conv_features_sqrt * n_e_sqrt, conv_size * n_e_sqrt))
+	b.xticks(xrange(conv_size, conv_size * (conv_features + 1), conv_size), xrange(1, conv_features + 1))
+	b.yticks(xrange(conv_size, conv_size * (n_e + 1), conv_size), xrange(1, n_e + 1))
+	b.xlabel('Convolution patch')
+	b.ylabel('Location in input (from top left to bottom right')
 	fig.canvas.draw()
 	return im, fig
 
@@ -423,12 +422,9 @@ def get_current_performance(performances, current_example_num):
 	end_num = current_example_num
 
 	for performance in performances.keys():
-		if performance != 'spatial_clusters':
-			difference = output_numbers[performance][start_num : end_num, 0] - input_numbers[start_num : end_num]
-			correct = len(np.where(difference == 0)[0])
-			performances[performance][current_evaluation] = correct / float(update_interval) * 100
-		else:
-			difference = 
+		difference = output_numbers[performance][start_num : end_num, 0] - input_numbers[start_num : end_num]
+		correct = len(np.where(difference == 0)[0])
+		performances[performance][current_evaluation] = correct / float(update_interval) * 100
 
 	return performances
 
@@ -462,7 +458,7 @@ def update_performance_plot(im, performances, current_example_num, fig):
 	return im, performances
 
 
-def get_recognized_number_ranking(assignments, kmeans_assignments, kmeans, simple_clusters, index_matrix, spike_rates, average_firing_rate):
+def get_recognized_number_ranking(assignments, kmeans_assignments, kmeans, simple_clusters, index_matrix, input_numbers, spike_rates, average_firing_rate):
 	'''
 	Given the label assignments of the excitatory layer and their spike rates over
 	the past 'update_interval', get the ranking of each of the categories of input.
@@ -535,27 +531,46 @@ def get_recognized_number_ranking(assignments, kmeans_assignments, kmeans, simpl
 			this_spike_rates = spike_rates_flat[simple_clusters[i]]
 			simple_cluster_summed_rates[i] = np.sum(this_spike_rates[np.argpartition(this_spike_rates, -10)][-10:])
 
-	spatial_cluster_index_vector = float('nan') * [n_e]
+	spatial_cluster_index_vector = np.empty(n_e)
+	spatial_cluster_index_vector[:] = np.nan
 
 	for idx in xrange(n_e):
-		satisfying_neurons = np.where(spike_rates_flat[np.logical_and(spike_rates_flat == idx % n_e, spike_rates_flat > np.percentile(spike_rates_flat, 90))])
-		if np.size(satisfying_neurons) > 0:
-			spatial_cluster_index_vector[idx] = np.max(spike_rates_flat[satisfying_neurons])
-
-	print spatial_cluster_index_vector
+		this_spatial_location = spike_rates_flat[idx::n_e]
+		this_spatial_cluster = np.where(this_spatial_location > np.percentile(this_spatial_location, 90))
+		if np.size(this_spatial_cluster) > 0:
+			spatial_cluster_index_vector[idx] = np.max(this_spatial_cluster)
 	
-	equal_cols_idxs = []
-	for idx in xrange(index_matrix.shape[0]):
-		if np.isnan(spatial_cluster_index_vector) == np.isnan(index_matrix[idx]):
-			equal_cols_idxs.append[idx]
+	# equal_cols_idxs = []
+	# for idx in xrange(index_matrix.shape[0]):
+	# 	if all([ x == y for (x, y) in zip(np.isnan(spatial_cluster_index_vector), np.isnan(index_matrix[idx])) ]):
+	# 		equal_cols_idxs.append(idx)
 
 	spatial_cluster_summed_rates = [0] * 10
-	num_assignments = [0] * 10
+	if input_numbers != []:
+		if all([ entry == 0 for entry in [ sum([ 1.0 if x == y else 0.0 for (x, y) in zip(spatial_cluster_index_vector, index_matrix[idx]) ]) for idx in xrange(update_interval) ]]):
+			for i in xrange(10):
+	 			num_assignments[i] = len(np.where(assignments == i)[0])
+	 			if num_assignments[i] > 0:
+	 				spatial_cluster_summed_rates[i] = np.sum(spike_rates[assignments == i]) / num_assignments[i]
+	 	else:
+	 		print 'No collision.'
+			best_col_idx = np.argmax([ sum([ 1.0 if x == y else 0.0 for (x, y) in zip(spatial_cluster_index_vector, index_matrix[idx]) ]) for idx in xrange(update_interval) ])
+			spatial_cluster_summed_rates[input_numbers[best_col_idx]] = 1.0
 
-	if equal_cols_idxs == 1:
-		num_assignments[i] = len(np.where(assignments[equal_cols_idxs[0]] == i)[0])
-		if num_assignments[i] > 0:
-			spatial_cluster_summed_rates[i] = np.sum(spike_rates[assignments == i]) / num_assignments[i]
+	# print '\n', spatial_cluster_summed_rates
+
+	# print len(equal_cols_idxs)
+	# 
+	# if len(equal_cols_idxs) == 1:
+	# 	spatial_cluster_summed_rates[input_numbers[equal_cols_idxs[0]]] = 1.0
+	# elif len(equal_cols_idxs) > 1:
+	# 	spatial_cluster_summed_rates[input_numbers[np.argmax([ sum([ 1.0 if x == y else 0.0 for (x, y) in \
+	# 							zip(spatial_cluster_index_vector, index_matrix[equal_cols_idx])  ]) for equal_cols_idx in equal_cols_idxs ])]] = 1.0 
+	# else:
+	# 	for i in xrange(10):
+	# 		num_assignments[i] = len(np.where(assignments == i)[0])
+	# 		if num_assignments[i] > 0:
+	# 			spatial_cluster_summed_rates[i] = np.sum(spike_rates[assignments == i]) / num_assignments[i]
 
 	return ( np.argsort(summed_rates)[::-1] for summed_rates in (all_summed_rates, most_spiked_summed_rates, top_percent_summed_rates, \
 																	kmeans_summed_rates, simple_cluster_summed_rates, spatial_cluster_summed_rates) )
@@ -626,7 +641,7 @@ def get_new_assignments(result_monitor, input_numbers):
 		if num_assignments > 0:
 			rate = np.sum(result_monitor[input_nums == j], axis=0) / float(num_assignments)
 			this_result_monitor = result_monitor[input_nums == j]
-			simple_clusters[j] = np.argsort(np.ravel(np.sum(this_result_monitor, axis=0)))[::-1][:int(0.025 * (np.size(rsult_monitor) / float(10000)))]
+			simple_clusters[j] = np.argsort(np.ravel(np.sum(this_result_monitor, axis=0)))[::-1][:int(0.025 * (np.size(result_monitor) / float(10000)))]
 
 	print '\n'
 	for j in xrange(10):
@@ -634,7 +649,20 @@ def get_new_assignments(result_monitor, input_numbers):
 			print 'There are', len(simple_clusters[j]), 'neurons in the cluster for digit', j, '\n'
 	print '\n'
 
-	return assignments, kmeans, kmeans_assignments, simple_clusters, weights, average_firing_rate
+	index_matrix = np.empty((update_interval, n_e))
+	index_matrix[:] = np.nan
+
+	spatial_cluster_index_vector = np.empty(n_e)
+	spatial_cluster_index_vector[:] = np.nan
+
+	for idx in xrange(update_interval):
+		for n in xrange(n_e):
+			this_result_monitor_flat = np.ravel(result_monitor[idx, :])
+			satisfying_neurons = np.where(this_result_monitor_flat[np.logical_and(this_result_monitor_flat == n % n_e, this_result_monitor_flat > np.percentile(this_result_monitor_flat, 90))])
+			if np.size(satisfying_neurons) > 0:
+				index_matrix[idx, n] = np.max(this_result_monitor_flat[satisfying_neurons])
+
+	return assignments, kmeans, kmeans_assignments, simple_clusters, weights, average_firing_rate, index_matrix
 
 
 def build_network():
@@ -872,7 +900,7 @@ def run_simulation():
 	Logic for running the simulation itself.
 	'''
 	global fig_num, input_intensity, previous_spike_count, rates, assignments, clusters, cluster_assignments, \
-				kmeans, kmeans_assignments, simple_clusters, simple_cluster_assignments
+				kmeans, kmeans_assignments, simple_clusters, simple_cluster_assignments, index_matrix
 
 	# plot input weights
 	if not test_mode and do_plot:
@@ -941,7 +969,7 @@ def run_simulation():
 		
 		# get new neuron label assignments every 'update_interval'
 		if j % update_interval == 0 and j > 0:
-			assignments, kmeans, kmeans_assignments, simple_clusters, weights, average_firing_rate = get_new_assignments(result_monitor[:], input_numbers[j - update_interval : j])
+			assignments, kmeans, kmeans_assignments, simple_clusters, weights, average_firing_rate, index_matrix = get_new_assignments(result_monitor[:], input_numbers[j - update_interval : j])
 			update_cluster_centers(kmeans.cluster_centers_, cluster_monitor, cluster_fig)
 
 		# get count of spikes over the past iteration
@@ -988,7 +1016,9 @@ def run_simulation():
 			output_numbers['all'][j, :], output_numbers['most_spiked'][j, :], output_numbers['top_percent'][j, :], \
 							output_numbers['kmeans'][j, :], output_numbers['simple_clusters'][j, :], output_numbers['spatial_clusters'][j, :] = \
 							get_recognized_number_ranking(assignments, kmeans_assignments, kmeans, simple_clusters, 
-							result_monitor[j % update_interval, :], average_firing_rate)
+							index_matrix, input_numbers[j - update_interval : j], result_monitor[j % update_interval, :], average_firing_rate)
+
+			# print output_numbers['spatial_clusters'][j, :]
 			
 			# print progress
 			if j % print_progress_interval == 0 and j > 0:
@@ -1152,7 +1182,7 @@ if __name__ == '__main__':
 		ee_STDP_on = True
 
 	# plotting or not
-	do_plot = False
+	do_plot = True
 
 	# number of inputs to the network
 	n_input = 784
@@ -1298,7 +1328,7 @@ if __name__ == '__main__':
 	convolution_locations = {}
 	for n in xrange(n_e):
 		convolution_locations[n] = [ ((n % n_e_sqrt) * conv_stride + (n // n_e_sqrt) * n_input_sqrt * conv_stride) + (x * n_input_sqrt) + y for y in xrange(conv_size) for x in xrange(conv_size) ]
-	
+
 	# instantiating neuron "vote" monitor
 	result_monitor = np.zeros((update_interval, conv_features, n_e))
 
@@ -1311,13 +1341,15 @@ if __name__ == '__main__':
 	kmeans = KMeans()
 	kmeans_assignments = {}
 	simple_clusters = {}
+	index_matrix = np.empty((update_interval, n_e))
+	index_matrix[:] = np.nan
 	input_numbers = [0] * num_examples
 	output_numbers['all'] = np.zeros((num_examples, 10))
 	output_numbers['most_spiked'] = np.zeros((num_examples, 10))
 	output_numbers['top_percent'] = np.zeros((num_examples, 10))
 	output_numbers['kmeans'] = np.zeros((num_examples, 10))
 	output_numbers['simple_clusters'] = np.zeros((num_examples, 10))
-	output_numbers['spatial_clusters'] = np.zeros((num_examples, n_e))
+	output_numbers['spatial_clusters'] = np.zeros((num_examples, 10))
 	rates = np.zeros((n_input_sqrt, n_input_sqrt))
 
 	# run the simulation of the network
