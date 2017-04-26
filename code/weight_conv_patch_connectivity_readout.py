@@ -53,7 +53,7 @@ def get_2d_input_weights():
 	# return rearranged_weights.T
 	
 	rearranged_weights = np.zeros((conv_features * conv_size, conv_size * n_e))
-	
+
 	# counts number of input -> excitatory weights displayed so far
 	connection = weight_matrix
 
@@ -61,6 +61,7 @@ def get_2d_input_weights():
 	for n in xrange(n_e):
 		# for each convolution feature
 		for feature in xrange(conv_features):
+			print convolution_locations[n]
 			temp = connection[:, feature * n_e + (n // n_e_sqrt) * n_e_sqrt + (n % n_e_sqrt)]
 			rearranged_weights[ feature * conv_size : (feature + 1) * conv_size, n * conv_size : (n + 1) * conv_size ] = \
 																		temp[convolution_locations[n]].reshape((conv_size, conv_size))
