@@ -930,8 +930,9 @@ def run_simulation():
 		fig_num += 1
 
 	average_firing_rate = np.ones(10)
-	cluster_monitor, cluster_fig = plot_cluster_centers([ np.zeros((conv_size, conv_size)) ] * 25)
-	fig_num += 1
+	if do_plot:
+		cluster_monitor, cluster_fig = plot_cluster_centers([ np.zeros((conv_size, conv_size)) ] * 25)
+		fig_num += 1
 
 	# plot input intensities
 	if do_plot:
@@ -1332,9 +1333,8 @@ if __name__ == '__main__':
 	# set ending of filename saves
 	ending = connectivity + '_' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e) + '_' + weight_dependence + '_' + post_pre + '_' + weight_sharing + '_' + lattice_structure + '_' + str(random_lattice_prob) # + '_' + str(random_inhibition_prob)
 
-	if do_plot:
-		b.ion()
-		fig_num = 1
+	b.ion()
+	fig_num = 1
 	
 	# creating dictionaries for various objects
 	neuron_groups, input_groups, connections, input_connections, stdp_methods, \
