@@ -16,7 +16,7 @@ from scipy.sparse import coo_matrix
 from struct import unpack
 from brian import *
 
-np.set_printoptions(threshold=np.nan)
+np.set_printoptions(threshold=np.nan, linewidth=200)
 
 # only show log messages of level ERROR or higher
 b.log_level_error()
@@ -527,60 +527,33 @@ def get_recognized_number_ranking(assignments, kmeans_assignments, kmeans, simpl
 
 	for i in xrange(10):
 		if i in simple_clusters.keys() and len(simple_clusters[i]) > 1:
-			# simple_cluster_summed_rates[i] = np.sum(spike_rates_flat[simple_clusters[i]]) / float(len(simple_clusters[i]))
 			this_spike_rates = spike_rates_flat[simple_clusters[i]]
 			simple_cluster_summed_rates[i] = np.sum(this_spike_rates[np.argpartition(this_spike_rates, -10)][-10:])
 
 	spatial_cluster_index_vector = np.empty(n_e)
 	spatial_cluster_index_vector[:] = np.nan
 
-	print np.percentile(spike_rates_flat, 99)
-
 	for idx in xrange(n_e):
 		this_spatial_location = spike_rates_flat[idx::n_e]
-		this_spatial_cluster = np.where(this_spatial_location > np.percentile(spike_rates_flat, 99))
-		# print np.size(this_spatial_cluster)
-		if np.size(this_spatial_cluster) > 0:
-			spatial_cluster_index_vector[idx] = np.argmax(this_spatial_location > np.percentile(spike_rates_flat, 99))
-			# print np.max(this_spatial_cluster)
-
-	print spatial_cluster_index_vector
-	
-	# equal_cols_idxs = []
-	# for idx in xrange(index_matrix.shape[0]):
-	# 	if all([ x == y for (x, y) in zip(np.isnan(spatial_cluster_index_vector), np.isnan(index_matrix[idx])) ]):
-	# 		equal_cols_idxs.append(idx)
-
-	# for idx in xrange(update_interval):
-	# 	print index_matrix[idx]
+		if np.size(np.where(this_spatial_location > 0)) > 0:
+			spatial_cluster_index_vector[idx] = np.argmax(this_spatial_location)
 
 	spatial_cluster_summed_rates = [0] * 10
 	if input_numbers != []:
-		if all([ entry == 0 for entry in [ sum([ 1.0 if x == y else 0.0 for (x, y) in zip(spatial_cluster_index_vector, index_matrix[idx]) ]) for idx in xrange(update_interval) ]]):
-			for i in xrange(10):
-	 			num_assignments[i] = len(np.where(assignments == i)[0])
-	 			if num_assignments[i] > 0:
-	 				spatial_cluster_summed_rates[i] = float(np.size(spike_rates[assignments == i]))
-	 	else:
-			best_col_idx = np.argmax([ sum([ 1.0 if x == y else 0.0 for (x, y) in zip(spatial_cluster_index_vector, index_matrix[idx]) ]) for idx in xrange(update_interval) ])
-			spatial_cluster_summed_rates[input_numbers[best_col_idx]] += 1.0
+		if np.count_nonzero([[ x == y for (x, y) in zip(spatial_cluster_index_vector, index_matrix[idx]) ] for idx in xrange(update_interval) ]) > 0:
+			# best_col_idx = np.argmax([ sum([ 1.0 if x == y else 0.0 for (x, y) in zip(spatial_cluster_index_vector, index_matrix[idx]) ]) for idx in xrange(update_interval) ])
+			# spatial_cluster_summed_rates[input_numbers[best_col_idx]] += 1.0
+			for idx in xrange(update_interval):
+				# print spatial_cluster_index_vector == index_matrix[idx]
+				spatial_cluster_summed_rates[input_numbers[idx]] += np.count_nonzero([ x == y for (x, y) in zip(spatial_cluster_index_vector, index_matrix[idx]) ])
 
-	print spatial_cluster_summed_rates
+			print '->', [ input_numbers.count(i) for i in xrange(10) ]
+			spatial_cluster_summed_rates = [ x / float(y) if y != 0 else x for (x, y) in zip(spatial_cluster_summed_rates, [ input_numbers.count(i) for i in xrange(10) ]) ]
 
-	# print '\n', spatial_cluster_summed_rates
+	# if spatial_cluster_summed_rates == [0] * 10:
+	# 	print '>', spatial_cluster_index_vector
 
-	# print len(equal_cols_idxs)
-	# 
-	# if len(equal_cols_idxs) == 1:
-	# 	spatial_cluster_summed_rates[input_numbers[equal_cols_idxs[0]]] = 1.0
-	# elif len(equal_cols_idxs) > 1:
-	# 	spatial_cluster_summed_rates[input_numbers[np.argmax([ sum([ 1.0 if x == y else 0.0 for (x, y) in \
-	# 							zip(spatial_cluster_index_vector, index_matrix[equal_cols_idx])  ]) for equal_cols_idx in equal_cols_idxs ])]] = 1.0 
-	# else:
-	# 	for i in xrange(10):
-	# 		num_assignments[i] = len(np.where(assignments == i)[0])
-	# 		if num_assignments[i] > 0:
-	# 			spatial_cluster_summed_rates[i] = np.sum(spike_rates[assignments == i]) / num_assignments[i]
+	# print spatial_cluster_summed_rates
 
 	return ( np.argsort(summed_rates)[::-1] for summed_rates in (all_summed_rates, most_spiked_summed_rates, top_percent_summed_rates, \
 																	kmeans_summed_rates, simple_cluster_summed_rates, spatial_cluster_summed_rates) )
@@ -644,7 +617,7 @@ def get_new_assignments(result_monitor, input_numbers):
 		average_firing_rate[j] = np.sum(this_result_monitor[np.nonzero(this_result_monitor)]) \
 							/ float(np.size(this_result_monitor[np.nonzero(this_result_monitor)]))
 
-	print '\n', average_firing_rate, '\n'
+	print '\n', average_firing_rate
 
 	for j in xrange(10):
 		num_assignments = len(np.where(input_nums == j)[0])
@@ -657,21 +630,18 @@ def get_new_assignments(result_monitor, input_numbers):
 	for j in xrange(10):
 		if j in simple_clusters.keys():
 			print 'There are', len(simple_clusters[j]), 'neurons in the cluster for digit', j, '\n'
-	print '\n'
 
 	index_matrix = np.empty((update_interval, n_e))
 	index_matrix[:] = np.nan
-
-	spatial_cluster_index_vector = np.empty(n_e)
-	spatial_cluster_index_vector[:] = np.nan
 
 	for idx in xrange(update_interval):
 		this_result_monitor_flat = np.ravel(result_monitor[idx, :])
 		for n in xrange(n_e):
 			this_spatial_result_monitor_flat = this_result_monitor_flat[n::n_e]
-			satisfying_neurons = np.where(this_result_monitor_flat > np.percentile(this_result_monitor_flat, 99))
-			if np.size(satisfying_neurons) > 0:
-				index_matrix[idx, n] = np.argmax(this_spatial_result_monitor_flat[satisfying_neurons])
+			if np.size(np.where(this_spatial_result_monitor_flat > 0)) > 0:
+				index_matrix[idx, n] = np.argmax(this_spatial_result_monitor_flat)
+
+	print index_matrix
 
 	return assignments, kmeans, kmeans_assignments, simple_clusters, weights, average_firing_rate, index_matrix
 
@@ -1029,9 +999,7 @@ def run_simulation():
 			output_numbers['all'][j, :], output_numbers['most_spiked'][j, :], output_numbers['top_percent'][j, :], \
 							output_numbers['kmeans'][j, :], output_numbers['simple_clusters'][j, :], output_numbers['spatial_clusters'][j, :] = \
 							get_recognized_number_ranking(assignments, kmeans_assignments, kmeans, simple_clusters, 
-							index_matrix, input_numbers[j - update_interval : j], result_monitor[j % update_interval, :], average_firing_rate)
-
-			# print output_numbers['spatial_clusters'][j, :]
+							index_matrix, input_numbers[j - update_interval - (j % update_interval) : j - (j % update_interval)], result_monitor[j % update_interval, :], average_firing_rate)
 			
 			# print progress
 			if j % print_progress_interval == 0 and j > 0:
@@ -1131,7 +1099,7 @@ if __name__ == '__main__':
 	parser.add_argument('--connectivity', default='none')
 	parser.add_argument('--weight_dependence', default='no_weight_dependence')
 	parser.add_argument('--post_pre', default='postpre')
-	parser.add_argument('--conv_size', type=int, default=16)
+	parser.add_argument('--conv_size', type=int, default=12)
 	parser.add_argument('--conv_stride', type=int, default=4)
 	parser.add_argument('--conv_features', type=int, default=50)
 	parser.add_argument('--weight_sharing', default='no_weight_sharing')
@@ -1217,7 +1185,7 @@ if __name__ == '__main__':
 	if test_mode:
 		update_interval = num_examples
 	else:
-		update_interval = 50
+		update_interval = 100
 
 	# weight updates and progress printing intervals
 	weight_update_interval = 10
