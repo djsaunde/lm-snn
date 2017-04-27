@@ -13,7 +13,7 @@ import matplotlib, time, scipy, math, sys, argparse, os
 from brian import *
 from struct import unpack
 
-np.set_printoptions(threshold=np.nan)
+np.set_printoptions(threshold=np.nan, linewidth=200)
 
 
 def get_labeled_data(picklename, b_train=True):
@@ -59,7 +59,7 @@ def get_labeled_data(picklename, b_train=True):
     return data
 
 
-def get_recognized_number_ranking(assignments, simple_clusters, spike_rates, average_firing_rate):
+def get_recognized_number_ranking(assignments, simple_clusters, index_matrix, input_numbers, spike_rates, average_firing_rate):
     '''
     Given the label assignments of the excitatory layer and their spike rates over
     the past 'update_interval', get the ranking of each of the categories of input.
@@ -153,7 +153,33 @@ def get_recognized_number_ranking(assignments, simple_clusters, spike_rates, ave
 
     # simple_cluster_summed_rates = simple_cluster_summed_rates / average_firing_rate
 
-    return ( np.argsort(summed_rates)[::-1] for summed_rates in (all_summed_rates, most_spiked_summed_rates, top_percent_summed_rates, simple_cluster_summed_rates) )
+    spatial_cluster_index_vector = np.empty(n_e)
+    spatial_cluster_index_vector[:] = np.nan
+
+    for idx in xrange(n_e):
+        this_spatial_location = spike_rates_flat[idx::n_e]
+        if np.size(np.where(this_spatial_location > 0.975 * np.max(spike_rates_flat))) > 0:
+            spatial_cluster_index_vector[idx] = np.argmax(this_spatial_location)
+
+    spatial_cluster_summed_rates = [0] * 10
+    if input_numbers != []:
+        if np.count_nonzero([[ x == y for (x, y) in zip(spatial_cluster_index_vector, index_matrix[idx]) ] for idx in xrange(update_interval) ]) > 0:
+            best_col_idx = np.argmax([ sum([ 1.0 if x == y else 0.0 for (x, y) in zip(spatial_cluster_index_vector, index_matrix[idx]) ]) for idx in xrange(update_interval) ])
+            spatial_cluster_summed_rates[input_numbers[best_col_idx]] = 1.0
+            # for idx in xrange(update_interval):
+            #   # print spatial_cluster_index_vector == index_matrix[idx]
+            #   spatial_cluster_summed_rates[input_numbers[idx]] += np.count_nonzero([ x == y for (x, y) in zip(spatial_cluster_index_vector, index_matrix[idx]) ])
+
+            # print '->', [ input_numbers.count(i) for i in xrange(10) ]
+            # spatial_cluster_summed_rates = [ x / float(y) if y != 0 else x for (x, y) in zip(spatial_cluster_summed_rates, [ input_numbers.count(i) for i in xrange(10) ]) ]
+
+    # if spatial_cluster_summed_rates == [0] * 10:
+    #   print '>', spatial_cluster_index_vector
+
+    # print spatial_cluster_summed_rates
+
+    return ( np.argsort(summed_rates)[::-1] for summed_rates in (all_summed_rates, most_spiked_summed_rates, top_percent_summed_rates, \
+                                                                     simple_cluster_summed_rates, spatial_cluster_summed_rates) )
 
 
 def get_new_assignments(result_monitor, input_numbers):
@@ -297,7 +323,19 @@ def get_new_assignments(result_monitor, input_numbers):
     #         print 'There are', len(simple_clusters[j]), 'neurons in the cluster for digit', j, '\n'
     # print '\n'
 
-    return assignments, simple_clusters, average_firing_rate
+    index_matrix = np.empty((update_interval, n_e))
+    index_matrix[:] = np.nan
+
+    for idx in xrange(update_interval):
+        this_result_monitor_flat = np.ravel(result_monitor[idx, :])
+        for n in xrange(n_e):
+            this_spatial_result_monitor_flat = this_result_monitor_flat[n::n_e]
+            if np.size(np.where(this_spatial_result_monitor_flat > 0.975 * np.max(this_result_monitor_flat))) > 0:
+                index_matrix[idx, n] = np.argmax(this_spatial_result_monitor_flat)
+
+    # print index_matrix
+
+    return assignments, simple_clusters, average_firing_rate, index_matrix
 
 
 MNIST_data_path = '../data/'
@@ -319,6 +357,8 @@ parser.add_argument('--random_inhibition_prob', type=float, default=0.0)
 parser.add_argument('--top_percent', type=int, default=10)
 parser.add_argument('--training_ending', type=int, default=10000)
 parser.add_argument('--testing_ending', type=int, default=10000)
+parser.add_argument('--training_partition', type=int, default=1000)
+parser.add_argument('--testing_partition', type=int, default=1000)
 parser.add_argument('--filename', type=bool, default=False)
 
 args = parser.parse_args()
@@ -326,6 +366,9 @@ args = parser.parse_args()
 # input and square root of input
 n_input = 784
 n_input_sqrt = int(math.sqrt(n_input))
+
+update_interval = args.training_partition
+training_partition, testing_partition = args.training_partition, args.testing_partition
 
 if args.filename == True:
     print '\n'
@@ -393,14 +436,15 @@ else:
     ending = connectivity + '_' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e) + '_' + weight_dependence + '_' + post_pre + '_' + weight_sharing + '_' + lattice_structure + '_' + str(random_lattice_prob) # + '_' + str(random_inhibition_prob)
 
     print '...loading results'
-    training_result_monitor = np.load(data_path + 'results_' + str(training_ending) + '_' + ending + '.npy')
-    training_input_numbers = np.load(data_path + 'input_numbers_' + str(training_ending) + '_' + ending + '.npy')
-    testing_result_monitor = np.load(data_path + 'results_' + str(testing_ending) + '_' + ending + '.npy')
-    testing_input_numbers = np.load(data_path + 'input_numbers_' + str(testing_ending) + '_' + ending + '.npy')
+    training_result_monitor = np.load(data_path + 'results_' + str(training_ending) + '_' + ending + '.npy')[:training_partition]
+    training_input_numbers = np.load(data_path + 'input_numbers_' + str(training_ending) + '_' + ending + '.npy')[:training_partition]
+    testing_result_monitor = np.load(data_path + 'results_' + str(testing_ending) + '_' + ending + '.npy')[training_partition:training_partition + testing_partition]
+    testing_input_numbers = np.load(data_path + 'input_numbers_' + str(testing_ending) + '_' + ending + '.npy')[training_partition:training_partition + testing_partition]
+
 
 start_time_training = 0
-end_time_training = int(training_ending)
-start_time_testing = 0
+end_time_training = int(training_ending / 2)
+start_time_testing = testing_ending / 2
 end_time_testing = int(testing_ending)
 
 print '...loading MNIST'
@@ -412,53 +456,76 @@ test_results = np.zeros((10, end_time_testing - start_time_testing))
 test_results_max = np.zeros((10, end_time_testing - start_time_testing))
 test_results_top = np.zeros((10, end_time_testing - start_time_testing))
 test_results_fixed = np.zeros((10, end_time_testing - start_time_testing))
-assignments, simple_clusters, average_firing_rate = get_new_assignments(training_result_monitor[start_time_training : end_time_training], training_input_numbers[start_time_training : end_time_training])
+
+assignments, simple_clusters, average_firing_rate, index_matrix = get_new_assignments(training_result_monitor, training_input_numbers)
 
 counter = 0
 num_tests = end_time_testing / testing_ending
-sum_accurracy = [[0, 0, 0, 0]] * num_tests
+sum_accuracy = [[0, 0, 0, 0, 0]] * num_tests
 
 
-while (counter < num_tests):
-    end_time = min(end_time_testing, testing_ending * (counter + 1))
-    start_time = 10000 * counter
+end_time = end_time_testing
+start_time = start_time_testing
 
-    test_results1 = np.zeros((10, end_time - start_time))
-    test_results2 = np.zeros((10, end_time - start_time))
-    test_results3 = np.zeros((10, end_time - start_time))
-    test_results4 = np.zeros((10, end_time - start_time))
+test_results1 = np.zeros((10, end_time - start_time))
+test_results2 = np.zeros((10, end_time - start_time))
+test_results3 = np.zeros((10, end_time - start_time))
+test_results4 = np.zeros((10, end_time - start_time))
+test_results5 = np.zeros((10, end_time - start_time))
 
-    print '...calculating accuracy for sum'
+print '...calculating accuracy for sum'
 
-    for i in xrange(end_time - start_time):
-        test_results1[:, i], test_results2[:, i], test_results3[:, i], test_results4[:, i] = get_recognized_number_ranking(assignments, simple_clusters, testing_result_monitor[i + start_time, :], average_firing_rate)
+index_matrix[np.isnan(index_matrix)] = 0
+index_matrix[np.logical_not(index_matrix == 0)] = 1
+print '\n', index_matrix.shape
+print '\n', training_input_numbers.shape
 
-    difference1 = test_results1[0, :] - testing_input_numbers[start_time:end_time]
-    difference2 = test_results2[0, :] - testing_input_numbers[start_time:end_time]
-    difference3 = test_results3[0, :] - testing_input_numbers[start_time:end_time]
-    difference4 = test_results4[0, :] - testing_input_numbers[start_time:end_time]
+temp = np.zeros((index_matrix.shape[0], index_matrix.shape[1] + 1))
+for idx in range(250):
+    temp[idx, :] = [ item for item in index_matrix[idx] ] + [ training_input_numbers[idx] ]
 
-    correct1 = len(np.where(difference1 == 0)[0])
-    correct2 = len(np.where(difference2 == 0)[0])
-    correct3 = len(np.where(difference3 == 0)[0])
-    correct4 = len(np.where(difference4 == 0)[0])
+temp = temp[temp[:, 16].argsort()]
+temp = np.array([ temp[idx, :] for idx in xrange(250) if np.sum(temp[idx, 0:16]) == 1 ])
 
-    incorrect1 = np.where(difference1 != 0)[0]
-    incorrect2 = np.where(difference2 != 0)[0]
-    incorrect3 = np.where(difference3 != 0)[0]
-    incorrect4 = np.where(difference4 != 0)[0]
+print temp
 
-    sum_accurracy[counter][0] = correct1 / float(end_time - start_time) * 100
-    sum_accurracy[counter][1] = correct2 / float(end_time - start_time) * 100
-    sum_accurracy[counter][2] = correct3 / float(end_time - start_time) * 100
-    sum_accurracy[counter][3] = correct4 / float(end_time - start_time) * 100
+# temp = temp[np.where(np.sum(temp[:, 0:16], axis=1))]
 
-    print 'All neurons response - accuracy:', sum_accurracy[counter][0], 'num incorrect:', len(incorrect1)
-    print 'Most-spiked (per patch) neurons vote - accuracy:', sum_accurracy[counter][1], 'num incorrect:', len(incorrect2)
-    print 'Most-spiked (overall) neurons vote - accuracy:', sum_accurracy[counter][2], 'num incorrect:', len(incorrect3)
-    print 'Simple clusters vote - accuracy:', sum_accurracy[counter][3], 'num incorrect:', len(incorrect4)
+np.savetxt('sorted_vectors3.txt', temp)
 
-    counter += 1
+
+for i in xrange(training_ending / 2):
+    test_results1[:, i], test_results2[:, i], test_results3[:, i], test_results4[:, i], test_results5[:, i] = get_recognized_number_ranking(assignments, simple_clusters, index_matrix, training_input_numbers, testing_result_monitor[i, :], average_firing_rate)
+
+difference1 = test_results1[0, :] - testing_input_numbers
+difference2 = test_results2[0, :] - testing_input_numbers
+difference3 = test_results3[0, :] - testing_input_numbers
+difference4 = test_results4[0, :] - testing_input_numbers
+difference5 = test_results5[0, :] - testing_input_numbers
+
+correct1 = len(np.where(difference1 == 0)[0])
+correct2 = len(np.where(difference2 == 0)[0])
+correct3 = len(np.where(difference3 == 0)[0])
+correct4 = len(np.where(difference4 == 0)[0])
+correct5 = len(np.where(difference5 == 0)[0])
+
+incorrect1 = np.where(difference1 != 0)[0]
+incorrect2 = np.where(difference2 != 0)[0]
+incorrect3 = np.where(difference3 != 0)[0]
+incorrect4 = np.where(difference4 != 0)[0]
+incorrect5 = np.where(difference5 != 0)[0]
+
+sum_accuracy[counter][0] = correct1 / float(end_time - start_time) * 100
+sum_accuracy[counter][1] = correct2 / float(end_time - start_time) * 100
+sum_accuracy[counter][2] = correct3 / float(end_time - start_time) * 100
+sum_accuracy[counter][3] = correct4 / float(end_time - start_time) * 100
+sum_accuracy[counter][4] = correct5 / float(end_time - start_time) * 100
+
+print 'All neurons response - accuracy:', sum_accuracy[counter][0], 'num incorrect:', len(incorrect1)
+print 'Most-spiked (per patch) neurons vote - accuracy:', sum_accuracy[counter][1], 'num incorrect:', len(incorrect2)
+print 'Most-spiked (overall) neurons vote - accuracy:', sum_accuracy[counter][2], 'num incorrect:', len(incorrect3)
+print 'Simple clusters vote - accuracy:', sum_accuracy[counter][3], 'num incorrect:', len(incorrect4)
+print 'Spatial correlation clusters vote - accuracy:', sum_accuracy[counter][4], 'num incorrect:', len(incorrect5)
 
 b.show()
 

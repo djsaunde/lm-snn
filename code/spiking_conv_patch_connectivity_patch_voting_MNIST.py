@@ -555,63 +555,6 @@ def get_new_assignments(result_monitor, input_numbers):
 					assignments[i // n_e, i % n_e] = j
 
 	weight_matrix = np.copy(np.array(connections['AeAe'][:].todense()))
-	
-	# print '\n'
-	# print 'Maximum between-patch edge weight:', np.max(weight_matrix)
-	# print '\n'
-	
-	# print '99-th percentile:', np.percentile(weight_matrix[np.where(weight_matrix != 0)], 99)
-	# print '99.5-th percentile:', np.percentile(weight_matrix[np.where(weight_matrix != 0)], 99.5)
-	# print '99.9-th percentile:', np.percentile(weight_matrix[np.where(weight_matrix != 0)], 99.9)
-
-	# weight_matrix[weight_matrix < np.percentile(weight_matrix[np.where(weight_matrix != 0)], 99)] = 0.0
-	# weight_matrix[weight_matrix > 0.0] = 1
-
-	# recurrent_graph = nx.Graph(weight_matrix)
-
-	# plt.figure(figsize=(18.5, 10))
-	# nx.draw_circular(recurrent_graph, node_color='g', edge_color='#909090', edge_size=1, node_size=10)
-	# plt.axis('equal')
-
-	# plt.show()
-
-	# _, temp = networkx_mcl(recurrent_graph, expand_factor=2, inflate_factor=2, mult_factor=2)
-
-	# clusters = {}
-	# for key, value in temp.items():
-	# 	if value not in clusters.values():
-	# 		clusters[key] = value
-
-	# # print '\n'
-	# # print 'Number of qualifying clusters:', len([ cluster for cluster in clusters.values() if len(cluster) > 1 ])
-	# # print 'Average size of qualifying clusters:', sum([ len(cluster) for cluster in clusters.values() if len(cluster) > 1 ]) / float(len(clusters))
-	# # print 'Nodes per cluster:', sorted([ len(cluster) for cluster in clusters.values() ], reverse=True)
-
-	# cluster_assignments = {}
-	# votes_vector = {}
-
-	# for cluster in clusters.keys():
-	# 	cluster_assignments[cluster] = -1
-	# 	votes_vector[cluster] = np.zeros(10)
-
-	# for j in xrange(10):
-	# 	num_assignments = len(np.where(input_nums == j)[0])
-	# 	if num_assignments > 0:
-	# 		rate = np.sum(result_monitor[input_nums == j], axis=0) / float(num_assignments)
-	# 		rate = np.ravel(rate)
-	# 		for cluster in clusters.keys():
-	# 			if len(clusters[cluster]) > 1:
-	# 				votes_vector[cluster][j] += np.sum(rate[clusters[cluster]]) / float(rate[clusters[cluster]].size)
-	# 		if j in cluster_assignments.values():
-	# 			votes_vector[j] / float(len([ value for value in cluster_assignments.values() if value == j ]))
-	
-	# for cluster in clusters.keys():
-	# 	cluster_assignments[cluster] = np.argmax(votes_vector[cluster])
-
-	# print 'Qualifying cluster assignments (in order of label):', sorted([ value for key, value in cluster_assignments.items() if value != -1 and len(clusters[key]) > 1 ]), '\n'
-	# for idx in xrange(10):
-	# 	print 'There are', len([ value for key, value in cluster_assignments.items() if value == idx and len(clusters[key]) > 1 ]), str(idx) + '-labeled qualifying clusters'
-	# print '\n'
 
 	kmeans_assignments = {}
 	votes_vector = {}
@@ -637,11 +580,6 @@ def get_new_assignments(result_monitor, input_numbers):
 	for cluster in xrange(kmeans.n_clusters):
 		kmeans_assignments[cluster] = np.argmax(votes_vector[cluster])
 
-	# print 'kmeans cluster assignments (in order of label):', sorted([ value for key, value in kmeans_assignments.items() if value != -1 ]), '\n'
-	# for idx in xrange(10):
-	# 	print 'There are', len([ value for key, value in kmeans_assignments.items() if value == idx ]), str(idx) + '-labeled KMeans clusters'
-	# print '\n'
-
 	simple_clusters = {}
 	votes_vector = {}
 
@@ -662,11 +600,7 @@ def get_new_assignments(result_monitor, input_numbers):
 		if num_assignments > 0:
 			rate = np.sum(result_monitor[input_nums == j], axis=0) / float(num_assignments)
 			this_result_monitor = result_monitor[input_nums == j]
-			# simple_clusters[j] = np.argwhere(np.sum(result_monitor[input_nums == j], axis=0) > np.percentile(this_result_monitor[np.nonzero(this_result_monitor)], 99))
-			# simple_clusters[j] = np.array([ node[0] * n_e + node[1] for node in simple_clusters[j] ])
-			# print '99-th percentile for cluster', j, ':', np.percentile(this_result_monitor[np.nonzero(this_result_monitor)], 99)
-			simple_clusters[j] = np.argsort(np.ravel(np.sum(this_result_monitor, axis=0)))[::-1][:40]
-			# simple_clusters[j] = np.array([ node[0] * n_e + node[1] for node in simple_clusters[j] ])
+			simple_clusters[j] = np.argsort(np.ravel(np.sum(this_result_monitor, axis=0)))[::-1][:int(0.025 * (np.size(result_monitor) / float(10000)))]
 			print simple_clusters[j]
 
 	# np.savetxt('activity.txt', result_monitor[j])
@@ -1201,7 +1135,7 @@ if __name__ == '__main__':
 		ee_STDP_on = True
 
 	# plotting or not
-	do_plot = False
+	do_plot = True
 
 	# number of inputs to the network
 	n_input = 784

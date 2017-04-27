@@ -180,7 +180,7 @@ def normalize_weights():
 				input_connections[conn_name][:, feature * n_e + n] = dense_weights
 
 	for conn_name in connections:
-		if 'AeAe' in conn_name and lattice_structure != 'none':
+		if 'AeAe' in conn_name and lattice_structure != 'none' and lattice_structure != 'none':
 			connection = connections[conn_name][:].todense()
 			for feature in xrange(conv_features):
 				feature_connection = connection[feature * n_e : (feature + 1) * n_e, :]
@@ -535,20 +535,20 @@ def get_recognized_number_ranking(assignments, kmeans_assignments, kmeans, simpl
 
 	for idx in xrange(n_e):
 		this_spatial_location = spike_rates_flat[idx::n_e]
-		if np.size(np.where(this_spatial_location > 0)) > 0:
+		if np.size(np.where(this_spatial_location > 0.9 * np.max(spike_rates_flat))) > 0:
 			spatial_cluster_index_vector[idx] = np.argmax(this_spatial_location)
 
 	spatial_cluster_summed_rates = [0] * 10
 	if input_numbers != []:
 		if np.count_nonzero([[ x == y for (x, y) in zip(spatial_cluster_index_vector, index_matrix[idx]) ] for idx in xrange(update_interval) ]) > 0:
-			# best_col_idx = np.argmax([ sum([ 1.0 if x == y else 0.0 for (x, y) in zip(spatial_cluster_index_vector, index_matrix[idx]) ]) for idx in xrange(update_interval) ])
-			# spatial_cluster_summed_rates[input_numbers[best_col_idx]] += 1.0
-			for idx in xrange(update_interval):
-				# print spatial_cluster_index_vector == index_matrix[idx]
-				spatial_cluster_summed_rates[input_numbers[idx]] += np.count_nonzero([ x == y for (x, y) in zip(spatial_cluster_index_vector, index_matrix[idx]) ])
+			best_col_idx = np.argmax([ sum([ 1.0 if x == y else 0.0 for (x, y) in zip(spatial_cluster_index_vector, index_matrix[idx]) ]) for idx in xrange(update_interval) ])
+			spatial_cluster_summed_rates[input_numbers[best_col_idx]] = 1.0
+			# for idx in xrange(update_interval):
+			# 	# print spatial_cluster_index_vector == index_matrix[idx]
+			# 	spatial_cluster_summed_rates[input_numbers[idx]] += np.count_nonzero([ x == y for (x, y) in zip(spatial_cluster_index_vector, index_matrix[idx]) ])
 
-			print '->', [ input_numbers.count(i) for i in xrange(10) ]
-			spatial_cluster_summed_rates = [ x / float(y) if y != 0 else x for (x, y) in zip(spatial_cluster_summed_rates, [ input_numbers.count(i) for i in xrange(10) ]) ]
+			# print '->', [ input_numbers.count(i) for i in xrange(10) ]
+			# spatial_cluster_summed_rates = [ x / float(y) if y != 0 else x for (x, y) in zip(spatial_cluster_summed_rates, [ input_numbers.count(i) for i in xrange(10) ]) ]
 
 	# if spatial_cluster_summed_rates == [0] * 10:
 	# 	print '>', spatial_cluster_index_vector
@@ -626,10 +626,10 @@ def get_new_assignments(result_monitor, input_numbers):
 			this_result_monitor = result_monitor[input_nums == j]
 			simple_clusters[j] = np.argsort(np.ravel(np.sum(this_result_monitor, axis=0)))[::-1][:int(0.025 * (np.size(result_monitor) / float(10000)))]
 
-	print '\n'
-	for j in xrange(10):
-		if j in simple_clusters.keys():
-			print 'There are', len(simple_clusters[j]), 'neurons in the cluster for digit', j, '\n'
+	# print '\n'
+	# for j in xrange(10):
+	# 	if j in simple_clusters.keys():
+	# 		print 'There are', len(simple_clusters[j]), 'neurons in the cluster for digit', j, '\n'
 
 	index_matrix = np.empty((update_interval, n_e))
 	index_matrix[:] = np.nan
@@ -638,10 +638,10 @@ def get_new_assignments(result_monitor, input_numbers):
 		this_result_monitor_flat = np.ravel(result_monitor[idx, :])
 		for n in xrange(n_e):
 			this_spatial_result_monitor_flat = this_result_monitor_flat[n::n_e]
-			if np.size(np.where(this_spatial_result_monitor_flat > 0)) > 0:
+			if np.size(np.where(this_spatial_result_monitor_flat > 0.9 * np.max(this_result_monitor_flat))) > 0:
 				index_matrix[idx, n] = np.argmax(this_spatial_result_monitor_flat)
 
-	print index_matrix
+	# print index_matrix
 
 	return assignments, kmeans, kmeans_assignments, simple_clusters, weights, average_firing_rate, index_matrix
 
@@ -887,8 +887,9 @@ def run_simulation():
 	if not test_mode and do_plot:
 		input_weight_monitor, fig_weights = plot_2d_input_weights()
 		fig_num += 1
-		patch_weight_monitor, fig2_weights = plot_patch_weights()
-		fig_num += 1
+		if connectivity != 'none':
+			patch_weight_monitor, fig2_weights = plot_patch_weights()
+			fig_num += 1
 		neuron_rects, fig_neuron_votes = plot_neuron_votes(assignments, result_monitor[:])
 		fig_num += 1
 
@@ -966,7 +967,8 @@ def run_simulation():
 		# update weights every 'weight_update_interval'
 		if j % weight_update_interval == 0 and not test_mode and do_plot:
 			update_2d_input_weights(input_weight_monitor, fig_weights)
-			update_patch_weights(patch_weight_monitor, fig2_weights)
+			if connectivity != 'none':
+				update_patch_weights(patch_weight_monitor, fig2_weights)
 			
 		if do_plot:
 			update_neuron_votes(neuron_rects, fig_neuron_votes, result_monitor[:])
@@ -1099,11 +1101,11 @@ if __name__ == '__main__':
 	parser.add_argument('--connectivity', default='none')
 	parser.add_argument('--weight_dependence', default='no_weight_dependence')
 	parser.add_argument('--post_pre', default='postpre')
-	parser.add_argument('--conv_size', type=int, default=12)
+	parser.add_argument('--conv_size', type=int, default=16)
 	parser.add_argument('--conv_stride', type=int, default=4)
 	parser.add_argument('--conv_features', type=int, default=50)
 	parser.add_argument('--weight_sharing', default='no_weight_sharing')
-	parser.add_argument('--lattice_structure', default='4')
+	parser.add_argument('--lattice_structure', default='8')
 	parser.add_argument('--random_lattice_prob', type=float, default=0.0)
 	parser.add_argument('--random_inhibition_prob', type=float, default=0.0)
 	parser.add_argument('--top_percent', type=int, default=10)
@@ -1149,7 +1151,7 @@ if __name__ == '__main__':
 	# set parameters for simulation based on train / test mode
 	if test_mode:
 		weight_path = top_level_path + 'weights/conv_patch_connectivity_weights/'
-		num_examples = 10000 * 1
+		num_examples = 500 * 1
 		use_testing_set = True
 		do_plot_performance = False
 		record_spikes = True
