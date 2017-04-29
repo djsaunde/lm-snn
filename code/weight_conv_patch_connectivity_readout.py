@@ -79,16 +79,14 @@ def get_2d_input_weights():
 		for feature in xrange(conv_features):
 			temp = connection[:, feature * n_e + (n // n_e_sqrt) * n_e_sqrt + (n % n_e_sqrt)]
 			if feature == 0:
-				euclid_dists[feature] = np.linalg.norm(temp[convolution_locations[n]])
+				euclid_dists[feature] = 0.0
 			else:
 				euclid_dists[feature] = np.linalg.norm(temps[0][convolution_locations[n]] - temp[convolution_locations[n]])
 			temps[feature, :] = temp
 
-		print np.sort(euclid_dists)
-
-		for feature in xrange(conv_features):
+		for idx, feature in enumerate(np.argsort(euclid_dists)):
 			temp = temps[feature]
-			rearranged_weights[ feature * conv_size : (feature + 1) * conv_size, n * conv_size : (n + 1) * conv_size ] = \
+			rearranged_weights[ idx * conv_size : (idx + 1) * conv_size, n * conv_size : (n + 1) * conv_size ] = \
 																	temp[convolution_locations[n]].reshape((conv_size, conv_size))
 
 	# return the rearranged weights to display to the user
@@ -106,6 +104,8 @@ def plot_2d_input_weights():
 	b.title('Reshaped input -> convolution weights')
 	b.xticks(xrange(conv_size, conv_size * (conv_features + 1), conv_size), xrange(1, conv_features + 1))
 	b.yticks(xrange(conv_size, conv_size * (n_e + 1), conv_size), xrange(1, n_e + 1))
+	b.xlabel('Convolution patch')
+	b.ylabel('Location in input (from top left to bottom right')
 	fig.canvas.draw()
 	return im, fig
 
@@ -157,3 +157,7 @@ normalize_weights()
 plot_2d_input_weights()
 
 b.show()
+
+print file_name
+
+b.savefig(file_name[:-4] + '.png')
