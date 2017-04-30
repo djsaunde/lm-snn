@@ -6,10 +6,7 @@ import brian_no_units
 import brian as b
 import networkx as nx
 
-sys.path.append('/home/dan/code/python_mcl/mcl')
-
 from scipy.sparse import coo_matrix
-from mcl_clustering import networkx_mcl
 from struct import unpack
 from brian import *
 
@@ -149,12 +146,6 @@ plt.axis('equal')
 plt.show()
 
 plt.figure(figsize=(18.5, 10))
-nx.draw_circular(G, node_color='g', edge_color='#909090', edge_size=1, node_size=10)
-plt.axis('equal')
-
-plt.show()
-
-plt.figure(figsize=(18.5, 10))
 nx.draw_spectral(G, node_color='g', edge_color='#909090', edge_size=1, node_size=10)
 plt.axis('equal')
 
@@ -162,12 +153,6 @@ plt.show()
 
 plt.figure(figsize=(18.5, 10))
 nx.draw_spring(G, node_color='g', edge_color='#909090', edge_size=1, node_size=10)
-plt.axis('equal')
-
-plt.show()
-
-plt.figure(figsize=(18.5, 10))
-nx.draw_shell(G, node_color='g', edge_color='#909090', edge_size=1, node_size=10)
 plt.axis('equal')
 
 plt.show()

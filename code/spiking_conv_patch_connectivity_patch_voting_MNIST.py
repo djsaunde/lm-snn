@@ -295,6 +295,8 @@ def plot_2d_input_weights():
 	b.title('Reshaped input -> convolution weights')
 	b.xticks(xrange(0, conv_size * conv_features_sqrt * n_e_sqrt, conv_size * n_e_sqrt))
 	b.yticks(xrange(0, conv_size * conv_features_sqrt * n_e_sqrt, conv_size * n_e_sqrt))
+	b.xlabel('Convolution patch')
+	b.ylabel('Location in input (from top left to bottom right')
 	fig.canvas.draw()
 	return im, fig
 
@@ -441,7 +443,7 @@ def update_performance_plot(im, performances, current_example_num, fig):
 	return im, performances
 
 
-def get_recognized_number_ranking(assignments, kmeans_assignments, kmeans, simple_clusters, spike_rates, average_firing_rate):
+def predict_label(assignments, kmeans_assignments, kmeans, simple_clusters, spike_rates, average_firing_rate):
 	'''
 	Given the label assignments of the excitatory layer and their spike rates over
 	the past 'update_interval', get the ranking of each of the categories of input.
@@ -536,7 +538,7 @@ def get_recognized_number_ranking(assignments, kmeans_assignments, kmeans, simpl
 	return ( np.argsort(summed_rates)[::-1] for summed_rates in (all_summed_rates, most_spiked_summed_rates, top_percent_summed_rates, kmeans_summed_rates, simple_cluster_summed_rates) )
 
 
-def get_new_assignments(result_monitor, input_numbers):
+def assign_labels(result_monitor, input_numbers):
 	'''
 	Based on the results from the previous 'update_interval', assign labels to the
 	excitatory neurons.
@@ -555,63 +557,6 @@ def get_new_assignments(result_monitor, input_numbers):
 					assignments[i // n_e, i % n_e] = j
 
 	weight_matrix = np.copy(np.array(connections['AeAe'][:].todense()))
-	
-	# print '\n'
-	# print 'Maximum between-patch edge weight:', np.max(weight_matrix)
-	# print '\n'
-	
-	# print '99-th percentile:', np.percentile(weight_matrix[np.where(weight_matrix != 0)], 99)
-	# print '99.5-th percentile:', np.percentile(weight_matrix[np.where(weight_matrix != 0)], 99.5)
-	# print '99.9-th percentile:', np.percentile(weight_matrix[np.where(weight_matrix != 0)], 99.9)
-
-	# weight_matrix[weight_matrix < np.percentile(weight_matrix[np.where(weight_matrix != 0)], 99)] = 0.0
-	# weight_matrix[weight_matrix > 0.0] = 1
-
-	# recurrent_graph = nx.Graph(weight_matrix)
-
-	# plt.figure(figsize=(18.5, 10))
-	# nx.draw_circular(recurrent_graph, node_color='g', edge_color='#909090', edge_size=1, node_size=10)
-	# plt.axis('equal')
-
-	# plt.show()
-
-	# _, temp = networkx_mcl(recurrent_graph, expand_factor=2, inflate_factor=2, mult_factor=2)
-
-	# clusters = {}
-	# for key, value in temp.items():
-	# 	if value not in clusters.values():
-	# 		clusters[key] = value
-
-	# # print '\n'
-	# # print 'Number of qualifying clusters:', len([ cluster for cluster in clusters.values() if len(cluster) > 1 ])
-	# # print 'Average size of qualifying clusters:', sum([ len(cluster) for cluster in clusters.values() if len(cluster) > 1 ]) / float(len(clusters))
-	# # print 'Nodes per cluster:', sorted([ len(cluster) for cluster in clusters.values() ], reverse=True)
-
-	# cluster_assignments = {}
-	# votes_vector = {}
-
-	# for cluster in clusters.keys():
-	# 	cluster_assignments[cluster] = -1
-	# 	votes_vector[cluster] = np.zeros(10)
-
-	# for j in xrange(10):
-	# 	num_assignments = len(np.where(input_nums == j)[0])
-	# 	if num_assignments > 0:
-	# 		rate = np.sum(result_monitor[input_nums == j], axis=0) / float(num_assignments)
-	# 		rate = np.ravel(rate)
-	# 		for cluster in clusters.keys():
-	# 			if len(clusters[cluster]) > 1:
-	# 				votes_vector[cluster][j] += np.sum(rate[clusters[cluster]]) / float(rate[clusters[cluster]].size)
-	# 		if j in cluster_assignments.values():
-	# 			votes_vector[j] / float(len([ value for value in cluster_assignments.values() if value == j ]))
-	
-	# for cluster in clusters.keys():
-	# 	cluster_assignments[cluster] = np.argmax(votes_vector[cluster])
-
-	# print 'Qualifying cluster assignments (in order of label):', sorted([ value for key, value in cluster_assignments.items() if value != -1 and len(clusters[key]) > 1 ]), '\n'
-	# for idx in xrange(10):
-	# 	print 'There are', len([ value for key, value in cluster_assignments.items() if value == idx and len(clusters[key]) > 1 ]), str(idx) + '-labeled qualifying clusters'
-	# print '\n'
 
 	kmeans_assignments = {}
 	votes_vector = {}
@@ -637,11 +582,6 @@ def get_new_assignments(result_monitor, input_numbers):
 	for cluster in xrange(kmeans.n_clusters):
 		kmeans_assignments[cluster] = np.argmax(votes_vector[cluster])
 
-	# print 'kmeans cluster assignments (in order of label):', sorted([ value for key, value in kmeans_assignments.items() if value != -1 ]), '\n'
-	# for idx in xrange(10):
-	# 	print 'There are', len([ value for key, value in kmeans_assignments.items() if value == idx ]), str(idx) + '-labeled KMeans clusters'
-	# print '\n'
-
 	simple_clusters = {}
 	votes_vector = {}
 
@@ -655,27 +595,23 @@ def get_new_assignments(result_monitor, input_numbers):
 		average_firing_rate[j] = np.sum(this_result_monitor[np.nonzero(this_result_monitor)]) \
 							/ float(np.size(this_result_monitor[np.nonzero(this_result_monitor)]))
 
-	print '\n', average_firing_rate, '\n'
+	print '\nAverage firing rates by digit class:', average_firing_rate, '\n'
 
 	for j in xrange(10):
 		num_assignments = len(np.where(input_nums == j)[0])
 		if num_assignments > 0:
 			rate = np.sum(result_monitor[input_nums == j], axis=0) / float(num_assignments)
 			this_result_monitor = result_monitor[input_nums == j]
-			# simple_clusters[j] = np.argwhere(np.sum(result_monitor[input_nums == j], axis=0) > np.percentile(this_result_monitor[np.nonzero(this_result_monitor)], 99))
-			# simple_clusters[j] = np.array([ node[0] * n_e + node[1] for node in simple_clusters[j] ])
-			# print '99-th percentile for cluster', j, ':', np.percentile(this_result_monitor[np.nonzero(this_result_monitor)], 99)
-			simple_clusters[j] = np.argsort(np.ravel(np.sum(this_result_monitor, axis=0)))[::-1][:40]
-			# simple_clusters[j] = np.array([ node[0] * n_e + node[1] for node in simple_clusters[j] ])
-			print simple_clusters[j]
+			simple_clusters[j] = np.argsort(np.ravel(np.sum(this_result_monitor, axis=0)))[::-1][:int(0.05 * (np.size(result_monitor) / float(10000)))]
+			# print simple_clusters[j]
 
 	# np.savetxt('activity.txt', result_monitor[j])
 
-	print '\n'
-	for j in xrange(10):
-		if j in simple_clusters.keys():
-			print 'There are', len(simple_clusters[j]), 'neurons in the cluster for digit', j, '\n'
-	print '\n'
+	# print '\n'
+	# for j in xrange(10):
+	# 	if j in simple_clusters.keys():
+	# 		print 'There are', len(simple_clusters[j]), 'neurons in the cluster for digit', j, '\n'
+	# print '\n'
 
 	return assignments, kmeans, kmeans_assignments, simple_clusters, weights, average_firing_rate
 
@@ -722,7 +658,7 @@ def build_network():
 				# instantiate the created connection
 				for feature in xrange(conv_features):
 					for n in xrange(n_e):
-						connections[conn_name][feature * n_e + n, feature] = 10.4 / ( n_e / 2.0 )
+						connections[conn_name][feature * n_e + n, feature] = 10.4
 
 			elif conn_type == 'ie':
 				# create connection name (composed of population and connection types)
@@ -965,7 +901,6 @@ def run_simulation():
 				rates = (testing['x'][j % 10000, :, :] / 8.0) * input_intensity
 			else:
 				rates = (training['x'][j % 60000, :, :] / 8.0) * input_intensity
-		
 		else:
 			# ensure weights don't grow without bound
 			normalize_weights()
@@ -984,7 +919,7 @@ def run_simulation():
 		
 		# get new neuron label assignments every 'update_interval'
 		if j % update_interval == 0 and j > 0:
-			assignments, kmeans, kmeans_assignments, simple_clusters, weights, average_firing_rate = get_new_assignments(result_monitor[:], input_numbers[j - update_interval : j])
+			assignments, kmeans, kmeans_assignments, simple_clusters, weights, average_firing_rate = assign_labels(result_monitor[:], input_numbers[j - update_interval : j])
 			if do_plot:
 				update_cluster_centers(kmeans.cluster_centers_, cluster_monitor, cluster_fig)
 
@@ -1031,7 +966,7 @@ def run_simulation():
 			# get the output classifications of the network
 			output_numbers['all'][j, :], output_numbers['most_spiked'][j, :], output_numbers['top_percent'][j, :], \
 							output_numbers['kmeans'][j, :], output_numbers['simple_clusters'][j, :] = \
-							get_recognized_number_ranking(assignments, kmeans_assignments, kmeans, simple_clusters, 
+							predict_label(assignments, kmeans_assignments, kmeans, simple_clusters, 
 							result_monitor[j % update_interval, :], average_firing_rate)
 			
 			# print progress
@@ -1136,7 +1071,7 @@ if __name__ == '__main__':
 	parser.add_argument('--mode', default='train')
 	parser.add_argument('--connectivity', default='none')
 	parser.add_argument('--weight_dependence', default='no_weight_dependence')
-	parser.add_argument('--post_pre', default='postpre')
+	parser.add_argument('--post_pre', default='no_postpre')
 	parser.add_argument('--conv_size', type=int, default=16)
 	parser.add_argument('--conv_stride', type=int, default=4)
 	parser.add_argument('--conv_features', type=int, default=50)
@@ -1201,7 +1136,7 @@ if __name__ == '__main__':
 		ee_STDP_on = True
 
 	# plotting or not
-	do_plot = False
+	do_plot = True
 
 	# number of inputs to the network
 	n_input = 784
@@ -1256,7 +1191,7 @@ if __name__ == '__main__':
 
 	# time constants, learning rates, max weights, weight dependence, etc.
 	tc_pre_ee, tc_post_ee = 20 * b.ms, 20 * b.ms
-	nu_ee_pre, nu_ee_post = 0.0001, 0.01
+	nu_ee_pre, nu_ee_post = 0.0001, 0.025
 	wmax_ee = 1.0
 	exp_ee_post = exp_ee_pre = 0.2
 	w_mu_pre, w_mu_post = 0.2, 0.2

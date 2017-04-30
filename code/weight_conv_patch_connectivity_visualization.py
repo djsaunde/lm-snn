@@ -31,6 +31,21 @@ def get_matrix_from_file(file_name, n_src, n_tgt):
 	return weight_matrix
 
 
+def normalize_weights():
+	'''
+	Squash the input -> excitatory weights to sum to a prespecified number.
+	'''
+	for feature in xrange(conv_features):
+		feature_connection = weight_matrix[:, feature * n_e : (feature + 1) * n_e]
+		column_sums = np.sum(feature_connection, axis=0)
+		column_factors = weight['ee_input'] / column_sums
+
+		for n in xrange(n_e):
+			dense_weights = weight_matrix[:, feature * n_e + n]
+			dense_weights[convolution_locations[n]] *= column_factors[n]
+			weight_matrix[:, feature * n_e + n] = dense_weights
+
+
 def get_2d_input_weights():
 	'''
 	Get the weights from the input to excitatory layer and reshape it to be two
@@ -59,11 +74,20 @@ def get_2d_input_weights():
 
 	# for each excitatory neuron in this convolution feature
 	for n in xrange(n_e):
+		temps, euclid_dists = np.zeros((conv_features, 784)), np.zeros(conv_features)
 		# for each convolution feature
 		for feature in xrange(conv_features):
 			temp = connection[:, feature * n_e + (n // n_e_sqrt) * n_e_sqrt + (n % n_e_sqrt)]
-			rearranged_weights[ feature * conv_size : (feature + 1) * conv_size, n * conv_size : (n + 1) * conv_size ] = \
-																		temp[convolution_locations[n]].reshape((conv_size, conv_size))
+			if feature == 0:
+				euclid_dists[feature] = 0.0
+			else:
+				euclid_dists[feature] = np.linalg.norm(temps[0][convolution_locations[n]] - temp[convolution_locations[n]])
+			temps[feature, :] = temp
+
+		for idx, feature in enumerate(np.argsort(euclid_dists)):
+			temp = temps[feature]
+			rearranged_weights[ idx * conv_size : (idx + 1) * conv_size, n * conv_size : (n + 1) * conv_size ] = \
+																	temp[convolution_locations[n]].reshape((conv_size, conv_size))
 
 	# return the rearranged weights to display to the user
 	return rearranged_weights.T
@@ -80,6 +104,8 @@ def plot_2d_input_weights():
 	b.title('Reshaped input -> convolution weights')
 	b.xticks(xrange(conv_size, conv_size * (conv_features + 1), conv_size), xrange(1, conv_features + 1))
 	b.yticks(xrange(conv_size, conv_size * (n_e + 1), conv_size), xrange(1, n_e + 1))
+	b.xlabel('Convolution patch')
+	b.ylabel('Location in input (from top left to bottom right')
 	fig.canvas.draw()
 	return im, fig
 
@@ -112,6 +138,9 @@ n_e_sqrt = int(math.sqrt(n_e))
 # number of inhibitory neurons (number of convolutational features (for now))
 n_i = n_e
 
+weight = {}
+weight['ee_input'] = (conv_size ** 2) * 0.1625
+
 conv_features_sqrt = int(math.ceil(math.sqrt(conv_features)))
 
 print '\n'
@@ -122,7 +151,13 @@ for n in xrange(n_e):
 	convolution_locations[n] = [ ((n % n_e_sqrt) * conv_stride + (n // n_e_sqrt) * n_input_sqrt * conv_stride) + (x * n_input_sqrt) + y for y in xrange(conv_size) for x in xrange(conv_size) ]
 
 weight_matrix = get_matrix_from_file(weight_dir + file_name, n_input, conv_features * n_e)
+weight_matrix[weight_matrix < 0.20] = 0
+normalize_weights()
 
 plot_2d_input_weights()
 
 b.show()
+
+print file_name
+
+b.savefig(file_name[:-4] + '.png')
