@@ -85,6 +85,7 @@ def is_lattice_connection(sqrt, i, j):
 	if lattice_structure == 'all':
 		return True
 
+
 def get_matrix_from_file(file_name, n_src, n_tgt):
 	'''
 	Given the name of a file pointing to a .npy ndarray object, load it into
@@ -359,6 +360,7 @@ def plot_patch_weights():
 	fig.canvas.draw()
 	return im, fig
 
+
 def update_patch_weights(im, fig):
 	'''
 	Update the plot of the weights between convolution patches to view during training.
@@ -367,6 +369,7 @@ def update_patch_weights(im, fig):
 	im.set_array(weights)
 	fig.canvas.draw()
 	return im
+
 
 def plot_neuron_votes(assignments, spike_rates):
 	'''
