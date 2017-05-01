@@ -301,7 +301,7 @@ def get_2d_input_weights():
 			else:
 				euclid_dists[n, feature] = np.linalg.norm(temps[n, 0, convolution_locations[n]] - temp[convolution_locations[n]])
 
-			temps[n, feature, :] = temp
+			temps[n, feature, :] = temp.ravel()
 
 		for idx, feature in enumerate(np.argsort(euclid_dists[n])):
 			temp = temps[n, feature]
@@ -1165,16 +1165,18 @@ if __name__ == '__main__':
 	parser.add_argument('--random_lattice_prob', type=float, default=0.0)
 	parser.add_argument('--random_inhibition_prob', type=float, default=0.0)
 	parser.add_argument('--top_percent', type=int, default=10)
+	parser.add_argument('--do_plot', type=bool, default=False)
 	
 	args = parser.parse_args()
-	mode, connectivity, weight_dependence, post_pre, conv_size, conv_stride, conv_features, weight_sharing, lattice_structure, random_lattice_prob, random_inhibition_prob, top_percent = \
-		args.mode, args.connectivity, args.weight_dependence, args.post_pre, args.conv_size, args.conv_stride, args.conv_features, args.weight_sharing, \
-		args.lattice_structure, args.random_lattice_prob, args.random_inhibition_prob, args.top_percent
+	mode, connectivity, weight_dependence, post_pre, conv_size, conv_stride, conv_features, weight_sharing, lattice_structure, \
+		random_lattice_prob, random_inhibition_prob, top_percent, do_plot = args.mode, args.connectivity, args.weight_dependence, \
+		args.post_pre, args.conv_size, args.conv_stride, args.conv_features, args.weight_sharing, args.lattice_structure, \
+		args.random_lattice_prob, args.random_inhibition_prob, args.top_percent, args.do_plot
 
 	print '\n'
 
 	print args.mode, args.connectivity, args.weight_dependence, args.post_pre, args.conv_size, args.conv_stride, args.conv_features, args.weight_sharing, \
-		args.lattice_structure, args.random_lattice_prob, args.random_inhibition_prob, args.top_percent
+		args.lattice_structure, args.random_lattice_prob, args.random_inhibition_prob, args.top_percent, args.do_plot
 
 	print '\n'
 
@@ -1207,7 +1209,7 @@ if __name__ == '__main__':
 	# set parameters for simulation based on train / test mode
 	if test_mode:
 		weight_path = top_level_path + 'weights/conv_patch_connectivity_weights/'
-		num_examples = 1000
+		num_examples = 10000
 		use_testing_set = True
 		do_plot_performance = False
 		record_spikes = True
@@ -1219,9 +1221,6 @@ if __name__ == '__main__':
 		do_plot_performance = False
 		record_spikes = True
 		ee_STDP_on = True
-
-	# plotting or not
-	do_plot = True
 
 	# number of inputs to the network
 	n_input = 784
