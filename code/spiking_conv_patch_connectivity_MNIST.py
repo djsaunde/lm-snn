@@ -85,6 +85,7 @@ def is_lattice_connection(sqrt, i, j):
 	if lattice_structure == 'all':
 		return True
 
+
 def get_matrix_from_file(file_name, n_src, n_tgt):
 	'''
 	Given the name of a file pointing to a .npy ndarray object, load it into
@@ -171,7 +172,7 @@ def normalize_weights():
 		connection = input_connections[conn_name][:].todense()
 		for feature in xrange(conv_features):
 			feature_connection = connection[:, feature * n_e : (feature + 1) * n_e]
-			column_sums = np.sum(feature_connection, axis=0)
+			column_sums = np.sum(np.asarray(feature_connection), axis=0)
 			column_factors = weight['ee_input'] / column_sums
 
 			for n in xrange(n_e):
@@ -180,7 +181,7 @@ def normalize_weights():
 				input_connections[conn_name][:, feature * n_e + n] = dense_weights
 
 	for conn_name in connections:
-		if 'AeAe' in conn_name and lattice_structure != 'none':
+		if 'AeAe' in conn_name and lattice_structure != 'none' and lattice_structure != 'none':
 			connection = connections[conn_name][:].todense()
 			for feature in xrange(conv_features):
 				feature_connection = connection[feature * n_e : (feature + 1) * n_e, :]
@@ -264,18 +265,48 @@ def get_2d_input_weights():
 	# # return the rearranged weights to display to the user
 	# return rearranged_weights.T
 
+	# rearranged_weights = np.zeros((conv_features * conv_size, conv_size * n_e))
+
+	# # counts number of input -> excitatory weights displayed so far
+	# connection = input_connections['XeAe'][:]
+
+	# # for each excitatory neuron in this convolution feature
+	# for n in xrange(n_e):
+	# 	# for each convolution feature
+	# 	for feature in xrange(conv_features):
+	# 		temp = connection[:, feature * n_e + (n // n_e_sqrt) * n_e_sqrt + (n % n_e_sqrt)].todense()
+	# 		rearranged_weights[ feature * conv_size : (feature + 1) * conv_size, n * conv_size : (n + 1) * conv_size ] = \
+	# 																	temp[convolution_locations[n]].reshape((conv_size, conv_size))
+
+	# # return the rearranged weights to display to the user
+	# return rearranged_weights.T
+
 	rearranged_weights = np.zeros((conv_features * conv_size, conv_size * n_e))
 
 	# counts number of input -> excitatory weights displayed so far
 	connection = input_connections['XeAe'][:]
 
 	# for each excitatory neuron in this convolution feature
+	euclid_dists = np.zeros((n_e, conv_features))
+	temps = np.zeros((n_e, conv_features, n_input))
 	for n in xrange(n_e):
 		# for each convolution feature
 		for feature in xrange(conv_features):
 			temp = connection[:, feature * n_e + (n // n_e_sqrt) * n_e_sqrt + (n % n_e_sqrt)].todense()
-			rearranged_weights[ feature * conv_size : (feature + 1) * conv_size, n * conv_size : (n + 1) * conv_size ] = \
-																		temp[convolution_locations[n]].reshape((conv_size, conv_size))
+			if feature == 0:
+				if n == 0:
+					euclid_dists[n, feature] = 0.0
+				else:
+					euclid_dists[n, feature] = np.linalg.norm(temps[0, 0, convolution_locations[n]] - temp[convolution_locations[n]])
+			else:
+				euclid_dists[n, feature] = np.linalg.norm(temps[n, 0, convolution_locations[n]] - temp[convolution_locations[n]])
+
+			temps[n, feature, :] = temp.ravel()
+
+		for idx, feature in enumerate(np.argsort(euclid_dists[n])):
+			temp = temps[n, feature]
+			rearranged_weights[ idx * conv_size : (idx + 1) * conv_size, n * conv_size : (n + 1) * conv_size ] = \
+																	temp[convolution_locations[n]].reshape((conv_size, conv_size))
 
 	# return the rearranged weights to display to the user
 	return rearranged_weights.T
@@ -359,6 +390,7 @@ def plot_patch_weights():
 	fig.canvas.draw()
 	return im, fig
 
+
 def update_patch_weights(im, fig):
 	'''
 	Update the plot of the weights between convolution patches to view during training.
@@ -367,6 +399,7 @@ def update_patch_weights(im, fig):
 	im.set_array(weights)
 	fig.canvas.draw()
 	return im
+
 
 def plot_neuron_votes(assignments, spike_rates):
 	'''
@@ -458,7 +491,7 @@ def update_performance_plot(im, performances, current_example_num, fig):
 	return im, performances
 
 
-def get_recognized_number_ranking(assignments, kmeans_assignments, kmeans, simple_clusters, index_matrix, input_numbers, spike_rates, average_firing_rate):
+def predict_label(assignments, kmeans_assignments, kmeans, simple_clusters, index_matrix, input_numbers, spike_rates, average_firing_rate):
 	'''
 	Given the label assignments of the excitatory layer and their spike rates over
 	the past 'update_interval', get the ranking of each of the categories of input.
@@ -535,20 +568,20 @@ def get_recognized_number_ranking(assignments, kmeans_assignments, kmeans, simpl
 
 	for idx in xrange(n_e):
 		this_spatial_location = spike_rates_flat[idx::n_e]
-		if np.size(np.where(this_spatial_location > 0)) > 0:
+		if np.size(np.where(this_spatial_location > 0.9 * np.max(spike_rates_flat))) > 0:
 			spatial_cluster_index_vector[idx] = np.argmax(this_spatial_location)
 
 	spatial_cluster_summed_rates = [0] * 10
 	if input_numbers != []:
 		if np.count_nonzero([[ x == y for (x, y) in zip(spatial_cluster_index_vector, index_matrix[idx]) ] for idx in xrange(update_interval) ]) > 0:
-			# best_col_idx = np.argmax([ sum([ 1.0 if x == y else 0.0 for (x, y) in zip(spatial_cluster_index_vector, index_matrix[idx]) ]) for idx in xrange(update_interval) ])
-			# spatial_cluster_summed_rates[input_numbers[best_col_idx]] += 1.0
-			for idx in xrange(update_interval):
-				# print spatial_cluster_index_vector == index_matrix[idx]
-				spatial_cluster_summed_rates[input_numbers[idx]] += np.count_nonzero([ x == y for (x, y) in zip(spatial_cluster_index_vector, index_matrix[idx]) ])
+			best_col_idx = np.argmax([ sum([ 1.0 if x == y else 0.0 for (x, y) in zip(spatial_cluster_index_vector, index_matrix[idx]) ]) for idx in xrange(update_interval) ])
+			spatial_cluster_summed_rates[input_numbers[best_col_idx]] = 1.0
+			# for idx in xrange(update_interval):
+			# 	# print spatial_cluster_index_vector == index_matrix[idx]
+			# 	spatial_cluster_summed_rates[input_numbers[idx]] += np.count_nonzero([ x == y for (x, y) in zip(spatial_cluster_index_vector, index_matrix[idx]) ])
 
-			print '->', [ input_numbers.count(i) for i in xrange(10) ]
-			spatial_cluster_summed_rates = [ x / float(y) if y != 0 else x for (x, y) in zip(spatial_cluster_summed_rates, [ input_numbers.count(i) for i in xrange(10) ]) ]
+			# print '->', [ input_numbers.count(i) for i in xrange(10) ]
+			# spatial_cluster_summed_rates = [ x / float(y) if y != 0 else x for (x, y) in zip(spatial_cluster_summed_rates, [ input_numbers.count(i) for i in xrange(10) ]) ]
 
 	# if spatial_cluster_summed_rates == [0] * 10:
 	# 	print '>', spatial_cluster_index_vector
@@ -559,7 +592,7 @@ def get_recognized_number_ranking(assignments, kmeans_assignments, kmeans, simpl
 																	kmeans_summed_rates, simple_cluster_summed_rates, spatial_cluster_summed_rates) )
 
 
-def get_new_assignments(result_monitor, input_numbers):
+def assign_labels(result_monitor, input_numbers):
 	'''
 	Based on the results from the previous 'update_interval', assign labels to the
 	excitatory neurons.
@@ -626,10 +659,10 @@ def get_new_assignments(result_monitor, input_numbers):
 			this_result_monitor = result_monitor[input_nums == j]
 			simple_clusters[j] = np.argsort(np.ravel(np.sum(this_result_monitor, axis=0)))[::-1][:int(0.025 * (np.size(result_monitor) / float(10000)))]
 
-	print '\n'
-	for j in xrange(10):
-		if j in simple_clusters.keys():
-			print 'There are', len(simple_clusters[j]), 'neurons in the cluster for digit', j, '\n'
+	# print '\n'
+	# for j in xrange(10):
+	# 	if j in simple_clusters.keys():
+	# 		print 'There are', len(simple_clusters[j]), 'neurons in the cluster for digit', j, '\n'
 
 	index_matrix = np.empty((update_interval, n_e))
 	index_matrix[:] = np.nan
@@ -638,10 +671,10 @@ def get_new_assignments(result_monitor, input_numbers):
 		this_result_monitor_flat = np.ravel(result_monitor[idx, :])
 		for n in xrange(n_e):
 			this_spatial_result_monitor_flat = this_result_monitor_flat[n::n_e]
-			if np.size(np.where(this_spatial_result_monitor_flat > 0)) > 0:
+			if np.size(np.where(this_spatial_result_monitor_flat > 0.9 * np.max(this_result_monitor_flat))) > 0:
 				index_matrix[idx, n] = np.argmax(this_spatial_result_monitor_flat)
 
-	print index_matrix
+	# print index_matrix
 
 	return assignments, kmeans, kmeans_assignments, simple_clusters, weights, average_firing_rate, index_matrix
 
@@ -651,10 +684,6 @@ def build_network():
 
 	neuron_groups['e'] = b.NeuronGroup(n_e_total, neuron_eqs_e, threshold=v_thresh_e, refractory=refrac_e, reset=scr_e, compile=True, freeze=True)
 	neuron_groups['i'] = b.NeuronGroup(n_e_total, neuron_eqs_i, threshold=v_thresh_i, refractory=refrac_i, reset=v_reset_i, compile=True, freeze=True)
-
-	########################################################
-	# CREATE NETWORK POPULATIONS AND RECURRENT CONNECTIONS #
-	########################################################
 
 	for name in population_names:
 		print '...creating neuron group:', name
@@ -672,12 +701,15 @@ def build_network():
 
 	for name in population_names:
 		# if we're in test mode / using some stored weights
-		if test_mode or weight_path[-8:] == 'weights/conv_patch_connectivity_weights/':
-			# load up adaptive threshold parameters
-			neuron_groups['e'].theta = np.load(weight_path + 'theta_A' + '_' + ending +'.npy')
-		else:
-			# otherwise, set the adaptive additive threshold parameter at 20mV
-			neuron_groups['e'].theta = np.ones((n_e_total)) * 20.0 * b.mV
+		# if test_mode or weight_path[-8:] == 'weights/conv_patch_connectivity_weights/':
+		# 	# load up adaptive threshold parameters
+		# 	neuron_groups['e'].theta = np.load(weight_path + 'theta_A' + '_' + ending +'.npy')
+		# else:
+		# 	# otherwise, set the adaptive additive threshold parameter at 20mV
+		# 	neuron_groups['e'].theta = np.ones((n_e_total)) * 20.0 * b.mV
+		
+		neuron_groups['e'].theta = np.ones((n_e_total)) * 20.0 * b.mV
+		# neuron_groups['e'].theta = np.load(weight_path + 'theta_A' + '_' + ending +'.npy')
 
 		for conn_type in recurrent_conn_names:
 			if conn_type == 'ei':
@@ -849,6 +881,7 @@ def build_network():
 			# get weight matrix depending on training or test phase
 			if test_mode:
 				weight_matrix = get_matrix_from_file(weight_path + conn_name + '_' + ending + '.npy', n_input, conv_features * n_e)
+				weight_matrix[weight_matrix < 0.20] = 0
 
 			# create connections from the windows of the input group to the neuron population
 			input_connections[conn_name] = b.Connection(input_groups['Xe'], neuron_groups[name[1] + conn_type[1]], structure='sparse', state='g' + conn_type[0], delay=True, max_delay=delay[conn_type][1])
@@ -863,6 +896,11 @@ def build_network():
 					for n in xrange(n_e):
 						for idx in xrange(conv_size ** 2):
 							input_connections[conn_name][convolution_locations[n][idx], feature * n_e + n] = (b.random() + 0.01) * 0.3
+
+			if test_mode:
+				normalize_weights()
+				plot_2d_input_weights()
+				fig_num += 1	
 
 		# if excitatory -> excitatory STDP is specified, add it here (input to excitatory populations)
 		if ee_STDP_on:
@@ -887,13 +925,14 @@ def run_simulation():
 	if not test_mode and do_plot:
 		input_weight_monitor, fig_weights = plot_2d_input_weights()
 		fig_num += 1
-		patch_weight_monitor, fig2_weights = plot_patch_weights()
-		fig_num += 1
+		if connectivity != 'none':
+			patch_weight_monitor, fig2_weights = plot_patch_weights()
+			fig_num += 1
 		neuron_rects, fig_neuron_votes = plot_neuron_votes(assignments, result_monitor[:])
 		fig_num += 1
 
 	average_firing_rate = np.ones(10)
-	if do_plot:
+	if do_plot and not test_mode:
 		cluster_monitor, cluster_fig = plot_cluster_centers([ np.zeros((conv_size, conv_size)) ] * 25)
 		fig_num += 1
 
@@ -951,8 +990,8 @@ def run_simulation():
 		
 		# get new neuron label assignments every 'update_interval'
 		if j % update_interval == 0 and j > 0:
-			assignments, kmeans, kmeans_assignments, simple_clusters, weights, average_firing_rate, index_matrix = get_new_assignments(result_monitor[:], input_numbers[j - update_interval : j])
-			if do_plot:
+			assignments, kmeans, kmeans_assignments, simple_clusters, weights, average_firing_rate, index_matrix = assign_labels(result_monitor[:], input_numbers[j - update_interval : j])
+			if do_plot and not test_mode:
 				update_cluster_centers(kmeans.cluster_centers_, cluster_monitor, cluster_fig)
 
 		# get count of spikes over the past iteration
@@ -966,9 +1005,10 @@ def run_simulation():
 		# update weights every 'weight_update_interval'
 		if j % weight_update_interval == 0 and not test_mode and do_plot:
 			update_2d_input_weights(input_weight_monitor, fig_weights)
-			update_patch_weights(patch_weight_monitor, fig2_weights)
+			if connectivity != 'none':
+				update_patch_weights(patch_weight_monitor, fig2_weights)
 			
-		if do_plot:
+		if not test_mode and do_plot:
 			update_neuron_votes(neuron_rects, fig_neuron_votes, result_monitor[:])
 
 		# if the neurons in the network didn't spike more than four times
@@ -998,8 +1038,8 @@ def run_simulation():
 			# get the output classifications of the network
 			output_numbers['all'][j, :], output_numbers['most_spiked'][j, :], output_numbers['top_percent'][j, :], \
 							output_numbers['kmeans'][j, :], output_numbers['simple_clusters'][j, :], output_numbers['spatial_clusters'][j, :] = \
-							get_recognized_number_ranking(assignments, kmeans_assignments, kmeans, simple_clusters, 
-							index_matrix, input_numbers[j - update_interval - (j % update_interval) : j - (j % update_interval)], result_monitor[j % update_interval, :], average_firing_rate)
+							predict_label(assignments, kmeans_assignments, kmeans, simple_clusters, index_matrix, 
+							input_numbers[j - update_interval - (j % update_interval) : j - (j % update_interval)], result_monitor[j % update_interval, :], average_firing_rate)
 			
 			# print progress
 			if j % print_progress_interval == 0 and j > 0:
@@ -1044,7 +1084,7 @@ def run_simulation():
 	normalize_weights()
 
 
-def save_and_plot_results():
+def save_results():
 	'''
 	Logic for saving and plotting results of the simulation.
 	'''
@@ -1060,36 +1100,54 @@ def save_and_plot_results():
 		np.save(top_level_path + 'activity/conv_patch_connectivity_activity/results_' + str(num_examples) + '_' + ending, result_monitor)
 		np.save(top_level_path + 'activity/conv_patch_connectivity_activity/input_numbers_' + str(num_examples) + '_' + ending, input_numbers)
 
-	if do_plot:
-		if rate_monitors:
-			b.figure(fig_num)
-			fig_num += 1
-			for i, name in enumerate(rate_monitors):
-				b.subplot(len(rate_monitors), 1, i + 1)
-				b.plot(rate_monitors[name].times / b.second, rate_monitors[name].rate, '.')
-				b.title('Rates of population ' + name)
 
-		if spike_monitors:
-			b.figure(fig_num)
-			fig_num += 1
-			for i, name in enumerate(spike_monitors):
-				b.subplot(len(spike_monitors), 1, i + 1)
-				b.raster_plot(spike_monitors[name])
-				b.title('Spikes of population ' + name)
+def evaluate_results():
+	global update_interval
 
-		if spike_counters:
-			b.figure(fig_num)
-			fig_num += 1
-			for i, name in enumerate(spike_counters):
-				b.subplot(len(spike_counters), 1, i + 1)
-				b.plot(np.asarray(spike_counters['Ae'].count[:]))
-				b.title('Spike count of population ' + name)
+	start_time_training = 0
+	end_time_training = int(0.1 * num_examples)
+	start_time_testing = int(0.1 * num_examples)
+	end_time_testing = num_examples
 
-		plot_2d_input_weights()
-		plot_patch_weights()
+	update_interval = end_time_training
 
-		b.ioff()
-		b.show()
+	training_result_monitor = result_monitor[:end_time_training]
+	training_input_numbers = input_numbers[:end_time_training]
+	testing_result_monitor = result_monitor[end_time_training:]
+	testing_input_numbers = input_numbers[end_time_training:]
+
+	print '...getting assignments'
+	test_results = np.zeros((10, end_time_testing - start_time_testing))
+	test_results_max = np.zeros((10, end_time_testing - start_time_testing))
+	test_results_top = np.zeros((10, end_time_testing - start_time_testing))
+	test_results_fixed = np.zeros((10, end_time_testing - start_time_testing))
+
+	assignments, kmeans, kmeans_assignments, simple_clusters, weights, average_firing_rate, index_matrix = \
+																assign_labels(training_result_monitor, training_input_numbers)
+
+	voting_mechanisms = [ 'all', 'most-spiked (per patch)', 'most-spiked (overall)', 'KMeans patch weights clusters',
+												'activity clusters', 'spatial correlation clusters' ]
+
+	test_results = {}
+	for mechanism in voting_mechanisms:
+		test_results[mechanism] = np.zeros((10, end_time_testing - start_time_testing))
+
+	print '\n...calculating accuracy per voting mechanism'
+
+	for idx in xrange(end_time_testing - end_time_training):
+		for (mechanism, label_ranking) in zip(voting_mechanisms, predict_label(assignments, kmeans_assignments, kmeans, simple_clusters, index_matrix,
+														training_input_numbers, testing_result_monitor[idx, :], average_firing_rate)):
+			test_results[mechanism][:, idx] = label_ranking
+
+	differences = { mechanism : test_results[mechanism][0, :] - testing_input_numbers for mechanism in voting_mechanisms }
+	correct = { mechanism : len(np.where(differences[mechanism] == 0)[0]) for mechanism in voting_mechanisms }
+	incorrect = { mechanism : len(np.where(differences[mechanism] != 0)[0]) for mechanism in voting_mechanisms }
+	accuracies = { mechanism : correct[mechanism] / float(end_time_testing - start_time_testing) * 100 for mechanism in voting_mechanisms }
+
+	for mechanism in voting_mechanisms:
+		print '\n-', mechanism, 'accuracy:', accuracies[mechanism]
+
+	print '\n'
 
 
 if __name__ == '__main__':
@@ -1099,7 +1157,7 @@ if __name__ == '__main__':
 	parser.add_argument('--connectivity', default='none')
 	parser.add_argument('--weight_dependence', default='no_weight_dependence')
 	parser.add_argument('--post_pre', default='postpre')
-	parser.add_argument('--conv_size', type=int, default=12)
+	parser.add_argument('--conv_size', type=int, default=16)
 	parser.add_argument('--conv_stride', type=int, default=4)
 	parser.add_argument('--conv_features', type=int, default=50)
 	parser.add_argument('--weight_sharing', default='no_weight_sharing')
@@ -1107,16 +1165,18 @@ if __name__ == '__main__':
 	parser.add_argument('--random_lattice_prob', type=float, default=0.0)
 	parser.add_argument('--random_inhibition_prob', type=float, default=0.0)
 	parser.add_argument('--top_percent', type=int, default=10)
+	parser.add_argument('--do_plot', type=bool, default=False)
 	
 	args = parser.parse_args()
-	mode, connectivity, weight_dependence, post_pre, conv_size, conv_stride, conv_features, weight_sharing, lattice_structure, random_lattice_prob, random_inhibition_prob, top_percent = \
-		args.mode, args.connectivity, args.weight_dependence, args.post_pre, args.conv_size, args.conv_stride, args.conv_features, args.weight_sharing, \
-		args.lattice_structure, args.random_lattice_prob, args.random_inhibition_prob, args.top_percent
+	mode, connectivity, weight_dependence, post_pre, conv_size, conv_stride, conv_features, weight_sharing, lattice_structure, \
+		random_lattice_prob, random_inhibition_prob, top_percent, do_plot = args.mode, args.connectivity, args.weight_dependence, \
+		args.post_pre, args.conv_size, args.conv_stride, args.conv_features, args.weight_sharing, args.lattice_structure, \
+		args.random_lattice_prob, args.random_inhibition_prob, args.top_percent, args.do_plot
 
 	print '\n'
 
 	print args.mode, args.connectivity, args.weight_dependence, args.post_pre, args.conv_size, args.conv_stride, args.conv_features, args.weight_sharing, \
-		args.lattice_structure, args.random_lattice_prob, args.random_inhibition_prob, args.top_percent
+		args.lattice_structure, args.random_lattice_prob, args.random_inhibition_prob, args.top_percent, args.do_plot
 
 	print '\n'
 
@@ -1135,35 +1195,32 @@ if __name__ == '__main__':
 		test_mode = False
 
 	if not test_mode:
-	    start = time.time()
-	    training = get_labeled_data(MNIST_data_path + 'training', b_train=True)
-	    end = time.time()
-	    print 'time needed to load training set:', end - start
+		start = time.time()
+		training = get_labeled_data(MNIST_data_path + 'training', b_train=True)
+		end = time.time()
+		print 'time needed to load training set:', end - start
 
 	else:
-	    start = time.time()
-	    testing = get_labeled_data(MNIST_data_path + 'testing', b_train=False)
-	    end = time.time()
-	    print 'time needed to load test set:', end - start
+		start = time.time()
+		testing = get_labeled_data(MNIST_data_path + 'testing', b_train=False)
+		end = time.time()
+		print 'time needed to load test set:', end - start
 
 	# set parameters for simulation based on train / test mode
 	if test_mode:
 		weight_path = top_level_path + 'weights/conv_patch_connectivity_weights/'
-		num_examples = 10000 * 1
+		num_examples = 10000
 		use_testing_set = True
 		do_plot_performance = False
 		record_spikes = True
 		ee_STDP_on = False
 	else:
 		weight_path = top_level_path + 'random/conv_patch_connectivity_random/'
-		num_examples = 60000 * 1
+		num_examples = 60000
 		use_testing_set = False
 		do_plot_performance = False
 		record_spikes = True
 		ee_STDP_on = True
-
-	# plotting or not
-	do_plot = False
 
 	# number of inputs to the network
 	n_input = 784
@@ -1296,7 +1353,8 @@ if __name__ == '__main__':
 	print '\n'
 
 	# set ending of filename saves
-	ending = connectivity + '_' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e) + '_' + weight_dependence + '_' + post_pre + '_' + weight_sharing + '_' + lattice_structure + '_' + str(random_lattice_prob) # + '_' + str(random_inhibition_prob)
+	ending = connectivity + '_' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e) + '_' + \
+					weight_dependence + '_' + post_pre + '_' + weight_sharing + '_' + lattice_structure + '_' + str(random_lattice_prob)
 
 	b.ion()
 	fig_num = 1
@@ -1337,4 +1395,8 @@ if __name__ == '__main__':
 	run_simulation()
 
 	# save and plot results
-	save_and_plot_results()
+	save_results()
+
+	# evaluate results
+	if test_mode:
+		evaluate_results()
