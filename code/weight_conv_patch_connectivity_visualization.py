@@ -112,8 +112,10 @@ def get_2d_input_weights():
 			rearranged_weights[ idx * conv_size : (idx + 1) * conv_size, n * conv_size : (n + 1) * conv_size ] = \
 																	temp[convolution_locations[n]].reshape((conv_size, conv_size))
 
-	# return the rearranged weights to display to the user
-	return rearranged_weights.T, [ np.argsort(euclid_dists[n]) for n in xrange(n_e) ]
+	euclid_dists = np.array(euclid_dists)
+	ordering = np.array([ np.argsort(euclid_dists[n, :]) for n in xrange(n_e) ])
+
+	return rearranged_weights.T, ordering
 
 
 def plot_2d_input_weights():
@@ -216,18 +218,20 @@ patch_weight_matrix[np.nonzero(patch_weight_matrix)] = 1
 _, ax, _, ordering = plot_2d_input_weights()
 fig_num += 1
 
-ordering = np.array(ordering)
 ordering = np.array([ ordering[i, :] + conv_features * i for i in xrange(n_e) ])
 
 print '\n...Plotting patch connectivity graph.\n'
 for i in xrange(6, ordering.size, n_e):
 	for j in xrange(ordering.size):
 		if patch_weight_matrix[i, j] == 1:
-			print i % n_e, j % n_e
+			# print [(ordering[i % n_e, i // conv_features] // conv_features), \
+			# 		 (ordering[j % n_e, j // conv_features] // conv_features)], \
+			# 		[(ordering[i % n_e, i // conv_features] % conv_features), \
+			# 		 (ordering[j % n_e, j // conv_features] % conv_features)]
 			ax.plot([(ordering[i % n_e, i // conv_features] % conv_features) * conv_size + (conv_size // 2), \
 					 (ordering[j % n_e, j // conv_features] % conv_features) * conv_size + (conv_size // 2)], \
 					[(ordering[i % n_e, i // conv_features] // conv_features) * conv_size + (conv_size // 2), \
 					 (ordering[j % n_e, j // conv_features] // conv_features) * conv_size + (conv_size // 2)], color='black', linestyle='--', linewidth=1)
 
-b.show()
-b.savefig(file_name[:-4] + '.png')
+plt.savefig('../plots/conv_patch_connectivity_plots/' + file_name[:-4] + '_patch_connectivity.png')
+plt.show()
