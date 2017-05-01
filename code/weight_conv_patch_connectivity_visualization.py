@@ -210,7 +210,7 @@ weight_matrix[weight_matrix < 0.2] = 0
 normalize_weights()
 
 patch_weight_matrix = get_matrix_from_file(weight_dir + file_name.replace('XeAe', 'AeAe'), conv_features * n_e, conv_features * n_e)
-patch_weight_matrix[patch_weight_matrix < np.percentile(patch_weight_matrix, 99)] = 0
+patch_weight_matrix[patch_weight_matrix < np.percentile(patch_weight_matrix, 99.9)] = 0
 patch_weight_matrix[np.nonzero(patch_weight_matrix)] = 1
 
 _, ax, _, ordering = plot_2d_input_weights()
@@ -219,15 +219,15 @@ fig_num += 1
 ordering = np.array(ordering)
 ordering = np.array([ ordering[i, :] + conv_features * i for i in xrange(n_e) ])
 
-print ordering.size 
-
-for i in xrange(ordering.size):
+print '\n...Plotting patch connectivity graph.\n'
+for i in xrange(6, ordering.size, n_e):
 	for j in xrange(ordering.size):
 		if patch_weight_matrix[i, j] == 1:
-			# print [(ordering[i % n_e, i // conv_features] % conv_features) * conv_size + (conv_size // 2), (ordering[j % n_e, j // conv_features] % conv_features) * conv_size + (conv_size // 2)], \
-			# 			[ordering[i % n_e, i // conv_features] * conv_size + (conv_size // 2), ordering[j % n_e, j // conv_features] * conv_size + (conv_size // 2)]
-			ax.plot([(ordering[j % n_e, j // conv_features] % conv_features) * conv_size + (conv_size // 2), (ordering[i % n_e, i // conv_features] % conv_features) * conv_size + (conv_size // 2)], \
-						[ordering[j % n_e, j // conv_features] * conv_size + (conv_size // 2), ordering[i % n_e, i // conv_features] * conv_size + (conv_size // 2)], color='black', linestyle=':')
+			print i % n_e, j % n_e
+			ax.plot([(ordering[i % n_e, i // conv_features] % conv_features) * conv_size + (conv_size // 2), \
+					 (ordering[j % n_e, j // conv_features] % conv_features) * conv_size + (conv_size // 2)], \
+					[(ordering[i % n_e, i // conv_features] // conv_features) * conv_size + (conv_size // 2), \
+					 (ordering[j % n_e, j // conv_features] // conv_features) * conv_size + (conv_size // 2)], color='black', linestyle='--', linewidth=1)
 
 b.show()
 b.savefig(file_name[:-4] + '.png')

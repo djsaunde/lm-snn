@@ -265,18 +265,48 @@ def get_2d_input_weights():
 	# # return the rearranged weights to display to the user
 	# return rearranged_weights.T
 
+	# rearranged_weights = np.zeros((conv_features * conv_size, conv_size * n_e))
+
+	# # counts number of input -> excitatory weights displayed so far
+	# connection = input_connections['XeAe'][:]
+
+	# # for each excitatory neuron in this convolution feature
+	# for n in xrange(n_e):
+	# 	# for each convolution feature
+	# 	for feature in xrange(conv_features):
+	# 		temp = connection[:, feature * n_e + (n // n_e_sqrt) * n_e_sqrt + (n % n_e_sqrt)].todense()
+	# 		rearranged_weights[ feature * conv_size : (feature + 1) * conv_size, n * conv_size : (n + 1) * conv_size ] = \
+	# 																	temp[convolution_locations[n]].reshape((conv_size, conv_size))
+
+	# # return the rearranged weights to display to the user
+	# return rearranged_weights.T
+
 	rearranged_weights = np.zeros((conv_features * conv_size, conv_size * n_e))
 
 	# counts number of input -> excitatory weights displayed so far
 	connection = input_connections['XeAe'][:]
 
 	# for each excitatory neuron in this convolution feature
+	euclid_dists = np.zeros((n_e, conv_features))
+	temps = np.zeros((n_e, conv_features, n_input))
 	for n in xrange(n_e):
 		# for each convolution feature
 		for feature in xrange(conv_features):
 			temp = connection[:, feature * n_e + (n // n_e_sqrt) * n_e_sqrt + (n % n_e_sqrt)].todense()
-			rearranged_weights[ feature * conv_size : (feature + 1) * conv_size, n * conv_size : (n + 1) * conv_size ] = \
-																		temp[convolution_locations[n]].reshape((conv_size, conv_size))
+			if feature == 0:
+				if n == 0:
+					euclid_dists[n, feature] = 0.0
+				else:
+					euclid_dists[n, feature] = np.linalg.norm(temps[0, 0, convolution_locations[n]] - temp[convolution_locations[n]])
+			else:
+				euclid_dists[n, feature] = np.linalg.norm(temps[n, 0, convolution_locations[n]] - temp[convolution_locations[n]])
+
+			temps[n, feature, :] = temp
+
+		for idx, feature in enumerate(np.argsort(euclid_dists[n])):
+			temp = temps[n, feature]
+			rearranged_weights[ idx * conv_size : (idx + 1) * conv_size, n * conv_size : (n + 1) * conv_size ] = \
+																	temp[convolution_locations[n]].reshape((conv_size, conv_size))
 
 	# return the rearranged weights to display to the user
 	return rearranged_weights.T
@@ -1008,8 +1038,8 @@ def run_simulation():
 			# get the output classifications of the network
 			output_numbers['all'][j, :], output_numbers['most_spiked'][j, :], output_numbers['top_percent'][j, :], \
 							output_numbers['kmeans'][j, :], output_numbers['simple_clusters'][j, :], output_numbers['spatial_clusters'][j, :] = \
-							predict_label(assignments, kmeans_assignments, kmeans, simple_clusters, 
-							index_matrix, input_numbers[j - update_interval - (j % update_interval) : j - (j % update_interval)], result_monitor[j % update_interval, :], average_firing_rate)
+							predict_label(assignments, kmeans_assignments, kmeans, simple_clusters, index_matrix, 
+							input_numbers[j - update_interval - (j % update_interval) : j - (j % update_interval)], result_monitor[j % update_interval, :], average_firing_rate)
 			
 			# print progress
 			if j % print_progress_interval == 0 and j > 0:

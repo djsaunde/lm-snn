@@ -443,7 +443,7 @@ def update_performance_plot(im, performances, current_example_num, fig):
 	return im, performances
 
 
-def predict_label(assignments, kmeans_assignments, kmeans, simple_clusters, spike_rates, average_firing_rate):
+def predict_label(assignments, kmeans_assignments, kmeans, simple_clusters, spike_rates, average_firing_rate, patch_assignments):
 	'''
 	Given the label assignments of the excitatory layer and their spike rates over
 	the past 'update_interval', get the ranking of each of the categories of input.
@@ -529,13 +529,21 @@ def predict_label(assignments, kmeans_assignments, kmeans, simple_clusters, spik
 		if i in simple_clusters.keys() and len(simple_clusters[i]) > 1:
 			# simple_cluster_summed_rates[i] = np.sum(spike_rates_flat[simple_clusters[i]]) / float(len(simple_clusters[i]))
 			this_spike_rates = spike_rates_flat[simple_clusters[i]]
-			simple_cluster_summed_rates[i] = np.sum(this_spike_rates[np.argpartition(this_spike_rates, -5)][-10:])
+			simple_cluster_summed_rates[i] = np.sum(this_spike_rates[np.argpartition(this_spike_rates, -10)][-10:])
 
-	# print simple_cluster_summed_rates
+	simple_cluster_summed_rates = simple_cluster_summed_rates / average_firing_rate
 
-	# simple_cluster_summed_rates = simple_cluster_summed_rates / average_firing_rate
+	patch_cluster_summed_rates = [0] * 10
+	num_assignments = [0] * 10
+	patch_summed_rates = np.array([ np.sum(spike_rates_flat[xrange(idx, spike_rates_flat.size, n_e)]) for idx in xrange(conv_features) ])
 
-	return ( np.argsort(summed_rates)[::-1] for summed_rates in (all_summed_rates, most_spiked_summed_rates, top_percent_summed_rates, kmeans_summed_rates, simple_cluster_summed_rates) )
+	for i in xrange(10):
+		num_assignments[i] = len(np.where(patch_assignments == i)[0])
+		if num_assignments[i] > 0:
+			patch_cluster_summed_rates[i] = np.sum(patch_summed_rates[np.where(patch_assignments == i)[0]]) / num_assignments[i]
+
+	return ( np.argsort(summed_rates)[::-1] for summed_rates in (all_summed_rates, most_spiked_summed_rates, \
+							top_percent_summed_rates, kmeans_summed_rates, simple_cluster_summed_rates, patch_cluster_summed_rates) )
 
 
 def assign_labels(result_monitor, input_numbers):
@@ -603,17 +611,33 @@ def assign_labels(result_monitor, input_numbers):
 			rate = np.sum(result_monitor[input_nums == j], axis=0) / float(num_assignments)
 			this_result_monitor = result_monitor[input_nums == j]
 			simple_clusters[j] = np.argsort(np.ravel(np.sum(this_result_monitor, axis=0)))[::-1][:int(0.05 * (np.size(result_monitor) / float(10000)))]
-			# print simple_clusters[j]
 
 	# np.savetxt('activity.txt', result_monitor[j])
 
-	# print '\n'
-	# for j in xrange(10):
-	# 	if j in simple_clusters.keys():
-	# 		print 'There are', len(simple_clusters[j]), 'neurons in the cluster for digit', j, '\n'
-	# print '\n'
+	maximum_rate = np.zeros(conv_features)
+	patch_assignments = np.full(conv_features, -1)
+	
+	for j in xrange(10):
+		num_assignments = len(np.where(input_nums == j)[0])
+		if num_assignments > 0:
+			for i in xrange(conv_features):
+				rate = np.sum(result_monitor[input_nums == j][:, i]) / float(num_assignments)
+				if rate > maximum_rate[i]:
+					maximum_rate[i] = rate
+					patch_assignments[i] = j
 
-	return assignments, kmeans, kmeans_assignments, simple_clusters, weights, average_firing_rate
+	maximum_rate = np.zeros(conv_features * n_e)
+	
+	for j in xrange(10):
+		num_assignments = len(np.where(input_nums == j)[0])
+		if num_assignments > 0:
+			rate = np.sum(result_monitor[input_nums == j], axis=0) / num_assignments
+			for i in xrange(conv_features * n_e):
+				if rate[i // n_e, i % n_e] > maximum_rate[i]:
+					maximum_rate[i] = rate[i // n_e, i % n_e]
+					assignments[i // n_e, i % n_e] = j
+
+	return assignments, kmeans, kmeans_assignments, simple_clusters, weights, average_firing_rate, patch_assignments
 
 
 def build_network():
@@ -851,7 +875,7 @@ def run_simulation():
 	Logic for running the simulation itself.
 	'''
 	global fig_num, input_intensity, previous_spike_count, rates, assignments, clusters, cluster_assignments, \
-				kmeans, kmeans_assignments, simple_clusters, simple_cluster_assignments
+				kmeans, kmeans_assignments, simple_clusters, simple_cluster_assignments, patch_assignments
 
 	# plot input weights
 	if not test_mode and do_plot:
@@ -875,7 +899,9 @@ def run_simulation():
 	# plot performance
 	num_evaluations = int(num_examples / update_interval)
 	performances = {}
-	performances['all'], performances['most_spiked'], performances['top_percent'], performances['kmeans'], performances['simple_clusters'] = np.zeros(num_evaluations), np.zeros(num_evaluations), np.zeros(num_evaluations), np.zeros(num_evaluations), np.zeros(num_evaluations)
+	performances['all'], performances['most spiked'], performances['top percent'], performances['kmeans'], performances['simple clusters'], \
+													performances['patch clusters'] = np.zeros(num_evaluations), np.zeros(num_evaluations), \
+													np.zeros(num_evaluations), np.zeros(num_evaluations), np.zeros(num_evaluations), np.zeros(num_evaluations)
 	if do_plot_performance and do_plot:
 		performance_monitor, fig_num, fig_performance = plot_performance(fig_num, performances, num_evaluations)
 	else:
@@ -919,7 +945,8 @@ def run_simulation():
 		
 		# get new neuron label assignments every 'update_interval'
 		if j % update_interval == 0 and j > 0:
-			assignments, kmeans, kmeans_assignments, simple_clusters, weights, average_firing_rate = assign_labels(result_monitor[:], input_numbers[j - update_interval : j])
+			assignments, kmeans, kmeans_assignments, simple_clusters, weights, average_firing_rate, patch_assignments = \
+																		assign_labels(result_monitor[:], input_numbers[j - update_interval : j])
 			if do_plot:
 				update_cluster_centers(kmeans.cluster_centers_, cluster_monitor, cluster_fig)
 
@@ -964,10 +991,10 @@ def run_simulation():
 				input_numbers[j] = training['y'][j % 60000][0]
 			
 			# get the output classifications of the network
-			output_numbers['all'][j, :], output_numbers['most_spiked'][j, :], output_numbers['top_percent'][j, :], \
-							output_numbers['kmeans'][j, :], output_numbers['simple_clusters'][j, :] = \
+			output_numbers['all'][j, :], output_numbers['most spiked'][j, :], output_numbers['top percent'][j, :], \
+							output_numbers['kmeans'][j, :], output_numbers['simple clusters'][j, :], output_numbers['patch clusters'][j, :] = \
 							predict_label(assignments, kmeans_assignments, kmeans, simple_clusters, 
-							result_monitor[j % update_interval, :], average_firing_rate)
+							result_monitor[j % update_interval, :], average_firing_rate, patch_assignments)
 			
 			# print progress
 			if j % print_progress_interval == 0 and j > 0:
@@ -1074,7 +1101,7 @@ if __name__ == '__main__':
 	parser.add_argument('--post_pre', default='no_postpre')
 	parser.add_argument('--conv_size', type=int, default=16)
 	parser.add_argument('--conv_stride', type=int, default=4)
-	parser.add_argument('--conv_features', type=int, default=50)
+	parser.add_argument('--conv_features', type=int, default=49)
 	parser.add_argument('--weight_sharing', default='no_weight_sharing')
 	parser.add_argument('--lattice_structure', default='4')
 	parser.add_argument('--random_lattice_prob', type=float, default=0.0)
@@ -1292,15 +1319,17 @@ if __name__ == '__main__':
 	# bookkeeping variables
 	previous_spike_count = np.zeros((conv_features, n_e))
 	assignments = np.zeros((conv_features, n_e))
+	patch_assignments = np.zeros(conv_features)
 	kmeans = KMeans()
 	kmeans_assignments = {}
 	simple_clusters = {}
 	input_numbers = [0] * num_examples
-	output_numbers['all'] = np.zeros((num_examples, 10))
-	output_numbers['most_spiked'] = np.zeros((num_examples, 10))
-	output_numbers['top_percent'] = np.zeros((num_examples, 10))
-	output_numbers['kmeans'] = np.zeros((num_examples, 10))
-	output_numbers['simple_clusters'] = np.zeros((num_examples, 10))
+	output_numbers['all'] = np.full((num_examples, 10), -1)
+	output_numbers['most spiked'] = np.full((num_examples, 10), -1)
+	output_numbers['top percent'] = np.full((num_examples, 10), -1)
+	output_numbers['kmeans'] = np.full((num_examples, 10), -1)
+	output_numbers['simple clusters'] = np.full((num_examples, 10), -1)
+	output_numbers['patch clusters'] = np.full((num_examples, 10), -1)
 	rates = np.zeros((n_input_sqrt, n_input_sqrt))
 
 	# run the simulation of the network
