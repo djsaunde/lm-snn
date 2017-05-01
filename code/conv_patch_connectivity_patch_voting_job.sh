@@ -2,13 +2,15 @@
 #
 #SBATCH --partition=longq
 #SBATCH --time=04-00:00:00
-#SBATCH --mem=20000
+#SBATCH --mem=40000
+#SBATCH --ntasks-per-node=8
 #SBATCH --account=rkozma
 
+
 connectivity=none
-conv_size=12
-conv_stride=4
-conv_features=50
+conv_size=14
+conv_stride=2
+conv_features=25
 weight_sharing=no_weight_sharing
 lattice_structure=4
 
