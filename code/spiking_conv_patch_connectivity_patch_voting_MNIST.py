@@ -1159,7 +1159,7 @@ if __name__ == '__main__':
 		num_examples = 60000 * 1
 		use_testing_set = False
 		do_plot_performance = False
-		record_spikes = True
+		record_spikes = False
 		ee_STDP_on = True
 
 	# plotting or not
