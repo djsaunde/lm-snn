@@ -126,11 +126,11 @@ def plot_2d_input_weights():
 	fig, ax = b.subplots(figsize=(18, 18))
 	im = ax.imshow(weights, interpolation='nearest', vmin=0, vmax=wmax_ee, cmap=cmap.get_cmap('hot_r'))
 	b.colorbar(im)
-	b.title('Reshaped input -> convolution weights')
+	b.title('Reshaped weights from input to convolutional layer', fontsize=18)
 	b.xticks(xrange(conv_size, conv_size * (conv_features + 1), conv_size), xrange(1, conv_features + 1))
 	b.yticks(xrange(conv_size, conv_size * (n_e + 1), conv_size), xrange(1, n_e + 1))
-	b.xlabel('Convolution patch')
-	b.ylabel('Location in input (from top left to bottom right')
+	b.xlabel('Sorted in order of similarity', fontsize=14)
+	b.ylabel('Location in input (from top left to bottom right)', fontsize=14)
 	fig.canvas.draw()
 	return fig, ax, im, ordering
 
@@ -208,12 +208,14 @@ for n in xrange(n_e):
 	convolution_locations[n] = [ ((n % n_e_sqrt) * conv_stride + (n // n_e_sqrt) * n_input_sqrt * conv_stride) + (x * n_input_sqrt) + y for y in xrange(conv_size) for x in xrange(conv_size) ]
 
 weight_matrix = get_matrix_from_file(weight_dir + file_name, n_input, conv_features * n_e)
-weight_matrix[weight_matrix < 0.2] = 0
+weight_matrix[weight_matrix < 0.175] = 0
 normalize_weights()
 
 patch_weight_matrix = get_matrix_from_file(weight_dir + file_name.replace('XeAe', 'AeAe'), conv_features * n_e, conv_features * n_e)
 patch_weight_matrix[patch_weight_matrix < np.percentile(patch_weight_matrix, 99.9)] = 0
 patch_weight_matrix[np.nonzero(patch_weight_matrix)] = 1
+
+plot_patch_weights()
 
 _, ax, _, ordering = plot_2d_input_weights()
 fig_num += 1

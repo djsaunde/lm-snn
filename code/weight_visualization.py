@@ -76,7 +76,7 @@ my_cmap = matplotlib.colors.LinearSegmentedColormap.from_list('own2',[bright_gre
 n_input = 784
 
 
-readout = np.load('../weights/' + readout_name + '.npy')
+readout = np.load('../weights/eth_model_weights/' + readout_name + '.npy')
 value_arr = np.nan * np.ones((n_input, n_e))
 connection_parameters = readout
 
@@ -115,6 +115,7 @@ for label, x, y in zip(range(200), XA_sum, AA_sum):
                 xy = (x, y), xytext = (-0, 0),
                 textcoords = 'offset points', ha = 'right', va = 'bottom',
                 color = 'k')
+
 xlabel('summed input from X to A for A neurons')
 ylabel('summed input from A to A for A neurons')
 savefig(str(fi.number))
