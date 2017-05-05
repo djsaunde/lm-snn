@@ -561,7 +561,7 @@ def predict_label(assignments, kmeans_assignments, kmeans, simple_clusters, inde
 	for i in xrange(10):
 		if i in simple_clusters.keys() and len(simple_clusters[i]) > 1:
 			this_spike_rates = spike_rates_flat[simple_clusters[i]]
-			simple_cluster_summed_rates[i] = np.sum(this_spike_rates[np.argpartition(this_spike_rates, -10)][-10:])
+			simple_cluster_summed_rates[i] = np.sum(this_spike_rates[np.argpartition(this_spike_rates, -1)][-1:])
 
 	spatial_cluster_index_vector = np.empty(n_e)
 	spatial_cluster_index_vector[:] = np.nan
@@ -899,8 +899,9 @@ def build_network():
 
 			if test_mode:
 				normalize_weights()
-				plot_2d_input_weights()
-				fig_num += 1	
+				if do_plot:
+					plot_2d_input_weights()
+					fig_num += 1	
 
 		# if excitatory -> excitatory STDP is specified, add it here (input to excitatory populations)
 		if ee_STDP_on:
@@ -1166,12 +1167,14 @@ if __name__ == '__main__':
 	parser.add_argument('--random_inhibition_prob', type=float, default=0.0)
 	parser.add_argument('--top_percent', type=int, default=10)
 	parser.add_argument('--do_plot', type=bool, default=False)
-	
+
 	args = parser.parse_args()
 	mode, connectivity, weight_dependence, post_pre, conv_size, conv_stride, conv_features, weight_sharing, lattice_structure, \
 		random_lattice_prob, random_inhibition_prob, top_percent, do_plot = args.mode, args.connectivity, args.weight_dependence, \
 		args.post_pre, args.conv_size, args.conv_stride, args.conv_features, args.weight_sharing, args.lattice_structure, \
 		args.random_lattice_prob, args.random_inhibition_prob, args.top_percent, args.do_plot
+
+	print do_plot
 
 	print '\n'
 
