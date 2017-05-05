@@ -1,4 +1,4 @@
-"Network","All","Most-spiked per patch","Most-spiked overall","Correlation clustering"
+"Network","All","Most-spiked","Top-percent","Corr. Clustering"
 "_10000_none_8_4_50_36_weight_dependence_postpre_no_weight_sharing_4_0.0.npy",76.94,72.73,70.51,78.71
 "_10000_pairs_27_1_50_4_no_weight_dependence_postpre_no_weight_sharing_8_0.0.npy",60.99,61.68,60.41,60.47
 "_10000_pairs_26_1_50_9_no_weight_dependence_postpre_no_weight_sharing_8_0.0.npy",67.06,66.25,65.59,65.41
