@@ -704,13 +704,10 @@ def build_network():
 		# if we're in test mode / using some stored weights
 		if test_mode or weight_path[-8:] == 'weights/conv_patch_connectivity_weights/':
 			# load up adaptive threshold parameters
-			neuron_groups['e'].theta = np.load(weight_path + 'theta_A' + '_' + ending +'.npy')
+			neuron_groups['e'].theta = np.zeros((n_e_total)) * b.mV
 		else:
 			# otherwise, set the adaptive additive threshold parameter at 20mV
 			neuron_groups['e'].theta = np.ones((n_e_total)) * 20.0 * b.mV
-		
-		# neuron_groups['e'].theta = np.ones((n_e_total)) * 20.0 * b.mV
-		# neuron_groups['e'].theta = np.load(weight_path + 'theta_A' + '_' + ending +'.npy')
 
 		for conn_type in recurrent_conn_names:
 			if conn_type == 'ei':
@@ -882,7 +879,7 @@ def build_network():
 			# get weight matrix depending on training or test phase
 			if test_mode:
 				weight_matrix = get_matrix_from_file(weight_path + conn_name + '_' + ending + '.npy', n_input, conv_features * n_e)
-				# weight_matrix[weight_matrix < 0.20] = 0
+				weight_matrix[weight_matrix < 0.20] = 0
 
 			# create connections from the windows of the input group to the neuron population
 			input_connections[conn_name] = b.Connection(input_groups['Xe'], neuron_groups[name[1] + conn_type[1]], structure='sparse', state='g' + conn_type[0], delay=True, max_delay=delay[conn_type][1])
@@ -899,7 +896,7 @@ def build_network():
 							input_connections[conn_name][convolution_locations[n][idx], feature * n_e + n] = (b.random() + 0.01) * 0.3
 
 			if test_mode:
-				# normalize_weights()
+				normalize_weights()
 				if do_plot:
 					plot_2d_input_weights()
 					fig_num += 1	

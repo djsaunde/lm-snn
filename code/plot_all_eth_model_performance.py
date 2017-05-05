@@ -9,11 +9,13 @@ conv_plot, = plt.plot(x, [ 99.0 ] * len(x), label='Convolutional neural network 
 fig = plt.gcf()
 fig.set_size_inches(16, 12)
 
-plt.legend(handles=[performance_plot, conv_plot], prop={ 'size' : 12 })
+plt.legend(handles=[performance_plot, conv_plot], prop={ 'size' : 16 })
 plt.xlim(25, 6400)
-plt.title('Classification performance by number of excitatory, inhibitory neurons', fontsize=16)
+plt.title('Classification performance by number of excitatory, inhibitory neurons', fontsize=20)
 plt.xticks([ 25, 50, 100, 200, 400, 800, 1600, 3200, 6400 ], [ 25, 50, 100, 200, 400, 800, 1600, 3200, 6400 ])
-plt.xlabel('No. of excitatory neurons', fontsize=12)
-plt.ylabel('Test dataset accuracy', fontsize=12)
+plt.xlabel('No. of excitatory neurons', fontsize=16)
+plt.ylabel('Test dataset accuracy', fontsize=16)
+
+plt.savefig('../plots/eth_performance.png')
 
 plt.show()
