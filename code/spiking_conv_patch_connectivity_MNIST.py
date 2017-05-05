@@ -1162,7 +1162,7 @@ if __name__ == '__main__':
 	parser.add_argument('--conv_stride', type=int, default=4)
 	parser.add_argument('--conv_features', type=int, default=50)
 	parser.add_argument('--weight_sharing', default='no_weight_sharing')
-	parser.add_argument('--lattice_structure', default='4')
+	parser.add_argument('--lattice_structure', default='8')
 	parser.add_argument('--random_lattice_prob', type=float, default=0.0)
 	parser.add_argument('--random_inhibition_prob', type=float, default=0.0)
 	parser.add_argument('--top_percent', type=int, default=10)

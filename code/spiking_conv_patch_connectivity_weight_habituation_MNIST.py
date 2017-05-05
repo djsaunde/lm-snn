@@ -1158,14 +1158,14 @@ if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
 
 	parser.add_argument('--mode', default='train')
-	parser.add_argument('--connectivity', default='none')
+	parser.add_argument('--connectivity', default='all')
 	parser.add_argument('--weight_dependence', default='no_weight_dependence')
 	parser.add_argument('--post_pre', default='postpre')
 	parser.add_argument('--conv_size', type=int, default=16)
 	parser.add_argument('--conv_stride', type=int, default=4)
 	parser.add_argument('--conv_features', type=int, default=50)
 	parser.add_argument('--weight_sharing', default='no_weight_sharing')
-	parser.add_argument('--lattice_structure', default='4')
+	parser.add_argument('--lattice_structure', default='8')
 	parser.add_argument('--random_lattice_prob', type=float, default=0.0)
 	parser.add_argument('--random_inhibition_prob', type=float, default=0.0)
 	parser.add_argument('--top_percent', type=int, default=10)
@@ -1177,12 +1177,20 @@ if __name__ == '__main__':
 		args.post_pre, args.conv_size, args.conv_stride, args.conv_features, args.weight_sharing, args.lattice_structure, \
 		args.random_lattice_prob, args.random_inhibition_prob, args.top_percent, args.do_plot
 
-	print do_plot
-
 	print '\n'
 
-	print args.mode, args.connectivity, args.weight_dependence, args.post_pre, args.conv_size, args.conv_stride, args.conv_features, args.weight_sharing, \
-		args.lattice_structure, args.random_lattice_prob, args.random_inhibition_prob, args.top_percent, args.do_plot
+	print 'mode:', args.mode
+	print 'connectivity:', args.connectivity
+	print 'STDP rule:', args.weight_dependence + '_' + args.post_pre
+	print 'convolution window size:', args.conv_size
+	print 'convolution (horizontal, vertical) stride:', args.conv_stride
+	print 'no. of convolution patches:', args.conv_features
+	print 'weight sharing?', args.weight_sharing
+	print 'lattice structure:', args.lattice_structure
+	print 'random lattice connections probability:', args.random_lattice_prob
+	print 'random inhibitory connections probability:', args.random_inhibition_prob
+	print 'top percentage voting:', args.top_percent
+	print 'plot?', args.do_plot
 
 	print '\n'
 
@@ -1282,7 +1290,7 @@ if __name__ == '__main__':
 	# time constants, learning rates, max weights, weight dependence, etc.
 	tc_pre_ee, tc_post_ee = 20 * b.ms, 20 * b.ms
 	nu_ee_pre, nu_ee_post = 0.0001, 0.01
-	weight_habituation_constant = 0.0001
+	weight_habituation_constant = 0.001
 	wmax_ee = 1.0
 	exp_ee_post = exp_ee_pre = 0.2
 	w_mu_pre, w_mu_post = 0.2, 0.2
