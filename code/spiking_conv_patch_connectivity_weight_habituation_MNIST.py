@@ -9,6 +9,7 @@ import cPickle as p
 import brian_no_units
 import brian as b
 import networkx as nx
+import pandas as pd
 import time, os.path, scipy, math, sys, timeit, random, argparse
 
 from sklearn.cluster import KMeans
@@ -111,7 +112,7 @@ def save_connections():
 	'''
 
 	# print out saved connections
-	print '...saving connections: weights/conv_patch_connectivity_weights/' + save_conns[0] + '_' + ending + ' and ' + 'weights/conv_patch_connectivity_weights/' + save_conns[1] + '_' + stdp_input
+	print '...saving connections: weights/conv_patch_connectivity_weight_habituation_weights/' + save_conns[0] + '_' + ending + ' and ' + 'weights/conv_patch_connectivity_weight_habituation_weights/' + save_conns[1] + '_' + stdp_input
 
 	# iterate over all connections to save
 	for conn_name in save_conns:
@@ -122,7 +123,7 @@ def save_connections():
 		# sparsify it into (row, column, entry) tuples
 		conn_list_sparse = ([(i, j, conn_matrix[i, j]) for i in xrange(conn_matrix.shape[0]) for j in xrange(conn_matrix.shape[1]) ])
 		# save it out to disk
-		np.save(top_level_path + 'weights/conv_patch_connectivity_weights/' + conn_name + '_' + ending, conn_list_sparse)
+		np.save(top_level_path + 'weights/conv_patch_connectivity_weight_habituation_weights/' + conn_name + '_' + ending, conn_list_sparse)
 
 
 def save_theta():
@@ -133,10 +134,10 @@ def save_theta():
 	# iterate over population for which to save theta parameters
 	for pop_name in population_names:
 		# print out saved theta populations
-		print '...saving theta: weights/conv_patch_connectivity_weights/theta_' + pop_name + '_' + ending
+		print '...saving theta: weights/conv_patch_connectivity_weight_habituation_weights/theta_' + pop_name + '_' + ending
 
 		# save out the theta parameters to file
-		np.save(top_level_path + 'weights/conv_patch_connectivity_weights/theta_' + pop_name + '_' + ending, neuron_groups[pop_name + 'e'].theta)
+		np.save(top_level_path + 'weights/conv_patch_connectivity_weight_habituation_weights/theta_' + pop_name + '_' + ending, neuron_groups[pop_name + 'e'].theta)
 
 
 def set_weights_most_fired(current_spike_count):
@@ -704,7 +705,7 @@ def build_network():
 
 	for name in population_names:
 		# if we're in test mode / using some stored weights
-		# if test_mode or weight_path[-8:] == 'weights/conv_patch_connectivity_weights/':
+		# if test_mode or weight_path[-8:] == 'weights/conv_patch_connectivity_weight_habituation_weights/':
 		# 	# load up adaptive threshold parameters
 		# 	neuron_groups['e'].theta = np.load(weight_path + 'theta_A' + '_' + ending +'.npy')
 		# else:
@@ -1059,7 +1060,7 @@ def run_simulation():
 					performances = get_current_performance(performances, j)
 
 				# printing out classification performance results so far
-				target = open('../performance/conv_patch_connectivity_performance/' + ending + '.txt', 'w')
+				target = open('../performance/conv_patch_connectivity_weight_habituation_performance/' + ending + '.txt', 'w')
 				target.truncate()
 				target.write('Iteration ' + str(j) + '\n')
 
@@ -1101,8 +1102,8 @@ def save_results():
 	if not test_mode:
 		save_connections()
 	else:
-		np.save(top_level_path + 'activity/conv_patch_connectivity_activity/results_' + str(num_examples) + '_' + ending, result_monitor)
-		np.save(top_level_path + 'activity/conv_patch_connectivity_activity/input_numbers_' + str(num_examples) + '_' + ending, input_numbers)
+		np.save(top_level_path + 'activity/conv_patch_connectivity_weight_habituation_activity/results_' + str(num_examples) + '_' + ending, result_monitor)
+		np.save(top_level_path + 'activity/conv_patch_connectivity_weight_habituation_activity/input_numbers_' + str(num_examples) + '_' + ending, input_numbers)
 
 
 def evaluate_results():
@@ -1151,6 +1152,14 @@ def evaluate_results():
 	for mechanism in voting_mechanisms:
 		print '\n-', mechanism, 'accuracy:', accuracies[mechanism]
 
+	results = pd.DataFrame(accuracies.values(), index=ending, columns=accuracies.keys())
+	if not 'all_accuracy_results_weight_habituation.csv' in os.listdir('../data/'):
+		results.to_csv('../data/all_accuracy_results_weight_habituation.csv', )
+	else:
+		all_results = pd.read_csv('../data/all_accuracy_results_weight_habituation.csv')
+		all_results.append(results)
+		all_results.to_csv('../data/all_accuracy_results_weight_habituation.csv')
+
 	print '\n'
 
 
@@ -1160,7 +1169,7 @@ if __name__ == '__main__':
 	parser.add_argument('--mode', default='train')
 	parser.add_argument('--connectivity', default='all')
 	parser.add_argument('--weight_dependence', default='no_weight_dependence')
-	parser.add_argument('--post_pre', default='postpre')
+	parser.add_argument('--post_pre', default='no_postpre')
 	parser.add_argument('--conv_size', type=int, default=16)
 	parser.add_argument('--conv_stride', type=int, default=4)
 	parser.add_argument('--conv_features', type=int, default=50)
@@ -1222,14 +1231,14 @@ if __name__ == '__main__':
 
 	# set parameters for simulation based on train / test mode
 	if test_mode:
-		weight_path = top_level_path + 'weights/conv_patch_connectivity_weights/'
+		weight_path = top_level_path + 'weights/conv_patch_connectivity_weight_habituation_weights/'
 		num_examples = 10000
 		use_testing_set = True
 		do_plot_performance = False
 		record_spikes = True
 		ee_STDP_on = False
 	else:
-		weight_path = top_level_path + 'random/conv_patch_connectivity_random/'
+		weight_path = top_level_path + 'random/conv_patch_connectivity_weight_habituation_random/'
 		num_examples = 60000
 		use_testing_set = False
 		do_plot_performance = False
@@ -1351,7 +1360,7 @@ if __name__ == '__main__':
 		if use_post_pre:
 			eqs_stdp_pre_ee = 'pre = 1.; w -= nu_ee_pre * post * w ** exp_ee_pre'
 			eqs_stdp_post_ee = 'w += nu_ee_post * pre * (wmax_ee - w) ** exp_ee_post; post = 1.'
-			eqs_stdp_pre_patch = 'w += ne_ee_post * post * (wmax_ee - w) ** exp_ee_post; pre = 1.'
+			eqs_stdp_pre_patch = 'w += nu_ee_post * post * (wmax_ee - w) ** exp_ee_post; pre = 1.'
 
 		else:
 			eqs_stdp_pre_ee = 'pre = 1.'
