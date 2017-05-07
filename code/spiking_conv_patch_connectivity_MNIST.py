@@ -1149,7 +1149,7 @@ def evaluate_results():
 	for mechanism in voting_mechanisms:
 		print '\n-', mechanism, 'accuracy:', accuracies[mechanism]
 
-	results = pd.DataFrame(accuracies.values(), index=ending, columns=accuracies.keys())
+	results = pd.DataFrame([ accuracies.values() ], index=[ ending ], columns=accuracies.keys())
 	if not 'all_accuracy_results_conv_patch_connectivity.csv' in os.listdir('../data/'):
 		results.to_csv('../data/all_accuracy_results_conv_patch_connectivity.csv', )
 	else:

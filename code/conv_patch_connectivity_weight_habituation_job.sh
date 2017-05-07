@@ -1,14 +1,14 @@
 #!/bin/bash
 #
 #SBATCH --partition=longq
-#SBATCH --time=02-00:00:00
-#SBATCH --mem=30000
+#SBATCH --time=03-00:00:00
+#SBATCH --mem=35000
 #SBATCH --account=rkozma
 
 connectivity=all
 conv_size=16
 conv_stride=4
-conv_features=100
+conv_features=50
 lattice_structure=8
 weight_sharing=no_weight_sharing
 
