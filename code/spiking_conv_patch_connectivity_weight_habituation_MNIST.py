@@ -705,14 +705,14 @@ def build_network():
 
 	for name in population_names:
 		# if we're in test mode / using some stored weights
-		# if test_mode or weight_path[-8:] == 'weights/conv_patch_connectivity_weight_habituation_weights/':
-		# 	# load up adaptive threshold parameters
-		# 	neuron_groups['e'].theta = np.load(weight_path + 'theta_A' + '_' + ending +'.npy')
-		# else:
-		# 	# otherwise, set the adaptive additive threshold parameter at 20mV
-		# 	neuron_groups['e'].theta = np.ones((n_e_total)) * 20.0 * b.mV
+		if test_mode or weight_path[-8:] == 'weights/conv_patch_connectivity_weight_habituation_weights/':
+			# load up adaptive threshold parameters
+			neuron_groups['e'].theta = np.load(weight_path + 'theta_A' + '_' + ending +'.npy')
+		else:
+			# otherwise, set the adaptive additive threshold parameter at 20mV
+			neuron_groups['e'].theta = np.ones((n_e_total)) * 20.0 * b.mV
 		
-		neuron_groups['e'].theta = np.ones((n_e_total)) * 20.0 * b.mV
+		# neuron_groups['e'].theta = np.ones((n_e_total)) * 20.0 * b.mV
 		# neuron_groups['e'].theta = np.load(weight_path + 'theta_A' + '_' + ending +'.npy')
 
 		for conn_type in recurrent_conn_names:

@@ -1106,23 +1106,25 @@ def save_results():
 def evaluate_results():
 	global update_interval
 
-	start_time_training = 0
-	end_time_training = int(0.1 * num_examples)
-	start_time_testing = int(0.1 * num_examples)
-	end_time_testing = num_examples
+	# start_time_training = 0
+	# end_time_training = int(0.1 * num_examples)
+	# start_time_testing = int(0.1 * num_examples)
+	# end_time_testing = num_examples
+
+	start_time_training = start_time_testing = 0
+	end_time_training = end_time_testing = num_examples
 
 	update_interval = end_time_training
 
-	training_result_monitor = result_monitor[:end_time_training]
-	training_input_numbers = input_numbers[:end_time_training]
-	testing_result_monitor = result_monitor[end_time_training:]
-	testing_input_numbers = input_numbers[end_time_training:]
+	# training_result_monitor = result_monitor[:end_time_training]
+	# training_input_numbers = input_numbers[:end_time_training]
+	# testing_result_monitor = result_monitor[end_time_training:]
+	# testing_input_numbers = input_numbers[end_time_training:]
+
+	training_result_monitor = testing_result_monitor = result_monitor
+	training_input_numbers = testing_input_numbers = input_numbers
 
 	print '...getting assignments'
-	test_results = np.zeros((10, end_time_testing - start_time_testing))
-	test_results_max = np.zeros((10, end_time_testing - start_time_testing))
-	test_results_top = np.zeros((10, end_time_testing - start_time_testing))
-	test_results_fixed = np.zeros((10, end_time_testing - start_time_testing))
 
 	assignments, kmeans, kmeans_assignments, simple_clusters, weights, average_firing_rate, index_matrix = \
 																assign_labels(training_result_monitor, training_input_numbers)
@@ -1132,11 +1134,13 @@ def evaluate_results():
 
 	test_results = {}
 	for mechanism in voting_mechanisms:
-		test_results[mechanism] = np.zeros((10, end_time_testing - start_time_testing))
+		# test_results[mechanism] = np.zeros((10, end_time_testing - start_time_testing))
+		test_results[mechanism] = np.zeros((10, num_examples))
 
 	print '\n...calculating accuracy per voting mechanism'
 
-	for idx in xrange(end_time_testing - end_time_training):
+	# for idx in xrange(end_time_testing - end_time_training):
+	for idx in xrange(num_examples):
 		for (mechanism, label_ranking) in zip(voting_mechanisms, predict_label(assignments, kmeans_assignments, kmeans, simple_clusters, index_matrix,
 														training_input_numbers, testing_result_monitor[idx, :], average_firing_rate)):
 			test_results[mechanism][:, idx] = label_ranking
@@ -1149,7 +1153,7 @@ def evaluate_results():
 	for mechanism in voting_mechanisms:
 		print '\n-', mechanism, 'accuracy:', accuracies[mechanism]
 
-	results = pd.DataFrame(accuracies.values(), index=ending, columns=accuracies.keys())
+	results = pd.DataFrame([ accuracies.values() ], index=[ str(num_examples) + '_' + ending ], columns=accuracies.keys())
 	if not 'all_accuracy_results_conv_patch_connectivity.csv' in os.listdir('../data/'):
 		results.to_csv('../data/all_accuracy_results_conv_patch_connectivity.csv', )
 	else:

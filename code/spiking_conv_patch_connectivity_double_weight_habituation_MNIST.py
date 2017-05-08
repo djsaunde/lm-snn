@@ -112,7 +112,7 @@ def save_connections():
 	'''
 
 	# print out saved connections
-	print '...saving connections: weights/conv_patch_connectivity_weights/' + save_conns[0] + '_' + ending + ' and ' + 'weights/conv_patch_connectivity_weights/' + save_conns[1] + '_' + stdp_input
+	print '...saving connections: weights/conv_patch_connectivity_weight_habituation_weights/' + save_conns[0] + '_' + ending + ' and ' + 'weights/conv_patch_connectivity_weight_habituation_weights/' + save_conns[1] + '_' + stdp_input
 
 	# iterate over all connections to save
 	for conn_name in save_conns:
@@ -123,7 +123,7 @@ def save_connections():
 		# sparsify it into (row, column, entry) tuples
 		conn_list_sparse = ([(i, j, conn_matrix[i, j]) for i in xrange(conn_matrix.shape[0]) for j in xrange(conn_matrix.shape[1]) ])
 		# save it out to disk
-		np.save(top_level_path + 'weights/conv_patch_connectivity_weights/' + conn_name + '_' + ending, conn_list_sparse)
+		np.save(top_level_path + 'weights/conv_patch_connectivity_weight_habituation_weights/' + conn_name + '_' + ending, conn_list_sparse)
 
 
 def save_theta():
@@ -134,10 +134,10 @@ def save_theta():
 	# iterate over population for which to save theta parameters
 	for pop_name in population_names:
 		# print out saved theta populations
-		print '...saving theta: weights/conv_patch_connectivity_weights/theta_' + pop_name + '_' + ending
+		print '...saving theta: weights/conv_patch_connectivity_weight_habituation_weights/theta_' + pop_name + '_' + ending
 
 		# save out the theta parameters to file
-		np.save(top_level_path + 'weights/conv_patch_connectivity_weights/theta_' + pop_name + '_' + ending, neuron_groups[pop_name + 'e'].theta)
+		np.save(top_level_path + 'weights/conv_patch_connectivity_weight_habituation_weights/theta_' + pop_name + '_' + ending, neuron_groups[pop_name + 'e'].theta)
 
 
 def set_weights_most_fired(current_spike_count):
@@ -170,27 +170,33 @@ def normalize_weights():
 	Squash the input -> excitatory weights to sum to a prespecified number.
 	'''
 	for conn_name in input_connections:
-		connection = input_connections[conn_name][:].todense()
-		for feature in xrange(conv_features):
-			feature_connection = connection[:, feature * n_e : (feature + 1) * n_e]
-			column_sums = np.sum(np.asarray(feature_connection), axis=0)
-			column_factors = weight['ee_input'] / column_sums
+		# connection = input_connections[conn_name][:].todense()
+		# for feature in xrange(conv_features):
+		# 	feature_connection = connection[:, feature * n_e : (feature + 1) * n_e]
+		# 	column_sums = np.sum(np.asarray(feature_connection), axis=0)
+		# 	column_factors = weight['ee_input'] / column_sums
 
-			for n in xrange(n_e):
-				dense_weights = input_connections[conn_name][:, feature * n_e + n].todense()
-				dense_weights[convolution_locations[n]] *= column_factors[n]
-				input_connections[conn_name][:, feature * n_e + n] = dense_weights
+		# 	for n in xrange(n_e):
+		# 		dense_weights = input_connections[conn_name][:, feature * n_e + n].todense()
+		# 		dense_weights[convolution_locations[n]] *= column_factors[n]
+		# 		input_connections[conn_name][:, feature * n_e + n] = dense_weights
+
+		for idx in xrange(conv_features * n_e):
+			input_connections[conn_name][:, idx] -= (100 * weight_habituation_constant) * input_connections[conn_name][:, idx]
 
 	for conn_name in connections:
 		if 'AeAe' in conn_name and lattice_structure != 'none' and lattice_structure != 'none':
-			connection = connections[conn_name][:].todense()
-			for feature in xrange(conv_features):
-				feature_connection = connection[feature * n_e : (feature + 1) * n_e, :]
-				column_sums = np.sum(feature_connection)
-				column_factors = weight['ee_recurr'] / column_sums
+			# connection = connections[conn_name][:].todense()
+			# for feature in xrange(conv_features):
+			# 	feature_connection = connection[feature * n_e : (feature + 1) * n_e, :]
+			# 	column_sums = np.sum(feature_connection)
+			# 	column_factors = weight['ee_recurr'] / column_sums
 
-				for idx in xrange(feature * n_e, (feature + 1) * n_e):
-					connections[conn_name][idx, :] *= column_factors
+			# 	for idx in xrange(feature * n_e, (feature + 1) * n_e):
+			# 		connections[conn_name][idx, :] *= column_factors
+
+			for idx in xrange(conv_features * n_e):
+				connections[conn_name][idx, :] -= weight_habituation_constant * connections[conn_name][idx, :]
 
 
 def plot_input(rates):
@@ -338,7 +344,7 @@ def plot_2d_input_weights():
 	weights = get_2d_input_weights()
 	fig = b.figure(fig_num, figsize=(18, 18))
 	im = b.imshow(weights, interpolation='nearest', vmin=0, vmax=wmax_ee, cmap=cmap.get_cmap('hot_r'))
-	b.colorbar(im)
+	b.colorbar(im, fraction=0.016)
 	b.title('Reshaped input -> convolution weights')
 	b.xticks(xrange(conv_size, conv_size * (conv_features + 1), conv_size), xrange(1, conv_features + 1))
 	b.yticks(xrange(conv_size, conv_size * (n_e + 1), conv_size), xrange(1, n_e + 1))
@@ -383,9 +389,9 @@ def plot_patch_weights():
 	weights = get_patch_weights()
 	fig = b.figure(fig_num, figsize=(8, 8))
 	im = b.imshow(weights, interpolation='nearest', vmin=0, vmax=wmax_ee, cmap=cmap.get_cmap('hot_r'))
-	for idx in xrange(n_e, n_e * conv_features, n_e):
-		b.axvline(idx, ls='--', lw=1)
-		b.axhline(idx, ls='--', lw=1)
+	# for idx in xrange(n_e, n_e * conv_features, n_e):
+	# 	b.axvline(idx, ls='--', lw=1)
+	# 	b.axhline(idx, ls='--', lw=1)
 	b.colorbar(im)
 	b.title('Between-patch connectivity')
 	fig.canvas.draw()
@@ -702,12 +708,15 @@ def build_network():
 
 	for name in population_names:
 		# if we're in test mode / using some stored weights
-		if test_mode or weight_path[-8:] == 'weights/conv_patch_connectivity_weights/':
+		if test_mode or weight_path[-8:] == 'weights/conv_patch_connectivity_weight_habituation_weights/':
 			# load up adaptive threshold parameters
-			neuron_groups['e'].theta = np.ones((n_e_total)) * 35.0 * b.mV
+			neuron_groups['e'].theta = np.load(weight_path + 'theta_A' + '_' + ending +'.npy')
 		else:
 			# otherwise, set the adaptive additive threshold parameter at 20mV
 			neuron_groups['e'].theta = np.ones((n_e_total)) * 20.0 * b.mV
+		
+		# neuron_groups['e'].theta = np.ones((n_e_total)) * 20.0 * b.mV
+		# neuron_groups['e'].theta = np.load(weight_path + 'theta_A' + '_' + ending +'.npy')
 
 		for conn_type in recurrent_conn_names:
 			if conn_type == 'ei':
@@ -760,7 +769,7 @@ def build_network():
 											if test_mode:
 												connections[conn_name][feature * n_e + this_n, other_feature * n_e + other_n] = weight_matrix[feature * n_e + this_n, other_feature * n_e + other_n]
 											else:
-												connections[conn_name][feature * n_e + this_n, other_feature * n_e + other_n] = (b.random() + 0.01) * 0.3
+												connections[conn_name][feature * n_e + this_n, other_feature * n_e + other_n] = 0.15 # (b.random() + 0.01) * 0.3
 
 				elif connectivity == 'pairs':
 					for feature in xrange(conv_features):
@@ -771,7 +780,7 @@ def build_network():
 										if test_mode:
 											connections[conn_name][feature * n_e + this_n, (feature + 1) * n_e + other_n] = weight_matrix[feature * n_e + this_n, (feature + 1) * n_e + other_n]
 										else:
-											connections[conn_name][feature * n_e + this_n, (feature + 1) * n_e + other_n] = (b.random() + 0.01) * 0.3
+											connections[conn_name][feature * n_e + this_n, (feature + 1) * n_e + other_n] = 0.15 # (b.random() + 0.01) * 0.3
 						elif feature % 2 == 1:
 							for this_n in xrange(n_e):
 								for other_n in xrange(n_e):
@@ -779,7 +788,7 @@ def build_network():
 										if test_mode:
 											connections[conn_name][feature * n_e + this_n, (feature - 1) * n_e + other_n] = weight_matrix[feature * n_e + this_n, (feature - 1) * n_e + other_n]
 										else:
-											connections[conn_name][feature * n_e + this_n, (feature - 1) * n_e + other_n] = (b.random() + 0.01) * 0.3
+											connections[conn_name][feature * n_e + this_n, (feature - 1) * n_e + other_n] = 0.15 # (b.random() + 0.01) * 0.3
 
 				elif connectivity == 'linear':
 					for feature in xrange(conv_features):
@@ -790,7 +799,7 @@ def build_network():
 										if test_mode:
 											connections[conn_name][feature * n_e + this_n, (feature + 1) * n_e + other_n] = weight_matrix[feature * n_e + this_n, (feature + 1) * n_e + other_n]
 										else:
-											connections[conn_name][feature * n_e + this_n, (feature + 1) * n_e + other_n] = (b.random() + 0.01) * 0.3
+											connections[conn_name][feature * n_e + this_n, (feature + 1) * n_e + other_n] = 0.15 # (b.random() + 0.01) * 0.3
 						if feature != 0:
 							for this_n in xrange(n_e):
 								for other_n in xrange(n_e):
@@ -798,14 +807,14 @@ def build_network():
 										if test_mode:
 											connections[conn_name][feature * n_e + this_n, (feature - 1) * n_e + other_n] = weight_matrix[feature * n_e + this_n, (feature - 1) * n_e + other_n]
 										else:
-											connections[conn_name][feature * n_e + this_n, (feature - 1) * n_e + other_n] = (b.random() + 0.01) * 0.3
+											connections[conn_name][feature * n_e + this_n, (feature - 1) * n_e + other_n] = 0.15 # (b.random() + 0.01) * 0.3
 
 				elif connectivity == 'none':
 					pass
 
 		# if STDP from excitatory -> excitatory is on and this connection is excitatory -> excitatory
 		if ee_STDP_on and 'ee' in recurrent_conn_names:
-			stdp_methods[name + 'e' + name + 'e'] = b.STDP(connections[name + 'e' + name + 'e'], eqs=eqs_stdp_ee, pre=eqs_stdp_pre_ee, post=eqs_stdp_post_ee, wmin=0., wmax=wmax_ee)
+			stdp_methods[name + 'e' + name + 'e'] = b.STDP(connections[name + 'e' + name + 'e'], eqs=eqs_stdp_ee, pre=eqs_stdp_pre_patch, post=eqs_stdp_post_ee, wmin=0., wmax=wmax_ee)
 
 		print '...creating monitors for:', name
 
@@ -1054,7 +1063,7 @@ def run_simulation():
 					performances = get_current_performance(performances, j)
 
 				# printing out classification performance results so far
-				target = open('../performance/conv_patch_connectivity_performance/' + ending + '.txt', 'w')
+				target = open('../performance/conv_patch_connectivity_weight_habituation_performance/' + ending + '.txt', 'w')
 				target.truncate()
 				target.write('Iteration ' + str(j) + '\n')
 
@@ -1096,32 +1105,30 @@ def save_results():
 	if not test_mode:
 		save_connections()
 	else:
-		np.save(top_level_path + 'activity/conv_patch_connectivity_activity/results_' + str(num_examples) + '_' + ending, result_monitor)
-		np.save(top_level_path + 'activity/conv_patch_connectivity_activity/input_numbers_' + str(num_examples) + '_' + ending, input_numbers)
+		np.save(top_level_path + 'activity/conv_patch_connectivity_weight_habituation_activity/results_' + str(num_examples) + '_' + ending, result_monitor)
+		np.save(top_level_path + 'activity/conv_patch_connectivity_weight_habituation_activity/input_numbers_' + str(num_examples) + '_' + ending, input_numbers)
 
 
 def evaluate_results():
 	global update_interval
 
-	# start_time_training = 0
-	# end_time_training = int(0.1 * num_examples)
-	# start_time_testing = int(0.1 * num_examples)
-	# end_time_testing = num_examples
-
-	start_time_training = start_time_testing = 0
-	end_time_training = end_time_testing = num_examples
+	start_time_training = 0
+	end_time_training = int(0.1 * num_examples)
+	start_time_testing = int(0.1 * num_examples)
+	end_time_testing = num_examples
 
 	update_interval = end_time_training
 
-	# training_result_monitor = result_monitor[:end_time_training]
-	# training_input_numbers = input_numbers[:end_time_training]
-	# testing_result_monitor = result_monitor[end_time_training:]
-	# testing_input_numbers = input_numbers[end_time_training:]
-
-	training_result_monitor = testing_result_monitor = result_monitor
-	training_input_numbers = testing_input_numbers = input_numbers
+	training_result_monitor = result_monitor[:end_time_training]
+	training_input_numbers = input_numbers[:end_time_training]
+	testing_result_monitor = result_monitor[end_time_training:]
+	testing_input_numbers = input_numbers[end_time_training:]
 
 	print '...getting assignments'
+	test_results = np.zeros((10, end_time_testing - start_time_testing))
+	test_results_max = np.zeros((10, end_time_testing - start_time_testing))
+	test_results_top = np.zeros((10, end_time_testing - start_time_testing))
+	test_results_fixed = np.zeros((10, end_time_testing - start_time_testing))
 
 	assignments, kmeans, kmeans_assignments, simple_clusters, weights, average_firing_rate, index_matrix = \
 																assign_labels(training_result_monitor, training_input_numbers)
@@ -1131,13 +1138,11 @@ def evaluate_results():
 
 	test_results = {}
 	for mechanism in voting_mechanisms:
-		# test_results[mechanism] = np.zeros((10, end_time_testing - start_time_testing))
-		test_results[mechanism] = np.zeros((10, num_examples))
+		test_results[mechanism] = np.zeros((10, end_time_testing - start_time_testing))
 
 	print '\n...calculating accuracy per voting mechanism'
 
-	# for idx in xrange(end_time_testing - end_time_training):
-	for idx in xrange(num_examples):
+	for idx in xrange(end_time_testing - end_time_training):
 		for (mechanism, label_ranking) in zip(voting_mechanisms, predict_label(assignments, kmeans_assignments, kmeans, simple_clusters, index_matrix,
 														training_input_numbers, testing_result_monitor[idx, :], average_firing_rate)):
 			test_results[mechanism][:, idx] = label_ranking
@@ -1150,13 +1155,13 @@ def evaluate_results():
 	for mechanism in voting_mechanisms:
 		print '\n-', mechanism, 'accuracy:', accuracies[mechanism]
 
-	results = pd.DataFrame([ accuracies.values() ], index=[ str(num_examples) + '_' + ending ], columns=accuracies.keys())
-	if not 'all_accuracy_results_conv_patch_connectivity_contrasting.csv' in os.listdir('../data/'):
-		results.to_csv('../data/all_accuracy_results_conv_patch_connectivity_contrasting.csv', )
+	results = pd.DataFrame(accuracies.values(), index=ending, columns=accuracies.keys())
+	if not 'all_accuracy_results_weight_habituation.csv' in os.listdir('../data/'):
+		results.to_csv('../data/all_accuracy_results_weight_habituation.csv', )
 	else:
-		all_results = pd.read_csv('../data/all_accuracy_results_conv_patch_connectivity_contrasting.csv')
+		all_results = pd.read_csv('../data/all_accuracy_results_weight_habituation.csv')
 		all_results.append(results)
-		all_results.to_csv('../data/all_accuracy_results_conv_patch_connectivity_contrasting.csv')
+		all_results.to_csv('../data/all_accuracy_results_weight_habituation.csv')
 
 	print '\n'
 
@@ -1165,9 +1170,9 @@ if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
 
 	parser.add_argument('--mode', default='train')
-	parser.add_argument('--connectivity', default='none')
+	parser.add_argument('--connectivity', default='all')
 	parser.add_argument('--weight_dependence', default='no_weight_dependence')
-	parser.add_argument('--post_pre', default='postpre')
+	parser.add_argument('--post_pre', default='no_postpre')
 	parser.add_argument('--conv_size', type=int, default=16)
 	parser.add_argument('--conv_stride', type=int, default=4)
 	parser.add_argument('--conv_features', type=int, default=50)
@@ -1184,12 +1189,20 @@ if __name__ == '__main__':
 		args.post_pre, args.conv_size, args.conv_stride, args.conv_features, args.weight_sharing, args.lattice_structure, \
 		args.random_lattice_prob, args.random_inhibition_prob, args.top_percent, args.do_plot
 
-	print do_plot
-
 	print '\n'
 
-	print args.mode, args.connectivity, args.weight_dependence, args.post_pre, args.conv_size, args.conv_stride, args.conv_features, args.weight_sharing, \
-		args.lattice_structure, args.random_lattice_prob, args.random_inhibition_prob, args.top_percent, args.do_plot
+	print 'mode:', args.mode
+	print 'connectivity:', args.connectivity
+	print 'STDP rule:', args.weight_dependence + '_' + args.post_pre
+	print 'convolution window size:', args.conv_size
+	print 'convolution (horizontal, vertical) stride:', args.conv_stride
+	print 'no. of convolution patches:', args.conv_features
+	print 'weight sharing?', args.weight_sharing
+	print 'lattice structure:', args.lattice_structure
+	print 'random lattice connections probability:', args.random_lattice_prob
+	print 'random inhibitory connections probability:', args.random_inhibition_prob
+	print 'top percentage voting:', args.top_percent
+	print 'plot?', args.do_plot
 
 	print '\n'
 
@@ -1221,14 +1234,14 @@ if __name__ == '__main__':
 
 	# set parameters for simulation based on train / test mode
 	if test_mode:
-		weight_path = top_level_path + 'weights/conv_patch_connectivity_weights/'
+		weight_path = top_level_path + 'weights/conv_patch_connectivity_weight_habituation_weights/'
 		num_examples = 10000
 		use_testing_set = True
 		do_plot_performance = False
 		record_spikes = True
 		ee_STDP_on = False
 	else:
-		weight_path = top_level_path + 'random/conv_patch_connectivity_random/'
+		weight_path = top_level_path + 'random/conv_patch_connectivity_weight_habituation_random/'
 		num_examples = 60000
 		use_testing_set = False
 		do_plot_performance = False
@@ -1289,6 +1302,7 @@ if __name__ == '__main__':
 	# time constants, learning rates, max weights, weight dependence, etc.
 	tc_pre_ee, tc_post_ee = 20 * b.ms, 20 * b.ms
 	nu_ee_pre, nu_ee_post = 0.0001, 0.01
+	weight_habituation_constant = 0.001
 	wmax_ee = 1.0
 	exp_ee_post = exp_ee_pre = 0.2
 	w_mu_pre, w_mu_post = 0.2, 0.2
@@ -1346,22 +1360,26 @@ if __name__ == '__main__':
 
 	# setting STDP update rule
 	if use_weight_dependence:
-		if post_pre:
+		if use_post_pre:
 			eqs_stdp_pre_ee = 'pre = 1.; w -= nu_ee_pre * post * w ** exp_ee_pre'
 			eqs_stdp_post_ee = 'w += nu_ee_post * pre * (wmax_ee - w) ** exp_ee_post; post = 1.'
+			eqs_stdp_pre_patch = 'w += nu_ee_post * post * (wmax_ee - w) ** exp_ee_post; pre = 1.'
 
 		else:
 			eqs_stdp_pre_ee = 'pre = 1.'
 			eqs_stdp_post_ee = 'w += nu_ee_post * pre * (wmax_ee - w) ** exp_ee_post; post = 1.'
+			eqs_stdp_pre_patch = 'w += nu_ee_post * post * (wmax_ee - w) ** exp_ee_post; pre = 1.'
 
 	else:
 		if use_post_pre:
 			eqs_stdp_pre_ee = 'pre = 1.; w -= nu_ee_pre * post'
 			eqs_stdp_post_ee = 'w += nu_ee_post * pre; post = 1.'
+			eqs_stdp_pre_patch = 'w += nu_ee_post * post; pre = 1.'
 
 		else:
 			eqs_stdp_pre_ee = 'pre = 1.'
 			eqs_stdp_post_ee = 'w += nu_ee_post * pre; post = 1.'
+			eqs_stdp_pre_patch = 'w += nu_ee_post * post; pre = 1.'
 
 	print '\n'
 

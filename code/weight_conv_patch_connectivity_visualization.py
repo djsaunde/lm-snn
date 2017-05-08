@@ -208,8 +208,8 @@ for n in xrange(n_e):
 	convolution_locations[n] = [ ((n % n_e_sqrt) * conv_stride + (n // n_e_sqrt) * n_input_sqrt * conv_stride) + (x * n_input_sqrt) + y for y in xrange(conv_size) for x in xrange(conv_size) ]
 
 weight_matrix = get_matrix_from_file(weight_dir + file_name, n_input, conv_features * n_e)
-weight_matrix[weight_matrix < 0.175] = 0
-normalize_weights()
+# weight_matrix[weight_matrix < 0.175] = 0
+# normalize_weights()
 
 patch_weight_matrix = get_matrix_from_file(weight_dir + file_name.replace('XeAe', 'AeAe'), conv_features * n_e, conv_features * n_e)
 patch_weight_matrix[patch_weight_matrix < np.percentile(patch_weight_matrix, 99.9)] = 0
