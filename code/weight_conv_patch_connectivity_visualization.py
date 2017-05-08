@@ -90,30 +90,45 @@ def get_2d_input_weights():
 	# counts number of input -> excitatory weights displayed so far
 	connection = weight_matrix
 
-	# for each excitatory neuron in this convolution feature
-	euclid_dists = np.zeros((n_e, conv_features))
-	temps = np.zeros((n_e, conv_features, n_input))
-	for n in xrange(n_e):
-		# for each convolution feature
-		for feature in xrange(conv_features):
-			temp = connection[:, feature * n_e + (n // n_e_sqrt) * n_e_sqrt + (n % n_e_sqrt)]
-			if feature == 0:
-				if n == 0:
-					euclid_dists[n, feature] = 0.0
+	if 'no_weight_sharing' in file_name:
+		# for each excitatory neuron in this convolution feature
+		euclid_dists = np.zeros((n_e, conv_features))
+		temps = np.zeros((n_e, conv_features, n_input))
+		for n in xrange(n_e):
+			# for each convolution feature
+			for feature in xrange(conv_features):
+				temp = connection[:, feature * n_e + (n // n_e_sqrt) * n_e_sqrt + (n % n_e_sqrt)]
+				if feature == 0:
+					if n == 0:
+						euclid_dists[n, feature] = 0.0
+					else:
+						euclid_dists[n, feature] = np.linalg.norm(temps[0, 0, convolution_locations[n]] - temp[convolution_locations[n]])
 				else:
-					euclid_dists[n, feature] = np.linalg.norm(temps[0, 0, convolution_locations[n]] - temp[convolution_locations[n]])
-			else:
-				euclid_dists[n, feature] = np.linalg.norm(temps[n, 0, convolution_locations[n]] - temp[convolution_locations[n]])
+					euclid_dists[n, feature] = np.linalg.norm(temps[n, 0, convolution_locations[n]] - temp[convolution_locations[n]])
 
-			temps[n, feature, :] = temp
+				temps[n, feature, :] = temp
 
-		for idx, feature in enumerate(np.argsort(euclid_dists[n])):
-			temp = temps[n, feature]
-			rearranged_weights[ idx * conv_size : (idx + 1) * conv_size, n * conv_size : (n + 1) * conv_size ] = \
-																	temp[convolution_locations[n]].reshape((conv_size, conv_size))
+			for idx, feature in enumerate(np.argsort(euclid_dists[n])):
+				temp = temps[n, feature]
+				rearranged_weights[ idx * conv_size : (idx + 1) * conv_size, n * conv_size : (n + 1) * conv_size ] = \
+																		temp[convolution_locations[n]].reshape((conv_size, conv_size))
 
-	euclid_dists = np.array(euclid_dists)
-	ordering = np.array([ np.argsort(euclid_dists[n, :]) for n in xrange(n_e) ])
+		euclid_dists = np.array(euclid_dists)
+		ordering = np.array([ np.argsort(euclid_dists[n, :]) for n in xrange(n_e) ])
+
+	else:
+		# for each excitatory neuron in this convolution feature
+		euclid_dists = np.zeros((n_e, conv_features))
+		temps = np.zeros((n_e, conv_features, n_input))
+		for n in xrange(n_e):
+			# for each convolution feature
+			for idx, feature in enumerate(xrange(conv_features)):
+				temp = connection[:, feature * n_e + (n // n_e_sqrt) * n_e_sqrt + (n % n_e_sqrt)]
+				rearranged_weights[ idx * conv_size : (idx + 1) * conv_size, n * conv_size : (n + 1) * conv_size ] = \
+																		temp[convolution_locations[n]].reshape((conv_size, conv_size))
+
+		euclid_dists = np.array(euclid_dists)
+		ordering = np.array([ np.argsort(euclid_dists[n, :]) for n in xrange(n_e) ])
 
 	return rearranged_weights.T, ordering
 
@@ -125,7 +140,7 @@ def plot_2d_input_weights():
 	weights, ordering = get_2d_input_weights()
 	fig, ax = b.subplots(figsize=(18, 18))
 	im = ax.imshow(weights, interpolation='nearest', vmin=0, vmax=wmax_ee, cmap=cmap.get_cmap('hot_r'))
-	b.colorbar(im)
+	b.colorbar(im, fraction=0.016)
 	b.title('Reshaped weights from input to convolutional layer', fontsize=18)
 	b.xticks(xrange(conv_size, conv_size * (conv_features + 1), conv_size), xrange(1, conv_features + 1))
 	b.yticks(xrange(conv_size, conv_size * (n_e + 1), conv_size), xrange(1, n_e + 1))
@@ -223,17 +238,13 @@ fig_num += 1
 ordering = np.array([ ordering[i, :] + conv_features * i for i in xrange(n_e) ])
 
 print '\n...Plotting patch connectivity graph.\n'
-for i in xrange(6, ordering.size, n_e):
+for i in xrange(ordering.size):
 	for j in xrange(ordering.size):
 		if patch_weight_matrix[i, j] == 1:
-			# print [(ordering[i % n_e, i // conv_features] // conv_features), \
-			# 		 (ordering[j % n_e, j // conv_features] // conv_features)], \
-			# 		[(ordering[i % n_e, i // conv_features] % conv_features), \
-			# 		 (ordering[j % n_e, j // conv_features] % conv_features)]
 			ax.plot([(ordering[i % n_e, i // conv_features] % conv_features) * conv_size + (conv_size // 2), \
 					 (ordering[j % n_e, j // conv_features] % conv_features) * conv_size + (conv_size // 2)], \
 					[(ordering[i % n_e, i // conv_features] // conv_features) * conv_size + (conv_size // 2), \
-					 (ordering[j % n_e, j // conv_features] // conv_features) * conv_size + (conv_size // 2)], color='black', linestyle='--', linewidth=1)
+					 (ordering[j % n_e, j // conv_features] // conv_features) * conv_size + (conv_size // 2)], color='gray', linestyle='--', linewidth=1)
 
 plt.savefig('../plots/conv_patch_connectivity_plots/' + file_name[:-4] + '_patch_connectivity.png')
 plt.show()

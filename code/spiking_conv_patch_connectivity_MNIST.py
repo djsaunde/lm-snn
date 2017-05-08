@@ -338,7 +338,7 @@ def plot_2d_input_weights():
 	weights = get_2d_input_weights()
 	fig = b.figure(fig_num, figsize=(18, 18))
 	im = b.imshow(weights, interpolation='nearest', vmin=0, vmax=wmax_ee, cmap=cmap.get_cmap('hot_r'))
-	b.colorbar(im)
+	b.colorbar(im, fraction=0.016)
 	b.title('Reshaped input -> convolution weights')
 	b.xticks(xrange(conv_size, conv_size * (conv_features + 1), conv_size), xrange(1, conv_features + 1))
 	b.yticks(xrange(conv_size, conv_size * (n_e + 1), conv_size), xrange(1, n_e + 1))
