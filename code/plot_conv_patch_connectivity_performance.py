@@ -1,6 +1,7 @@
 from __future__ import division
 
 import matplotlib.pyplot as plt
+import cPickle as p
 import numpy as np
 import os
 
@@ -8,19 +9,14 @@ import os
 performance_dir = '../performance/conv_patch_connectivity_performance/'
 
 print '\n'
-print '\n'.join([ str(idx + 1) + ' | ' + file_name for idx, file_name in enumerate(sorted(os.listdir(performance_dir))) if '.txt' in file_name ])
+print '\n'.join([ str(idx + 1) + ' | ' + file_name for idx, file_name in enumerate(sorted(os.listdir(performance_dir))) if '.p' in file_name ])
 print '\n'
 
 to_plot = raw_input('Enter the index of the file from above which you\'d like to plot: ')
-file_name = sorted([ file_name for file_name in os.listdir(performance_dir) if '.txt' in file_name ])[int(to_plot) - 1]
+file_name = sorted([ file_name for file_name in os.listdir(performance_dir) if '.p' in file_name ])[int(to_plot) - 1]
 
-print file_name
-
-performances = {}
-performance_lines = open(performance_dir + file_name, 'r').readlines()[1:]
-for idx, line in enumerate(performance_lines):
-    voting_mechanism, performance = [ token.strip() for token in line.split(':') ][0], [ token.strip() for token in line.split(':') ][1:]
-    performances[voting_mechanism] = [ float(token) for token in performance.split() ]
+# get pickled performances dictionary (voting mechanism, performance recordings over training)
+_, performances = p.load(open(performance_dir + file_name, 'rb'))
 
 print '\n'
 

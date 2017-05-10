@@ -22,8 +22,18 @@ np.set_printoptions(threshold=np.nan, linewidth=200)
 # only show log messages of level ERROR or higher
 b.log_level_error()
 
+# set these appropriate to your directory structure
 MNIST_data_path = '../data/'
 top_level_path = '../'
+
+performance_dir = top_level_path + 'performance/conv_patch_connectivity_performance/'
+activity_dir = top_level_path + 'activity/conv_patch_connectivity_acitivity/'
+weights_dir = top_level_path + 'weights/conv_patch_connectivity_weights/'
+random_dir = top_level_path + 'random/conv_patch_connectivity_random/'
+
+for d in [ performance_dir, activity_dir, weights_dir, random_dir ]:
+	if not os.path.isdir(d):
+		os.makedirs(d)
 
 
 def get_labeled_data(picklename, b_train=True):
@@ -112,7 +122,7 @@ def save_connections():
 	'''
 
 	# print out saved connections
-	print '...saving connections: weights/conv_patch_connectivity_weights/' + save_conns[0] + '_' + ending + ' and ' + 'weights/conv_patch_connectivity_weights/' + save_conns[1] + '_' + stdp_input
+	print '...saving connections: ' + weights_dir + save_conns[0] + '_' + ending + ' and ' + weights_dir + save_conns[1] + '_' + stdp_input
 
 	# iterate over all connections to save
 	for conn_name in save_conns:
@@ -123,7 +133,7 @@ def save_connections():
 		# sparsify it into (row, column, entry) tuples
 		conn_list_sparse = ([(i, j, conn_matrix[i, j]) for i in xrange(conn_matrix.shape[0]) for j in xrange(conn_matrix.shape[1]) ])
 		# save it out to disk
-		np.save(top_level_path + 'weights/conv_patch_connectivity_weights/' + conn_name + '_' + ending, conn_list_sparse)
+		np.save(top_level_path + weights_dir + conn_name + '_' + ending, conn_list_sparse)
 
 
 def save_theta():
@@ -134,10 +144,10 @@ def save_theta():
 	# iterate over population for which to save theta parameters
 	for pop_name in population_names:
 		# print out saved theta populations
-		print '...saving theta: weights/conv_patch_connectivity_weights/theta_' + pop_name + '_' + ending
+		print '...saving theta: ' + weights_dir + 'theta_' + pop_name + '_' + ending
 
 		# save out the theta parameters to file
-		np.save(top_level_path + 'weights/conv_patch_connectivity_weights/theta_' + pop_name + '_' + ending, neuron_groups[pop_name + 'e'].theta)
+		np.save(top_level_path + weights_dir + 'theta_' + pop_name + '_' + ending, neuron_groups[pop_name + 'e'].theta)
 
 
 def set_weights_most_fired(current_spike_count):
@@ -702,9 +712,9 @@ def build_network():
 
 	for name in population_names:
 		# if we're in test mode / using some stored weights
-		if test_mode or weight_path[-8:] == 'weights/conv_patch_connectivity_weights/':
+		if test_mode:
 			# load up adaptive threshold parameters
-			neuron_groups['e'].theta = np.load(weight_path + 'theta_A' + '_' + ending +'.npy')
+			neuron_groups['e'].theta = np.load(weights_dir + 'theta_A' + '_' + ending +'.npy')
 		else:
 			# otherwise, set the adaptive additive threshold parameter at 20mV
 			neuron_groups['e'].theta = np.ones((n_e_total)) * 20.0 * b.mV
@@ -749,7 +759,7 @@ def build_network():
 				conn_name = name + conn_type[0] + name + conn_type[1]
 				# get weights from file if we are in test mode
 				if test_mode:
-					weight_matrix = get_matrix_from_file(weight_path + conn_name + '_' + ending + '.npy', conv_features * n_e, conv_features * n_e)
+					weight_matrix = get_matrix_from_file(weights_dir + conn_name + '_' + ending + '.npy', conv_features * n_e, conv_features * n_e)
 				# create a connection from the first group in conn_name with the second group
 				connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
 				# instantiate the created connection
@@ -881,7 +891,7 @@ def build_network():
 
 			# get weight matrix depending on training or test phase
 			if test_mode:
-				weight_matrix = get_matrix_from_file(weight_path + conn_name + '_' + ending + '.npy', n_input, conv_features * n_e)
+				weight_matrix = get_matrix_from_file(weights_dir + conn_name + '_' + ending + '.npy', n_input, conv_features * n_e)
 				# weight_matrix[weight_matrix < 0.20] = 0
 
 			# create connections from the windows of the input group to the neuron population
@@ -1057,16 +1067,13 @@ def run_simulation():
 				else:
 					performances = get_current_performance(performances, j)
 
-				# printing out classification performance results so far
-				target = open('../performance/conv_patch_connectivity_performance/' + ending + '.txt', 'w')
-				target.truncate()
-				target.write('Iteration ' + str(j) + '\n')
+				# pickling performance recording and iteration number
+				p.dump((j, performances), open(performance_dir + ending + '.p', 'wb'))
 
 				for performance in performances:
-					print '\nClassification performance (' + performance + ')', performances[performance][1:int(j / float(update_interval)) + 1], '\nAverage performance:', sum(performances[performance][1:int(j / float(update_interval)) + 1]) / float(len(performances[performance][1:int(j / float(update_interval)) + 1])), '\n'		
-					target.write(performance + ' : ' + ' '.join([ str(item) for item in performances[performance][1:int(j / float(update_interval)) + 1] ]) + '\n')
-				
-				target.close()
+					print '\nClassification performance (' + performance + ')', performances[performance][1:int(j / float(update_interval)) + 1], \
+								'\nAverage performance:', sum(performances[performance][1:int(j / float(update_interval)) + 1]) / \
+									float(len(performances[performance][1:int(j / float(update_interval)) + 1])), '\n'
 					
 			# set input firing rates back to zero
 			for name in input_population_names:
@@ -1074,9 +1081,8 @@ def run_simulation():
 			
 			# run the network for 'resting_time' to relax back to rest potentials
 			b.run(resting_time)
-			# reset the input firing intensity
+			# bookkeeping
 			input_intensity = start_input_intensity
-			# increment the example counter
 			j += 1
 
 	# set weights to those of the most-fired neuron
@@ -1100,8 +1106,8 @@ def save_results():
 	if not test_mode:
 		save_connections()
 	else:
-		np.save(top_level_path + 'activity/conv_patch_connectivity_activity/results_' + str(num_examples) + '_' + ending, result_monitor)
-		np.save(top_level_path + 'activity/conv_patch_connectivity_activity/input_numbers_' + str(num_examples) + '_' + ending, input_numbers)
+		np.save(activity_dir + 'results_' + str(num_examples) + '_' + ending, result_monitor)
+		np.save(activity_dir + 'input_numbers_' + str(num_examples) + '_' + ending, input_numbers)
 
 
 def evaluate_results():
@@ -1188,12 +1194,20 @@ if __name__ == '__main__':
 		args.post_pre, args.conv_size, args.conv_stride, args.conv_features, args.weight_sharing, args.lattice_structure, \
 		args.random_lattice_prob, args.random_inhibition_prob, args.top_percent, args.do_plot
 
-	print do_plot
-
 	print '\n'
 
-	print args.mode, args.connectivity, args.weight_dependence, args.post_pre, args.conv_size, args.conv_stride, args.conv_features, args.weight_sharing, \
-		args.lattice_structure, args.random_lattice_prob, args.random_inhibition_prob, args.top_percent, args.do_plot
+	print 'mode:', args.mode
+	print 'connectivity:', args.connectivity
+	print 'STDP rule:', args.weight_dependence + '_' + args.post_pre
+	print 'convolution window size:', args.conv_size
+	print 'convolution (horizontal, vertical) stride:', args.conv_stride
+	print 'no. of convolution patches:', args.conv_features
+	print 'weight sharing?', args.weight_sharing
+	print 'lattice structure:', args.lattice_structure
+	print 'random lattice connections probability:', args.random_lattice_prob
+	print 'random inhibitory connections probability:', args.random_inhibition_prob
+	print 'top percentage voting:', args.top_percent
+	print 'plot?', args.do_plot
 
 	print '\n'
 
@@ -1225,14 +1239,12 @@ if __name__ == '__main__':
 
 	# set parameters for simulation based on train / test mode
 	if test_mode:
-		weight_path = top_level_path + 'weights/conv_patch_connectivity_weights/'
 		num_examples = 10000
 		use_testing_set = True
 		do_plot_performance = False
 		record_spikes = True
 		ee_STDP_on = False
 	else:
-		weight_path = top_level_path + 'random/conv_patch_connectivity_random/'
 		num_examples = 60000
 		use_testing_set = False
 		do_plot_performance = False

@@ -1062,16 +1062,13 @@ def run_simulation():
 				else:
 					performances = get_current_performance(performances, j)
 
-				# printing out classification performance results so far
-				target = open('../performance/conv_patch_connectivity_weight_habituation_performance/' + ending + '.txt', 'w')
-				target.truncate()
-				target.write('Iteration ' + str(j) + '\n')
+				# pickling performance recording and iteration number
+				p.dump((j, performances), open('../performance/conv_patch_connectivity_weight_habituation_performance/' + ending + '.p', 'wb'))
 
 				for performance in performances:
-					print '\nClassification performance (' + performance + ')', performances[performance][1:int(j / float(update_interval)) + 1], '\nAverage performance:', sum(performances[performance][1:int(j / float(update_interval)) + 1]) / float(len(performances[performance][1:int(j / float(update_interval)) + 1])), '\n'		
-					target.write(performance + ' : ' + ' '.join([ str(item) for item in performances[performance][1:int(j / float(update_interval)) + 1] ]) + '\n')
-				
-				target.close()
+					print '\nClassification performance (' + performance + ')', performances[performance][1:int(j / float(update_interval)) + 1], \
+								'\nAverage performance:', sum(performances[performance][1:int(j / float(update_interval)) + 1]) / \
+									float(len(performances[performance][1:int(j / float(update_interval)) + 1])), '\n'
 					
 			# set input firing rates back to zero
 			for name in input_population_names:
