@@ -976,7 +976,7 @@ def run_simulation():
 		
 		else:
 			# ensure weights don't grow without bound
-			normalize_weights()
+			# normalize_weights()
 			# get the firing rates of the next input example
 			rates = (training['x'][j % 60000, :, :] / 8.0) * input_intensity
 		
@@ -992,7 +992,8 @@ def run_simulation():
 		
 		# get new neuron label assignments every 'update_interval'
 		if j % update_interval == 0 and j > 0:
-			assignments, kmeans, kmeans_assignments, simple_clusters, weights, average_firing_rate, index_matrix = assign_labels(result_monitor[:], input_numbers[j - update_interval : j])
+			assignments, kmeans, kmeans_assignments, simple_clusters, weights, average_firing_rate, index_matrix = \
+																assign_labels(result_monitor[:], input_numbers[j - update_interval : j])
 			if do_plot and not test_mode:
 				update_cluster_centers(kmeans.cluster_centers_, cluster_monitor, cluster_fig)
 
@@ -1083,7 +1084,7 @@ def run_simulation():
 		set_weights_most_fired(current_spike_count)
 
 	# ensure weights don't grow without bound
-	normalize_weights()
+	# normalize_weights()
 
 
 def save_results():

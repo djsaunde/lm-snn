@@ -19,7 +19,7 @@ print file_name
 performances = {}
 performance_lines = open(performance_dir + file_name, 'r').readlines()[1:]
 for idx, line in enumerate(performance_lines):
-    voting_mechanism, performance = [ token.strip() for token in line.split(':') ]
+    voting_mechanism, performance = [ token.strip() for token in line.split(':') ][0], [ token.strip() for token in line.split(':') ][1:]
     performances[voting_mechanism] = [ float(token) for token in performance.split() ]
 
 print '\n'

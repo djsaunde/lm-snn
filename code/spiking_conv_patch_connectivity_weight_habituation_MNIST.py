@@ -412,6 +412,9 @@ def plot_neuron_votes(assignments, spike_rates):
 	all_summed_rates = [0] * 10
 	num_assignments = [0] * 10
 
+	spike_rates = np.sum(spike_rates, axis=0)
+	print spike_rates.shape
+
 	for i in xrange(10):
 		num_assignments[i] = len(np.where(assignments == i)[0])
 		if num_assignments[i] > 0:
