@@ -6,8 +6,8 @@
 #SBATCH --account=rkozma
 
 connectivity=all
-conv_size=16
-conv_stride=4
+conv_size=20
+conv_stride=2
 conv_features=50
 lattice_structure=8
 weight_sharing=no_weight_sharing
