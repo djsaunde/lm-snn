@@ -23,14 +23,6 @@ print '\n'
 performance_plots = []
 for voting_mechanism in sorted(performances.keys()):
     performance_plots.append(plt.plot(performances[voting_mechanism], label=voting_mechanism)[0])
-    # average_plot, = plt.plot([ np.mean(performances[voting_mechanism]) ] * len(performances[voting_mechanism]),
-    #                                             label='average: ' + str(np.mean(performances[voting_mechanism])))
-    # upper_std_plot, = plt.plot([ np.mean(performances[voting_mechanism]) + np.std(performances[voting_mechanism]) ] * 
-    #                                             len(performances[voting_mechanism]), label='plus one standard deviation: ' + 
-    #                                             str(np.mean(performances[voting_mechanism]) + np.std(performances[voting_mechanism])))
-    # lower_std_plot, = plt.plot([ np.mean(performances[voting_mechanism]) - np.std(performances[voting_mechanism]) ] * 
-    #                                             len(performances[voting_mechanism]), label='minus one standard deviation: ' + 
-    #                                             str(np.mean(performances[voting_mechanism]) - np.std(performances[voting_mechanism])))
     
 plt.legend(handles=performance_plots)
 
@@ -42,7 +34,6 @@ plt.ylabel('Classification accuracy (out of 100%)')
 
 title_strs = file_name[:file_name.index('weight') - 1].split('_')
 
-# plt.title('Classification accuracy by iteration number (' + title_strs[0] + 'x' + title_strs[0] + ' convolution, stride ' + title_strs[1] + ', ' + title_strs[2] + ' convolution features, giving ' + title_strs[3] + ' excitatory neurons per convolutional patch')
 plt.title(file_name[:file_name.index('.')])
 plt.savefig(performance_dir + 'performance_plots/' + file_name[:file_name.index('.')])
 plt.show()

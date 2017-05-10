@@ -27,7 +27,7 @@ MNIST_data_path = '../data/'
 top_level_path = '../'
 
 performance_dir = top_level_path + 'performance/conv_patch_connectivity_performance/'
-activity_dir = top_level_path + 'activity/conv_patch_connectivity_acitivity/'
+activity_dir = top_level_path + 'activity/conv_patch_connectivity_activity/'
 weights_dir = top_level_path + 'weights/conv_patch_connectivity_weights/'
 random_dir = top_level_path + 'random/conv_patch_connectivity_random/'
 
