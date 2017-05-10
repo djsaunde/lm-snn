@@ -8,9 +8,6 @@ import os
 
 performance_dir = '../performance/conv_patch_connectivity_performance/'
 
-if not os.path.isdir(performance_dir + 'performance_plots_smoothed/'):
-    os.makedirs(performance_dir + 'performance_plots_smoothed/')
-
 def window(size):
     return np.ones(size) / float(size)
 
@@ -55,7 +52,7 @@ plt.title(str(conv_size) + 'x' + str(conv_size) + ' convolutions, stride ' + str
                         ' convolution patches, ' + ' '.join(weight_sharing.split('_')) + ', ' + str(lattice_structure) + '-lattice')
 plt.tight_layout()
 
-plt.savefig(performance_dir + 'performance_plots_smoothed/' + file_name[:file_name.index('.')])
+plt.savefig(performance_dir + 'performance_plots/' + file_name[:file_name.index('.')])
 plt.show()
 
 print '\n'
