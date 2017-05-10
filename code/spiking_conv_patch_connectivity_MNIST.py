@@ -976,7 +976,7 @@ def run_simulation():
 		
 		else:
 			# ensure weights don't grow without bound
-			# normalize_weights()
+			normalize_weights()
 			# get the firing rates of the next input example
 			rates = (training['x'][j % 60000, :, :] / 8.0) * input_intensity
 		
@@ -1084,7 +1084,7 @@ def run_simulation():
 		set_weights_most_fired(current_spike_count)
 
 	# ensure weights don't grow without bound
-	# normalize_weights()
+	normalize_weights()
 
 
 def save_results():
