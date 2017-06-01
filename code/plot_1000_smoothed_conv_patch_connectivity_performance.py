@@ -25,19 +25,19 @@ print '\n'
 
 performance_plots = []
 for voting_mechanism in sorted(performances.keys()):
-    if voting_mechanism in [ 'all', 'most_spiked', 'top_percent', 'spatial_clusters' ]:
-        performance_plots.append(plt.plot(np.convolve(performances[voting_mechanism], window(15), 'same'), label=voting_mechanism)[0])
-
-plt.legend(handles=performance_plots)
+    if voting_mechanism in [ 'all', 'most_spiked', 'top_percent' ]:
+        performance_plots.append(plt.plot(np.convolve(performances[voting_mechanism], window(10), 'same'), label=voting_mechanism)[0])
 
 fig = plt.gcf()
 fig.set_size_inches(16, 12)
 
-plt.xlabel('Iteration number')
-plt.xticks([ x for x in xrange(0, len(performances[performances.keys()[0]]) + 25, 25) ], [ x * 100 for x in xrange(0, len(performances[performances.keys()[0]]) + 25, 25) ])
-plt.ylabel('Classification accuracy (out of 100%)')
+plt.xlabel('Iteration number', size=18)
+plt.xticks([ x for x in xrange(0, len(performances[performances.keys()[0]]) + 10, 10) ], [ x * 100 for x in xrange(0, len(performances[performances.keys()[0]]) + 10, 10) ])
+plt.ylabel('Classification accuracy (out of 100%)', size=18)
+plt.xlim([0, 100])
+iter_line = plt.axvline(10, color='r', linestyle='-.')
 
-title_strs = file_name[:file_name.index('weight') - 1].split('_')
+plt.legend(handles=performance_plots + [ iter_line ], fontsize=18)
 
 conv_size = int(file_name.split('_')[1])
 conv_stride = int(file_name.split('_')[2])
@@ -49,7 +49,7 @@ else:
     weight_sharing = 'weight_sharing'
 
 plt.title(str(conv_size) + 'x' + str(conv_size) + ' convolutions, stride ' + str(conv_stride) + ', ' + str(conv_features) + \
-                        ' convolution patches, ' + ' '.join(weight_sharing.split('_')) + ', ' + str(lattice_structure) + '-lattice')
+                        ' convolution patches, ' + ' '.join(weight_sharing.split('_')) + ', ' + str(lattice_structure) + '-lattice', size=22)
 plt.tight_layout()
 
 plt.savefig(performance_dir + 'performance_plots/' + file_name[:file_name.index('.')])
