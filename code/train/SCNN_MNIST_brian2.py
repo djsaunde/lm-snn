@@ -1,8 +1,3 @@
-'''
-Much the same as 'spiking_MNIST.py', but we instead use a number of convolutional
-windows to map the input to a reduced space.
-'''
-
 import numpy as np
 import matplotlib.cm as cmap
 import cPickle as p
@@ -16,8 +11,20 @@ from brian2 import *
 
 np.set_printoptions(threshold=np.nan)
 
-MNIST_data_path = '../data/'
-top_level_path = '../'
+# set these appropriate to your directory structure
+top_level_path = '../../'
+MNIST_data_path = top_level_path + 'data/'
+results_path = top_level_path + 'results/'
+model_name = 'conv_path_connectivity_brian2'
+
+performance_dir = top_level_path + 'performance/' + model_name + '/'
+activity_dir = top_level_path + 'activity/' + model_name + '/'
+weights_dir = top_level_path + 'weights/' + model_name + '/'
+random_dir = top_level_path + 'random/' + model_name + '/'
+
+for d in [ performance_dir, activity_dir, weights_dir, random_dir, MNIST_data_path, results_path ]:
+	if not os.path.isdir(d):
+		os.makedirs(d)
 
 
 def get_labeled_data(picklename, b_train=True):
