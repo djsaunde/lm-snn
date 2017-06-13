@@ -17,7 +17,7 @@ b.log_level_error()
 # set these appropriate to your directory structure
 MNIST_data_path = '../../data/'
 top_level_path = '../../'
-model_name = 'scnn'
+model_name = 'csnn'
 
 performance_dir = top_level_path + 'performance/' + model_name + '/'
 activity_dir = top_level_path + 'activity/' + model_name + '/'

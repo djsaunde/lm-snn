@@ -1,7 +1,3 @@
-'''
-@author: Dan Saunders
-'''
-
 import brian as b
 import numpy as np
 import networkx as nx
@@ -337,9 +333,9 @@ def assign_labels(result_monitor, input_numbers):
 
     return assignments, simple_clusters, average_firing_rate, index_matrix
 
-
-MNIST_data_path = '../data/'
-data_path = '../activity/conv_patch_connectivity_activity/'
+top_level_path = '../../'
+MNIST_data_path = top_level_path + 'data/'
+data_path = top_level_path + 'activity/csnn_pc/'
 
 parser = argparse.ArgumentParser()
 

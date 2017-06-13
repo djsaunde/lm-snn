@@ -4,9 +4,9 @@ import matplotlib.cm as cm
 
 chosenCmap = cm.get_cmap('hot_r')
 
-
 top_level_path = '../../'
 weight_path = top_level_path + 'weights/snn/'
+
 
 # number of excitatory neurons
 n_e_input = raw_input('Enter number of excitatory / inhibitory neurons (default 100): ')

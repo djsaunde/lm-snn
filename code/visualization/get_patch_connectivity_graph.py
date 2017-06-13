@@ -15,6 +15,9 @@ wmax_ee = 1.0
 
 np.set_printoptions(threshold=np.nan)
 
+top_level_path = '../../'
+weight_dir = top_level_path + 'weights/csnn_pc/'
+
 
 def get_matrix_from_file(file_name, n_src, n_tgt):
 	'''
@@ -86,8 +89,6 @@ def is_lattice_connection(sqrt, i, j):
 	if lattice_structure == 'all':
 		return True
 
-
-weight_dir = '../../weights/conv_patch_connectivity_weights/'
 
 print '\n'
 print '\n'.join([ str(idx) + ' | ' + file_name for idx, file_name in enumerate([ file_name for file_name in sorted(os.listdir(weight_dir)) if 'AeAe' in file_name and 'all' in file_name and '.npy' in file_name ]) ])

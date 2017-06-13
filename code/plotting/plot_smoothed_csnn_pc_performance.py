@@ -6,14 +6,13 @@ import numpy as np
 import os
 
 
-performance_dir = '../performance/conv_patch_connectivity_performance/'
+top_level_path = '../../'
+performance_dir = top_level_path + 'performance/csnn_pc/'
 
 def window(size):
     return np.ones(size) / float(size)
 
-print '\n'
-print '\n'.join([ str(idx + 1) + ' | ' + file_name for idx, file_name in enumerate(sorted(os.listdir(performance_dir))) if '.p' in file_name ])
-print '\n'
+print '\n'.join([ str(idx + 1) + ' | ' + file_name for idx, file_name in enumerate(sorted(os.listdir(performance_dir))) if '.p' in file_name ]), '\n'
 
 to_plot = raw_input('Enter the index of the file from above which you\'d like to plot: ')
 file_name = sorted([ file_name for file_name in os.listdir(performance_dir) if '.p' in file_name ])[int(to_plot) - 1]

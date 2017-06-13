@@ -44,8 +44,8 @@ def get_input_weights(weight_matrix):
 	# return the rearranged weights to display to the user
 	return weights
 
-
-weight_dir = '../../weights/conv_patch_connectivity_weights/'
+top_level_path = '../../'
+weight_dir = top_level_path + 'weights/csnn_pc/'
 
 print '\n'
 print '\n'.join([ str(idx) + ' | ' + file_name for idx, file_name in enumerate([ file_name for file_name in sorted(os.listdir(weight_dir)) if 'XeAe' in file_name ]) ])

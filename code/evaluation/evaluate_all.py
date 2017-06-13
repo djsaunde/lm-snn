@@ -163,7 +163,7 @@ def get_new_assignments(result_monitor, input_numbers):
 
 top_level_path = '../../'
 MNIST_data_path = top_level_path + 'data/'
-data_path = top_level_path + 'activity/conv_patch_connectivity_activity/'
+data_path = top_level_path + 'activity/csnn_pc/'
 
 print '\n...Loading MNIST'
 training = get_labeled_data(MNIST_data_path + 'training', b_train=True)

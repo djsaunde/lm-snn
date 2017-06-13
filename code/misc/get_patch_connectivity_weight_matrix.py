@@ -29,7 +29,8 @@ def get_matrix_from_file(file_name, n_src, n_tgt):
 	# return the weight matrix read from file
 	return weight_matrix
 
-weight_path = '../../weights/conv_patch_connectivity_weights/'
+top_level_path = '../../'
+weight_path = top_level_path + 'weights/csnn_pc/'
 
 print '\n'
 print '\n'.join([ str(idx + 1) + ' | ' + file_name for idx, file_name in enumerate([ file_name for file_name in sorted(os.listdir(weight_path)) if 'AeAe' in file_name and 'all' in file_name and '.npy' in file_name ]) ])
@@ -56,7 +57,7 @@ weight_matrix = get_matrix_from_file(weight_path + file_name, conv_features * n_
 weight_matrix[weight_matrix < np.percentile(weight_matrix[np.where(weight_matrix != 0)], 99)] = 0.0
 weight_matrix[weight_matrix > 0.0] = 1
 
-np.savetxt('../../data/patch_connectivity_matrices/' + file_name.split('.npy')[0] + '.txt', weight_matrix)
+np.savetxt(top_level_path + 'data/patch_connectivity_matrices/' + file_name.split('.npy')[0] + '.txt', weight_matrix)
 
 print 'Total number of possible connections:', (conv_features * n_e) ** 2
 print 'Shape of connectivity matrix:', weight_matrix.shape

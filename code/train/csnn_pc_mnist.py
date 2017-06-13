@@ -21,7 +21,7 @@ b.log_level_error()
 top_level_path = '../../'
 MNIST_data_path = top_level_path + 'data/'
 results_path = top_level_path + 'results/'
-model_name = 'scnn_pc'
+model_name = 'csnn_pc'
 
 performance_dir = top_level_path + 'performance/' + model_name + '/'
 activity_dir = top_level_path + 'activity/' + model_name + '/'

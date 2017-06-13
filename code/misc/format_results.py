@@ -1,13 +1,13 @@
 '''
-Script which parses .csv file of all results into desired LaTeX table.
-
-@author: Dan Saunders (djsaunde.github.io)
+Script which parses .csv file of all results into desired LaTeX table. Abandoned (for now) in favor of Jupyter notebook
+entitled "Format Results.ipynb".
 '''
 
 import pandas as pd
 
+top_level_path = '../../'
 
-results = pd.read_csv('../../data/all_accuracy_results.csv', index_col=0, delimiter=',', encoding="utf-8-sig", header=0)
+results = pd.read_csv(top_level_path + 'data/all_accuracy_results.csv', index_col=0, delimiter=',', encoding="utf-8-sig", header=0)
 
 print results
 

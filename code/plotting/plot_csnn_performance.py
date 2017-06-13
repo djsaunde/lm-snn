@@ -5,7 +5,8 @@ import numpy as np
 import os
 
 
-perf_dir = '../performance/conv_performance/'
+top_level_path = '../../'
+perf_dir = top_level_path + 'performance/csnn/'
 
 perfs = {}
 for file_name in os.listdir(perf_dir):

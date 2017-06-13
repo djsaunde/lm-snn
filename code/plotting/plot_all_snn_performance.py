@@ -1,5 +1,7 @@
 import matplotlib.pyplot as plt
 
+top_level_path = '../../'
+
 performances = [ 51.86, 66.18, 78.16, 84.59, 90.54, 91.98, 92.17, 93.01, 95.22 ]
 x = [ 25, 50, 100, 200, 400, 800, 1600, 3200, 6400 ]
 
@@ -16,6 +18,6 @@ plt.xticks([ 25, 50, 100, 200, 400, 800, 1600, 3200, 6400 ], [ 25, 50, 100, 200,
 plt.xlabel('No. of excitatory neurons', fontsize=16)
 plt.ylabel('Test dataset accuracy', fontsize=16)
 
-plt.savefig('../plots/eth_performance.png')
+plt.savefig(top_level_path + 'plots/snn_performance.png')
 
 plt.show()
