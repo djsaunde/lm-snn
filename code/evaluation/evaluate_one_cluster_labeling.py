@@ -1,7 +1,3 @@
-'''
-@author: Dan Saunders
-'''
-
 import brian as b
 import numpy as np
 import networkx as nx
@@ -131,15 +127,16 @@ def get_new_assignments(result_monitor, input_numbers):
     return assignments, simple_clusters, average_firing_rate, stddev_firing_rate
 
 
-MNIST_data_path = '../data/'
-data_path = '../activity/conv_patch_connectivity_activity/'
+top_level_path = '../../'
+MNIST_data_path = top_level_path + 'data/'
+activity_path = top_level_path + 'activity/csnn_pc/'
 
 # input and square root of input
 n_input = 784
 n_input_sqrt = int(math.sqrt(n_input))
 
 print '\n'
-print '\n'.join([ str(idx + 1) + ' | ' + file_name for idx, file_name in enumerate([ file_name for file_name in sorted(os.listdir(data_path)) if 'results' in file_name and '10000' in file_name ]) ])
+print '\n'.join([ str(idx + 1) + ' | ' + file_name for idx, file_name in enumerate([ file_name for file_name in sorted(os.listdir(activity_path)) if 'results' in file_name and '10000' in file_name ]) ])
 print '\n'
 
 to_evaluate = raw_input('Enter the index of the file from above which you\'d like to plot: ')
@@ -150,10 +147,10 @@ print '\n...Loading MNIST'
 training = get_labeled_data(MNIST_data_path + 'training', b_train=True)
 testing = get_labeled_data(MNIST_data_path + 'testing', b_train=False)
 
-training_result_monitor = np.load(data_path + 'results' + file_name)
-training_input_numbers = np.load(data_path + 'input_numbers' + file_name)
-testing_result_monitor = np.load(data_path + 'results' + file_name)
-testing_input_numbers = np.load(data_path + 'input_numbers' + file_name)
+training_result_monitor = np.load(activity_path + 'results' + file_name)
+training_input_numbers = np.load(activity_path + 'input_numbers' + file_name)
+testing_result_monitor = np.load(activity_path + 'results' + file_name)
+testing_input_numbers = np.load(activity_path + 'input_numbers' + file_name)
 
 training_ending = int(file_name.split('_')[1])
 testing_ending = int(file_name.split('_')[1])
@@ -174,10 +171,10 @@ top_percent = 10
 
 print '\n...Evaluating', file_name
 
-training_result_monitor = np.load(data_path + 'results' + file_name)
-training_input_numbers = np.load(data_path + 'input_numbers' + file_name)
-testing_result_monitor = np.load(data_path + 'results' + file_name)
-testing_input_numbers = np.load(data_path + 'input_numbers' + file_name)
+training_result_monitor = np.load(activity_path + 'results' + file_name)
+training_input_numbers = np.load(activity_path + 'input_numbers' + file_name)
+testing_result_monitor = np.load(activity_path + 'results' + file_name)
+testing_input_numbers = np.load(activity_path + 'input_numbers' + file_name)
 
 training_ending = testing_ending = int(file_name.split('_')[1])
 

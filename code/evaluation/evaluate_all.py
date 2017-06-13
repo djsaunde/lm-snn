@@ -1,7 +1,3 @@
-'''
-@author: Dan Saunders
-'''
-
 import brian as b
 import numpy as np
 import pandas as pd
@@ -165,8 +161,9 @@ def get_new_assignments(result_monitor, input_numbers):
     return assignments, simple_clusters, average_firing_rate
 
 
-MNIST_data_path = '../data/'
-data_path = '../activity/conv_patch_connectivity_activity/'
+top_level_path = '../../'
+MNIST_data_path = top_level_path + 'data/'
+data_path = top_level_path + 'activity/conv_patch_connectivity_activity/'
 
 print '\n...Loading MNIST'
 training = get_labeled_data(MNIST_data_path + 'training', b_train=True)
@@ -227,4 +224,4 @@ for file_name in file_names:
     print '\n'
 
 results_csv = pd.DataFrame([ [ accuracy for accuracy in result ] for result in results.values() ], index=results.keys(), columns=['All', 'Most-spiked per patch', 'Most-spiked overall', 'Correlation clustering']) # , columns=['All', 'Most-Spiked Per Patch', 'Most-Spiked Overall', 'Activity Correlation Clustering'])
-results_csv.to_csv('../data/all_accuracy_results.csv')
+results_csv.to_csv(top_level_path + 'data/all_accuracy_results.csv')
