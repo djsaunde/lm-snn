@@ -20,6 +20,6 @@ to train a CSNN-PC model with default parameters. To see a list of optional argu
 python csnn_pc_mnist.py --help
 ```
 
-Perhaps the most illuminating command-line argument is `do_plot`, which allows you to visualize network training progress, learned convolution filters and between-patch connection weights, current input to the network, and the distribution of "votes" (i.e., individual excitatory neuron classifications) over the last minibatch (`update_interval`) of data.
+Perhaps the most illuminating command-line argument is `do_plot`, which, when set as `do_plot=True`, allows you to visualize network training progress, learned convolution filters and between-patch connection weights, current input to the network, and the distribution of "votes" (i.e., individual excitatory neuron classifications) over the last minibatch (`update_interval`) of data.
 
 There are various supporting scripts in other subfolders of the project repository which allow a user accomplish tasks like testing or visualizing parameters of trained models, plotting performance curves, and running jobs on the CICS swarm2 computing cluster. As the project is currently under heavy development, much of the code is fragmented, disorganized, and / or broken, but the state of things will hopefully improve as the project develops.
