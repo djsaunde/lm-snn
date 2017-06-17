@@ -257,64 +257,41 @@ def get_2d_input_weights():
 	Get the weights from the input to excitatory layer and reshape it to be two
 	dimensional and square.
 	'''
-	# rearranged_weights = np.zeros((conv_features_sqrt * conv_size * n_e_sqrt, conv_features_sqrt * conv_size * n_e_sqrt))
-	# connection = input_connections['XeAe'][:]
-
-	# # for each convolution feature
-	# for feature in xrange(conv_features):
-	# 	# for each excitatory neuron in this convolution feature
-	# 	for n in xrange(n_e):
-	# 		temp = connection[:, feature * n_e + (n // n_e_sqrt) * n_e_sqrt + (n % n_e_sqrt)].todense()
-
-	# 		# print ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * conv_size), ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * conv_size) + conv_size, ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * (conv_size)), ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * (conv_size)) + conv_size
-
-	# 		rearranged_weights[ ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * conv_size) : ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * conv_size) + conv_size, ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * (conv_size)) : ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * (conv_size)) + conv_size ] = temp[convolution_locations[n]].reshape((conv_size, conv_size))
-
-	# # return the rearranged weights to display to the user
-	# return rearranged_weights.T
-
-	# rearranged_weights = np.zeros((conv_features * conv_size, conv_size * n_e))
-
-	# # counts number of input -> excitatory weights displayed so far
-	# connection = input_connections['XeAe'][:]
-
-	# # for each excitatory neuron in this convolution feature
-	# for n in xrange(n_e):
-	# 	# for each convolution feature
-	# 	for feature in xrange(conv_features):
-	# 		temp = connection[:, feature * n_e + (n // n_e_sqrt) * n_e_sqrt + (n % n_e_sqrt)].todense()
-	# 		rearranged_weights[ feature * conv_size : (feature + 1) * conv_size, n * conv_size : (n + 1) * conv_size ] = \
-	# 																	temp[convolution_locations[n]].reshape((conv_size, conv_size))
-
-	# # return the rearranged weights to display to the user
-	# return rearranged_weights.T
-
+	# specify the desired shape of the reshaped input -> excitatory weights
 	rearranged_weights = np.zeros((conv_features * conv_size, conv_size * n_e))
 
-	# counts number of input -> excitatory weights displayed so far
+	# get the input -> excitatory synaptic weights
 	connection = input_connections['XeAe'][:]
 
-	# for each excitatory neuron in this convolution feature
-	euclid_dists = np.zeros((n_e, conv_features))
-	temps = np.zeros((n_e, conv_features, n_input))
-	for n in xrange(n_e):
-		# for each convolution feature
-		for feature in xrange(conv_features):
-			temp = connection[:, feature * n_e + (n // n_e_sqrt) * n_e_sqrt + (n % n_e_sqrt)].todense()
-			if feature == 0:
-				if n == 0:
-					euclid_dists[n, feature] = 0.0
+	if sort_euclidean:
+		# for each excitatory neuron in this convolution feature
+		euclid_dists = np.zeros((n_e, conv_features))
+		temps = np.zeros((n_e, conv_features, n_input))
+		for n in xrange(n_e):
+			# for each convolution feature
+			for feature in xrange(conv_features):
+				temp = connection[:, feature * n_e + (n // n_e_sqrt) * n_e_sqrt + (n % n_e_sqrt)].todense()
+				if feature == 0:
+					if n == 0:
+						euclid_dists[n, feature] = 0.0
+					else:
+						euclid_dists[n, feature] = np.linalg.norm(temps[0, 0, convolution_locations[n]] - temp[convolution_locations[n]])
 				else:
-					euclid_dists[n, feature] = np.linalg.norm(temps[0, 0, convolution_locations[n]] - temp[convolution_locations[n]])
-			else:
-				euclid_dists[n, feature] = np.linalg.norm(temps[n, 0, convolution_locations[n]] - temp[convolution_locations[n]])
+					euclid_dists[n, feature] = np.linalg.norm(temps[n, 0, convolution_locations[n]] - temp[convolution_locations[n]])
 
-			temps[n, feature, :] = temp.ravel()
+				temps[n, feature, :] = temp.ravel()
 
-		for idx, feature in enumerate(np.argsort(euclid_dists[n])):
-			temp = temps[n, feature]
-			rearranged_weights[ idx * conv_size : (idx + 1) * conv_size, n * conv_size : (n + 1) * conv_size ] = \
-																	temp[convolution_locations[n]].reshape((conv_size, conv_size))
+			for idx, feature in enumerate(np.argsort(euclid_dists[n])):
+				temp = temps[n, feature]
+				rearranged_weights[ idx * conv_size : (idx + 1) * conv_size, n * conv_size : (n + 1) * conv_size ] = \
+																temp[convolution_locations[n]].reshape((conv_size, conv_size))
+
+	else:
+		for n in xrange(n_e):
+			for feature in xrange(conv_features):
+				temp = connection[:, feature * n_e + (n // n_e_sqrt) * n_e_sqrt + (n % n_e_sqrt)].todense()
+				rearranged_weights[ feature * conv_size : (feature + 1) * conv_size, n * conv_size : (n + 1) * conv_size ] = \
+																temp[convolution_locations[n]].reshape((conv_size, conv_size))
 
 	# return the rearranged weights to display to the user
 	return rearranged_weights.T
@@ -416,10 +393,13 @@ def plot_neuron_votes(assignments, spike_rates):
 	all_summed_rates = [0] * 10
 	num_assignments = [0] * 10
 
+	print spike_rates.shape
+	print assignments.shape
+
 	for i in xrange(10):
 		num_assignments[i] = len(np.where(assignments == i)[0])
 		if num_assignments[i] > 0:
-			all_summed_rates[i] = np.sum(spike_rates[assignments == i]) / num_assignments[i]
+			all_summed_rates[i] = np.sum(spike_rates[:, assignments == i]) / num_assignments[i]
 
 	fig = b.figure(fig_num, figsize=(6, 4))
 	rects = b.bar(xrange(10), [ 0.1 ] * 10)
@@ -439,7 +419,7 @@ def update_neuron_votes(rects, fig, spike_rates):
 	for i in xrange(10):
 		num_assignments[i] = len(np.where(assignments == i)[0])
 		if num_assignments[i] > 0:
-			all_summed_rates[i] = np.sum(spike_rates[assignments == i]) / num_assignments[i]
+			all_summed_rates[i] = np.sum(spike_rates[:, assignments == i]) / num_assignments[i]
 
 	total_votes = np.sum(all_summed_rates)
 
@@ -591,11 +571,6 @@ def predict_label(assignments, kmeans_assignments, kmeans, simple_clusters, inde
 			# print '->', [ input_numbers.count(i) for i in xrange(10) ]
 			# spatial_cluster_summed_rates = [ x / float(y) if y != 0 else x for (x, y) in zip(spatial_cluster_summed_rates, [ input_numbers.count(i) for i in xrange(10) ]) ]
 
-	# if spatial_cluster_summed_rates == [0] * 10:
-	# 	print '>', spatial_cluster_index_vector
-
-	# print spatial_cluster_summed_rates
-
 	return ( np.argsort(summed_rates)[::-1] for summed_rates in (all_summed_rates, most_spiked_summed_rates, top_percent_summed_rates, \
 																	kmeans_summed_rates, simple_cluster_summed_rates, spatial_cluster_summed_rates) )
 
@@ -667,11 +642,6 @@ def assign_labels(result_monitor, input_numbers):
 			this_result_monitor = result_monitor[input_nums == j]
 			simple_clusters[j] = np.argsort(np.ravel(np.sum(this_result_monitor, axis=0)))[::-1][:int(0.025 * (np.size(result_monitor) / float(10000)))]
 
-	# print '\n'
-	# for j in xrange(10):
-	# 	if j in simple_clusters.keys():
-	# 		print 'There are', len(simple_clusters[j]), 'neurons in the cluster for digit', j, '\n'
-
 	index_matrix = np.empty((update_interval, n_e))
 	index_matrix[:] = np.nan
 
@@ -681,8 +651,6 @@ def assign_labels(result_monitor, input_numbers):
 			this_spatial_result_monitor_flat = this_result_monitor_flat[n::n_e]
 			if np.size(np.where(this_spatial_result_monitor_flat > 0.9 * np.max(this_result_monitor_flat))) > 0:
 				index_matrix[idx, n] = np.argmax(this_spatial_result_monitor_flat)
-
-	# print index_matrix
 
 	return assignments, kmeans, kmeans_assignments, simple_clusters, weights, average_firing_rate, index_matrix
 
@@ -716,9 +684,6 @@ def build_network():
 			# otherwise, set the adaptive additive threshold parameter at 20mV
 			neuron_groups['e'].theta = np.ones((n_e_total)) * 20.0 * b.mV
 		
-		# neuron_groups['e'].theta = np.ones((n_e_total)) * 20.0 * b.mV
-		# neuron_groups['e'].theta = np.load(weight_path + 'theta_A' + '_' + ending +'.npy')
-
 		for conn_type in recurrent_conn_names:
 			if conn_type == 'ei':
 				# create connection name (composed of population and connection types)
@@ -1184,32 +1149,18 @@ if __name__ == '__main__':
 	parser.add_argument('--random_inhibition_prob', type=float, default=0.0)
 	parser.add_argument('--top_percent', type=int, default=10)
 	parser.add_argument('--do_plot', type=bool, default=False)
+	parser.add_argument('--sort_euclidean', type=bool, default=False)
 
 	args = parser.parse_args()
 	mode, connectivity, weight_dependence, post_pre, conv_size, conv_stride, conv_features, weight_sharing, lattice_structure, \
-		random_lattice_prob, random_inhibition_prob, top_percent, do_plot = args.mode, args.connectivity, args.weight_dependence, \
+		random_lattice_prob, random_inhibition_prob, top_percent, do_plot, sort_euclidean = args.mode, args.connectivity, args.weight_dependence, \
 		args.post_pre, args.conv_size, args.conv_stride, args.conv_features, args.weight_sharing, args.lattice_structure, \
-		args.random_lattice_prob, args.random_inhibition_prob, args.top_percent, args.do_plot
-
-	print '\n'
+		args.random_lattice_prob, args.random_inhibition_prob, args.top_percent, args.do_plot, args.sort_euclidean
 
 	args = vars(args)
-	print 'Optional argument values:'
+	print '\nOptional argument values:'
 	for key, value in args.items():
 		print '-', key, ':', value
-
-	# print 'mode:', args.mode
-	# print 'connectivity:', args.connectivity
-	# print 'STDP rule:', args.weight_dependence + '_' + args.post_pre
-	# print 'convolution window size:', args.conv_size
-	# print 'convolution (horizontal, vertical) stride:', args.conv_stride
-	# print 'no. of convolution patches:', args.conv_features
-	# print 'weight sharing?', args.weight_sharing
-	# print 'lattice structure:', args.lattice_structure
-	# print 'random lattice connections probability:', args.random_lattice_prob
-	# print 'random inhibitory connections probability:', args.random_inhibition_prob
-	# print 'top percentage voting:', args.top_percent
-	# print 'plot?', args.do_plot
 
 	print '\n'
 

@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.cm as cmap
-import time, os.path, scipy, math, sys, timeit
+import time, os, scipy, math, sys, timeit
 import cPickle as p
 import brian_no_units
 import brian as b
@@ -15,8 +15,9 @@ wmax_ee = 1.0
 
 np.set_printoptions(threshold=np.nan)
 
-top_level_path = '../../'
-weight_dir = top_level_path + 'weights/csnn_pc/'
+top_level_path = os.path.join('..', '..')
+model_name = 'csnn_pc'
+weight_dir = os.path.join(top_level_path, 'weights', model_name)
 
 
 def get_matrix_from_file(file_name, n_src, n_tgt):
@@ -124,7 +125,7 @@ conv_features_sqrt = int(math.sqrt(conv_features))
 
 print '\n'
 
-weight_matrix = get_matrix_from_file(weight_dir + file_name, conv_features * n_e, conv_features * n_e)
+weight_matrix = get_matrix_from_file(os.path.join(weight_dir, file_name), conv_features * n_e, conv_features * n_e)
 
 plot_patch_weights()
 b.show()

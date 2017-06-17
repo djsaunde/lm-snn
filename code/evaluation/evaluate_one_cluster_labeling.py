@@ -140,7 +140,7 @@ print '\n'.join([ str(idx + 1) + ' | ' + file_name for idx, file_name in enumera
 print '\n'
 
 to_evaluate = raw_input('Enter the index of the file from above which you\'d like to plot: ')
-file_name = [ file_name for file_name in sorted(os.listdir(data_path)) if 'results' in file_name and '10000' in file_name ][int(to_evaluate) - 1].split('results')[1]
+file_name = [ file_name for file_name in sorted(os.listdir(activity_path)) if 'results' in file_name and '10000' in file_name ][int(to_evaluate) - 1].split('results')[1]
 
 print '\n...Loading MNIST'
 
