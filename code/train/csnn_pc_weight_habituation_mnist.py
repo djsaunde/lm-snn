@@ -12,104 +12,27 @@ from scipy.sparse import coo_matrix
 from struct import unpack
 from brian import *
 
+from util import *
+
 np.set_printoptions(threshold=np.nan, linewidth=200)
 
 # only show log messages of level ERROR or higher
 b.log_level_error()
 
 # set these appropriate to your directory structure
-top_level_path = '../../'
-MNIST_data_path = top_level_path + 'data/'
-results_path = top_level_path + 'results/'
+top_level_path = os.path.join('..', '..')
+MNIST_data_path = os.path.join(top_level_path, 'data')
 model_name = 'csnn_pc_weight_habituation'
+results_path = os.path.join(top_level_path, 'results', model_name)
 
-performance_dir = top_level_path + 'performance/' + model_name + '/'
-activity_dir = top_level_path + 'activity/' + model_name + '/'
-weights_dir = top_level_path + 'weights/' + model_name + '/'
-random_dir = top_level_path + 'random/' + model_name + '/'
+performance_dir = os.path.join(top_level_path, 'performance', model_name)
+activity_dir = os.path.join(top_level_path, 'activity', model_name)
+weights_dir = os.path.join(top_level_path, 'weights', model_name)
+random_dir = os.path.join(top_level_path, 'random', model_name)
 
 for d in [ performance_dir, activity_dir, weights_dir, random_dir, MNIST_data_path, results_path ]:
 	if not os.path.isdir(d):
 		os.makedirs(d)
-
-
-def get_labeled_data(picklename, b_train=True):
-	'''
-	Read input-vector (image) and target class (label, 0-9) and return it as 
-	a list of tuples.
-	'''
-	if os.path.isfile('%s.pickle' % picklename):
-		data = p.load(open('%s.pickle' % picklename))
-	else:
-		# Open the images with gzip in read binary mode
-		if b_train:
-			images = open(MNIST_data_path + 'train-images-idx3-ubyte', 'rb')
-			labels = open(MNIST_data_path + 'train-labels-idx1-ubyte', 'rb')
-		else:
-			images = open(MNIST_data_path + 't10k-images-idx3-ubyte', 'rb')
-			labels = open(MNIST_data_path + 't10k-labels-idx1-ubyte', 'rb')
-
-		# Get metadata for images
-		images.read(4)  # skip the magic_number
-		number_of_images = unpack('>I', images.read(4))[0]
-		rows = unpack('>I', images.read(4))[0]
-		cols = unpack('>I', images.read(4))[0]
-
-		# Get metadata for labels
-		labels.read(4)  # skip the magic_number
-		N = unpack('>I', labels.read(4))[0]
-
-		if number_of_images != N:
-			raise Exception('number of labels did not match the number of images')
-
-		# Get the data
-		x = np.zeros((N, rows, cols), dtype=np.uint8)  # Initialize numpy array
-		y = np.zeros((N, 1), dtype=np.uint8)  # Initialize numpy array
-		for i in xrange(N):
-			if i % 1000 == 0:
-				print("i: %i" % i)
-			x[i] = [[unpack('>B', images.read(1))[0] for unused_col in xrange(cols)]  for unused_row in xrange(rows) ]
-			y[i] = unpack('>B', labels.read(1))[0]
-
-		data = {'x': x, 'y': y, 'rows': rows, 'cols': cols}
-		p.dump(data, open("%s.pickle" % picklename, "wb"))
-	return data
-
-
-def is_lattice_connection(sqrt, i, j):
-	'''
-	Boolean method which checks if two indices in a network correspond to neighboring nodes in a 4-, 8-, or all-lattice.
-
-	sqrt: square root of the number of nodes in population
-	i: First neuron's index
-	k: Second neuron's index
-	'''
-	if lattice_structure == 'none':
-		return False
-	if lattice_structure == '4':
-		return i + 1 == j and j % sqrt != 0 or i - 1 == j and i % sqrt != 0 or i + sqrt == j or i - sqrt == j
-	if lattice_structure == '8':
-		return i + 1 == j and j % sqrt != 0 or i - 1 == j and i % sqrt != 0 or i + sqrt == j or i - sqrt == j or i + sqrt == j + 1 and j % sqrt != 0 or i + sqrt == j - 1 and i % sqrt != 0 or i - sqrt == j + 1 and i % sqrt != 0 or i - sqrt == j - 1 and j % sqrt != 0
-	if lattice_structure == 'all':
-		return True
-
-
-def get_matrix_from_file(file_name, n_src, n_tgt):
-	'''
-	Given the name of a file pointing to a .npy ndarray object, load it into
-	'weight_matrix' and return it
-	'''
-
-	# load the stored ndarray into 'readout', instantiate 'weight_matrix' as 
-	# correctly-shaped zeros matrix
-	readout = np.load(file_name)
-	weight_matrix = np.zeros((n_src, n_tgt))
-
-	# read the 'readout' ndarray values into weight_matrix by (row, column) indices
-	weight_matrix[np.int32(readout[:,0]), np.int32(readout[:,1])] = readout[:,2]
-
-	# return the weight matrix read from file
-	return weight_matrix
 
 
 def save_connections():
@@ -119,7 +42,7 @@ def save_connections():
 	'''
 
 	# print out saved connections
-	print '...saving connections: ' + weights_dir + save_conns[0] + '_' + ending + ' and ' + weights_dir + save_conns[1] + '_' + stdp_input
+	print '...saving connections: ' + os.path.join(weights_dir, save_conns[0] + '_' + ending) + ' and ' + os.path.join(weights_dir, save_conns[1] + '_' + stdp_input)
 
 	# iterate over all connections to save
 	for conn_name in save_conns:
@@ -141,10 +64,10 @@ def save_theta():
 	# iterate over population for which to save theta parameters
 	for pop_name in population_names:
 		# print out saved theta populations
-		print '...saving theta: ' + weights_dir + 'theta_' + pop_name + '_' + ending
+		print '...saving theta: ' + os.path.join(weights_dir, 'theta_' + pop_name + '_' + ending)
 
 		# save out the theta parameters to file
-		np.save(top_level_path + weights_dir + 'theta_' + pop_name + '_' + ending, neuron_groups[pop_name + 'e'].theta)
+		np.save(os.path.join(weights_dir, 'theta_' + pop_name + '_' + ending), neuron_groups[pop_name + 'e'].theta)
 
 
 def set_weights_most_fired(current_spike_count):
@@ -251,64 +174,41 @@ def get_2d_input_weights():
 	Get the weights from the input to excitatory layer and reshape it to be two
 	dimensional and square.
 	'''
-	# rearranged_weights = np.zeros((conv_features_sqrt * conv_size * n_e_sqrt, conv_features_sqrt * conv_size * n_e_sqrt))
-	# connection = input_connections['XeAe'][:]
-
-	# # for each convolution feature
-	# for feature in xrange(conv_features):
-	# 	# for each excitatory neuron in this convolution feature
-	# 	for n in xrange(n_e):
-	# 		temp = connection[:, feature * n_e + (n // n_e_sqrt) * n_e_sqrt + (n % n_e_sqrt)].todense()
-
-	# 		# print ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * conv_size), ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * conv_size) + conv_size, ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * (conv_size)), ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * (conv_size)) + conv_size
-
-	# 		rearranged_weights[ ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * conv_size) : ((feature % conv_features_sqrt) * conv_size * n_e_sqrt) + ((n % n_e_sqrt) * conv_size) + conv_size, ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * (conv_size)) : ((feature // conv_features_sqrt) * conv_size * n_e_sqrt) + ((n // n_e_sqrt) * (conv_size)) + conv_size ] = temp[convolution_locations[n]].reshape((conv_size, conv_size))
-
-	# # return the rearranged weights to display to the user
-	# return rearranged_weights.T
-
-	# rearranged_weights = np.zeros((conv_features * conv_size, conv_size * n_e))
-
-	# # counts number of input -> excitatory weights displayed so far
-	# connection = input_connections['XeAe'][:]
-
-	# # for each excitatory neuron in this convolution feature
-	# for n in xrange(n_e):
-	# 	# for each convolution feature
-	# 	for feature in xrange(conv_features):
-	# 		temp = connection[:, feature * n_e + (n // n_e_sqrt) * n_e_sqrt + (n % n_e_sqrt)].todense()
-	# 		rearranged_weights[ feature * conv_size : (feature + 1) * conv_size, n * conv_size : (n + 1) * conv_size ] = \
-	# 																	temp[convolution_locations[n]].reshape((conv_size, conv_size))
-
-	# # return the rearranged weights to display to the user
-	# return rearranged_weights.T
-
+	# specify the desired shape of the reshaped input -> excitatory weights
 	rearranged_weights = np.zeros((conv_features * conv_size, conv_size * n_e))
 
-	# counts number of input -> excitatory weights displayed so far
+	# get the input -> excitatory synaptic weights
 	connection = input_connections['XeAe'][:]
 
-	# for each excitatory neuron in this convolution feature
-	euclid_dists = np.zeros((n_e, conv_features))
-	temps = np.zeros((n_e, conv_features, n_input))
-	for n in xrange(n_e):
-		# for each convolution feature
-		for feature in xrange(conv_features):
-			temp = connection[:, feature * n_e + (n // n_e_sqrt) * n_e_sqrt + (n % n_e_sqrt)].todense()
-			if feature == 0:
-				if n == 0:
-					euclid_dists[n, feature] = 0.0
+	if sort_euclidean:
+		# for each excitatory neuron in this convolution feature
+		euclid_dists = np.zeros((n_e, conv_features))
+		temps = np.zeros((n_e, conv_features, n_input))
+		for n in xrange(n_e):
+			# for each convolution feature
+			for feature in xrange(conv_features):
+				temp = connection[:, feature * n_e + (n // n_e_sqrt) * n_e_sqrt + (n % n_e_sqrt)].todense()
+				if feature == 0:
+					if n == 0:
+						euclid_dists[n, feature] = 0.0
+					else:
+						euclid_dists[n, feature] = np.linalg.norm(temps[0, 0, convolution_locations[n]] - temp[convolution_locations[n]])
 				else:
-					euclid_dists[n, feature] = np.linalg.norm(temps[0, 0, convolution_locations[n]] - temp[convolution_locations[n]])
-			else:
-				euclid_dists[n, feature] = np.linalg.norm(temps[n, 0, convolution_locations[n]] - temp[convolution_locations[n]])
+					euclid_dists[n, feature] = np.linalg.norm(temps[n, 0, convolution_locations[n]] - temp[convolution_locations[n]])
 
-			temps[n, feature, :] = temp.ravel()
+				temps[n, feature, :] = temp.ravel()
 
-		for idx, feature in enumerate(np.argsort(euclid_dists[n])):
-			temp = temps[n, feature]
-			rearranged_weights[ idx * conv_size : (idx + 1) * conv_size, n * conv_size : (n + 1) * conv_size ] = \
-																	temp[convolution_locations[n]].reshape((conv_size, conv_size))
+			for idx, feature in enumerate(np.argsort(euclid_dists[n])):
+				temp = temps[n, feature]
+				rearranged_weights[ idx * conv_size : (idx + 1) * conv_size, n * conv_size : (n + 1) * conv_size ] = \
+																temp[convolution_locations[n]].reshape((conv_size, conv_size))
+
+	else:
+		for n in xrange(n_e):
+			for feature in xrange(conv_features):
+				temp = connection[:, feature * n_e + (n // n_e_sqrt) * n_e_sqrt + (n % n_e_sqrt)].todense()
+				rearranged_weights[ feature * conv_size : (feature + 1) * conv_size, n * conv_size : (n + 1) * conv_size ] = \
+																temp[convolution_locations[n]].reshape((conv_size, conv_size))
 
 	# return the rearranged weights to display to the user
 	return rearranged_weights.T
@@ -316,8 +216,7 @@ def get_2d_input_weights():
 
 def get_input_weights(weight_matrix):
 	'''
-	Get the weights from the input to excitatory layer and reshape it to be two
-	dimensional and square.
+	Get the weights from the input to excitatory layer.
 	'''
 	weights = []
 
@@ -371,7 +270,7 @@ def get_patch_weights():
 			if feature != other_feature:
 				for this_n in xrange(n_e):
 					for other_n in xrange(n_e):
-						if is_lattice_connection(n_e_sqrt, this_n, other_n):
+						if is_lattice_connection(n_e_sqrt, this_n, other_n, lattice_structure):
 							rearranged_weights[feature * n_e + this_n, other_feature * n_e + other_n] = connection[feature * n_e + this_n, other_feature * n_e + other_n]
 
 	return rearranged_weights
@@ -760,49 +659,49 @@ def build_network():
 							if feature != other_feature:
 								for this_n in xrange(n_e):
 									for other_n in xrange(n_e):
-										if is_lattice_connection(n_e_sqrt, this_n, other_n):
+										if is_lattice_connection(n_e_sqrt, this_n, other_n, lattice_structure):
 											if test_mode:
 												connections[conn_name][feature * n_e + this_n, other_feature * n_e + other_n] = weight_matrix[feature * n_e + this_n, other_feature * n_e + other_n]
 											else:
-												connections[conn_name][feature * n_e + this_n, other_feature * n_e + other_n] = 0.15 # (b.random() + 0.01) * 0.3
+												connections[conn_name][feature * n_e + this_n, other_feature * n_e + other_n] = 0.15
 
 				elif connectivity == 'pairs':
 					for feature in xrange(conv_features):
 						if feature % 2 == 0:
 							for this_n in xrange(n_e):
 								for other_n in xrange(n_e):
-									if is_lattice_connection(n_e_sqrt, this_n, other_n):
+									if is_lattice_connection(n_e_sqrt, this_n, other_n, lattice_structure):
 										if test_mode:
 											connections[conn_name][feature * n_e + this_n, (feature + 1) * n_e + other_n] = weight_matrix[feature * n_e + this_n, (feature + 1) * n_e + other_n]
 										else:
-											connections[conn_name][feature * n_e + this_n, (feature + 1) * n_e + other_n] = 0.15 # (b.random() + 0.01) * 0.3
+											connections[conn_name][feature * n_e + this_n, (feature + 1) * n_e + other_n] = 0.15
 						elif feature % 2 == 1:
 							for this_n in xrange(n_e):
 								for other_n in xrange(n_e):
-									if is_lattice_connection(n_e_sqrt, this_n, other_n):
+									if is_lattice_connection(n_e_sqrt, this_n, other_n, lattice_structure):
 										if test_mode:
 											connections[conn_name][feature * n_e + this_n, (feature - 1) * n_e + other_n] = weight_matrix[feature * n_e + this_n, (feature - 1) * n_e + other_n]
 										else:
-											connections[conn_name][feature * n_e + this_n, (feature - 1) * n_e + other_n] = 0.15 # (b.random() + 0.01) * 0.3
+											connections[conn_name][feature * n_e + this_n, (feature - 1) * n_e + other_n] = 0.15
 
 				elif connectivity == 'linear':
 					for feature in xrange(conv_features):
 						if feature != conv_features - 1:
 							for this_n in xrange(n_e):
 								for other_n in xrange(n_e):
-									if is_lattice_connection(n_e_sqrt, this_n, other_n):
+									if is_lattice_connection(n_e_sqrt, this_n, other_n, lattice_structure):
 										if test_mode:
 											connections[conn_name][feature * n_e + this_n, (feature + 1) * n_e + other_n] = weight_matrix[feature * n_e + this_n, (feature + 1) * n_e + other_n]
 										else:
-											connections[conn_name][feature * n_e + this_n, (feature + 1) * n_e + other_n] = 0.15 # (b.random() + 0.01) * 0.3
+											connections[conn_name][feature * n_e + this_n, (feature + 1) * n_e + other_n] = 0.15
 						if feature != 0:
 							for this_n in xrange(n_e):
 								for other_n in xrange(n_e):
-									if is_lattice_connection(n_e_sqrt, this_n, other_n):
+									if is_lattice_connection(n_e_sqrt, this_n, other_n, lattice_structure):
 										if test_mode:
 											connections[conn_name][feature * n_e + this_n, (feature - 1) * n_e + other_n] = weight_matrix[feature * n_e + this_n, (feature - 1) * n_e + other_n]
 										else:
-											connections[conn_name][feature * n_e + this_n, (feature - 1) * n_e + other_n] = 0.15 # (b.random() + 0.01) * 0.3
+											connections[conn_name][feature * n_e + this_n, (feature - 1) * n_e + other_n] = 0.15
 
 				elif connectivity == 'none':
 					pass
@@ -836,17 +735,17 @@ def build_network():
 	if connectivity == 'all':
 		lattice_locations = {}
 		for this_n in xrange(conv_features * n_e):
-			lattice_locations[this_n] = [ other_n for other_n in xrange(conv_features * n_e) if is_lattice_connection(n_e_sqrt, this_n % n_e, other_n % n_e) ]
+			lattice_locations[this_n] = [ other_n for other_n in xrange(conv_features * n_e) if is_lattice_connection(n_e_sqrt, this_n % n_e, other_n % n_e, lattice_structure) ]
 	elif connectivity == 'pairs':
 		lattice_locations = {}
 		for this_n in xrange(conv_features * n_e):
 			lattice_locations[this_n] = []
 			for other_n in xrange(conv_features * n_e):
 				if this_n // n_e % 2 == 0:
-					if is_lattice_connection(n_e_sqrt, this_n % n_e, other_n % n_e) and other_n // n_e == this_n // n_e + 1:
+					if is_lattice_connection(n_e_sqrt, this_n % n_e, other_n % n_e, lattice_structure) and other_n // n_e == this_n // n_e + 1:
 						lattice_locations[this_n].append(other_n)
 				elif this_n // n_e % 2 == 1:
-					if is_lattice_connection(n_e_sqrt, this_n % n_e, other_n % n_e) and other_n // n_e == this_n // n_e - 1:
+					if is_lattice_connection(n_e_sqrt, this_n % n_e, other_n % n_e, lattice_structure) and other_n // n_e == this_n // n_e - 1:
 						lattice_locations[this_n].append(other_n)
 	elif connectivity == 'linear':
 		lattice_locations = {}
@@ -854,10 +753,10 @@ def build_network():
 			lattice_locations[this_n] = []
 			for other_n in xrange(conv_features * n_e):
 				if this_n // n_e != conv_features - 1:
-					if is_lattice_connection(n_e_sqrt, this_n % n_e, other_n % n_e) and other_n // n_e == this_n // n_e + 1:
+					if is_lattice_connection(n_e_sqrt, this_n % n_e, other_n % n_e, lattice_structure) and other_n // n_e == this_n // n_e + 1:
 						lattice_locations[this_n].append(other_n)
 				elif this_n // n_e != 0:
-					if is_lattice_connection(n_e_sqrt, this_n % n_e, other_n % n_e) and other_n // n_e == this_n // n_e - 1:
+					if is_lattice_connection(n_e_sqrt, this_n % n_e, other_n % n_e, lattice_structure) and other_n // n_e == this_n // n_e - 1:
 						lattice_locations[this_n].append(other_n)
 	elif connectivity == 'none':
 		lattice_locations = {}
