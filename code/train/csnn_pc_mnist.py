@@ -914,7 +914,7 @@ def run_simulation():
 					performances = get_current_performance(performances, j)
 
 				# pickling performance recording and iteration number
-				p.dump((j, performances), open(performance_dir + ending + '.p', 'wb'))
+				p.dump((j, performances), open(os.path.join(performance_dir, ending + '.p'), 'wb'))
 
 				for performance in performances:
 					print '\nClassification performance (' + performance + ')', performances[performance][1:int(j / float(update_interval)) + 1], \
@@ -1067,13 +1067,13 @@ if __name__ == '__main__':
 
 	# set parameters for simulation based on train / test mode
 	if test_mode:
-		num_examples = 100
+		num_examples = 10000
 		use_testing_set = True
 		do_plot_performance = False
 		record_spikes = True
 		ee_STDP_on = False
 	else:
-		num_examples = 100
+		num_examples = 60000
 		use_testing_set = False
 		do_plot_performance = False
 		record_spikes = True

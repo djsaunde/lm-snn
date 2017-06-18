@@ -35,41 +35,6 @@ for d in [ performance_dir, activity_dir, weights_dir, random_dir, MNIST_data_pa
 		os.makedirs(d)
 
 
-def save_connections():
-	'''
-	Save all connections in 'save_conns'; ending may be set to the index of the last
-	example run through the network
-	'''
-
-	# print out saved connections
-	print '...saving connections: ' + os.path.join(weights_dir, save_conns[0] + '_' + ending) + ' and ' + os.path.join(weights_dir, save_conns[1] + '_' + stdp_input)
-
-	# iterate over all connections to save
-	for conn_name in save_conns:
-		if conn_name == 'AeAe':
-			conn_matrix = connections[conn_name][:]
-		else:
-			conn_matrix = input_connections[conn_name][:]
-		# sparsify it into (row, column, entry) tuples
-		conn_list_sparse = ([(i, j, conn_matrix[i, j]) for i in xrange(conn_matrix.shape[0]) for j in xrange(conn_matrix.shape[1]) ])
-		# save it out to disk
-		np.save(top_level_path + weights_dir + conn_name + '_' + ending, conn_list_sparse)
-
-
-def save_theta():
-	'''
-	Save the adaptive threshold parameters to a file.
-	'''
-
-	# iterate over population for which to save theta parameters
-	for pop_name in population_names:
-		# print out saved theta populations
-		print '...saving theta: ' + os.path.join(weights_dir, 'theta_' + pop_name + '_' + ending)
-
-		# save out the theta parameters to file
-		np.save(os.path.join(weights_dir, 'theta_' + pop_name + '_' + ending), neuron_groups[pop_name + 'e'].theta)
-
-
 def set_weights_most_fired(current_spike_count):
 	'''
 	For each convolutional patch, set the weights to those of the neuron which
@@ -310,7 +275,6 @@ def plot_neuron_votes(assignments, spike_rates):
 	num_assignments = [0] * 10
 
 	spike_rates = np.sum(spike_rates, axis=0)
-	print spike_rates.shape
 
 	for i in xrange(10):
 		num_assignments[i] = len(np.where(assignments == i)[0])
@@ -480,17 +444,6 @@ def predict_label(assignments, kmeans_assignments, kmeans, simple_clusters, inde
 		if np.count_nonzero([[ x == y for (x, y) in zip(spatial_cluster_index_vector, index_matrix[idx]) ] for idx in xrange(update_interval) ]) > 0:
 			best_col_idx = np.argmax([ sum([ 1.0 if x == y else 0.0 for (x, y) in zip(spatial_cluster_index_vector, index_matrix[idx]) ]) for idx in xrange(update_interval) ])
 			spatial_cluster_summed_rates[input_numbers[best_col_idx]] = 1.0
-			# for idx in xrange(update_interval):
-			# 	# print spatial_cluster_index_vector == index_matrix[idx]
-			# 	spatial_cluster_summed_rates[input_numbers[idx]] += np.count_nonzero([ x == y for (x, y) in zip(spatial_cluster_index_vector, index_matrix[idx]) ])
-
-			# print '->', [ input_numbers.count(i) for i in xrange(10) ]
-			# spatial_cluster_summed_rates = [ x / float(y) if y != 0 else x for (x, y) in zip(spatial_cluster_summed_rates, [ input_numbers.count(i) for i in xrange(10) ]) ]
-
-	# if spatial_cluster_summed_rates == [0] * 10:
-	# 	print '>', spatial_cluster_index_vector
-
-	# print spatial_cluster_summed_rates
 
 	return ( np.argsort(summed_rates)[::-1] for summed_rates in (all_summed_rates, most_spiked_summed_rates, top_percent_summed_rates, \
 																	kmeans_summed_rates, simple_cluster_summed_rates, spatial_cluster_summed_rates) )
@@ -554,19 +507,12 @@ def assign_labels(result_monitor, input_numbers):
 		average_firing_rate[j] = np.sum(this_result_monitor[np.nonzero(this_result_monitor)]) \
 							/ float(np.size(this_result_monitor[np.nonzero(this_result_monitor)]))
 
-	print '\n', average_firing_rate
-
 	for j in xrange(10):
 		num_assignments = len(np.where(input_nums == j)[0])
 		if num_assignments > 0:
 			rate = np.sum(result_monitor[input_nums == j], axis=0) / float(num_assignments)
 			this_result_monitor = result_monitor[input_nums == j]
 			simple_clusters[j] = np.argsort(np.ravel(np.sum(this_result_monitor, axis=0)))[::-1][:int(0.025 * (np.size(result_monitor) / float(10000)))]
-
-	# print '\n'
-	# for j in xrange(10):
-	# 	if j in simple_clusters.keys():
-	# 		print 'There are', len(simple_clusters[j]), 'neurons in the cluster for digit', j, '\n'
 
 	index_matrix = np.empty((update_interval, n_e))
 	index_matrix[:] = np.nan
@@ -577,8 +523,6 @@ def assign_labels(result_monitor, input_numbers):
 			this_spatial_result_monitor_flat = this_result_monitor_flat[n::n_e]
 			if np.size(np.where(this_spatial_result_monitor_flat > 0.9 * np.max(this_result_monitor_flat))) > 0:
 				index_matrix[idx, n] = np.argmax(this_spatial_result_monitor_flat)
-
-	# print index_matrix
 
 	return assignments, kmeans, kmeans_assignments, simple_clusters, weights, average_firing_rate, index_matrix
 
@@ -607,7 +551,7 @@ def build_network():
 		# if we're in test mode / using some stored weights
 		if test_mode:
 			# load up adaptive threshold parameters
-			neuron_groups['e'].theta = np.load(weights_dir + 'theta_A' + '_' + ending +'.npy')
+			neuron_groups['e'].theta = np.load(os.path.join(weights_dir, 'theta_A' + '_' + ending +'.npy'))
 		else:
 			# otherwise, set the adaptive additive threshold parameter at 20mV
 			neuron_groups['e'].theta = np.ones((n_e_total)) * 20.0 * b.mV
@@ -649,7 +593,7 @@ def build_network():
 				conn_name = name + conn_type[0] + name + conn_type[1]
 				# get weights from file if we are in test mode
 				if test_mode:
-					weight_matrix = get_matrix_from_file(weights_dir + conn_name + '_' + ending + '.npy', conv_features * n_e, conv_features * n_e)
+					weight_matrix = np.load(os.path.join(weights_dir, conn_name + '_' + ending + '.npy'))
 				# create a connection from the first group in conn_name with the second group
 				connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
 				# instantiate the created connection
@@ -781,7 +725,7 @@ def build_network():
 
 			# get weight matrix depending on training or test phase
 			if test_mode:
-				weight_matrix = get_matrix_from_file(weights_dir + conn_name + '_' + ending + '.npy', n_input, conv_features * n_e)
+				weight_matrix = np.load(os.path.join(weights_dir, conn_name + '_' + ending + '.npy'))
 				weight_matrix[weight_matrix < 0.20] = 0
 
 			# create connections from the windows of the input group to the neuron population
@@ -957,7 +901,7 @@ def run_simulation():
 					performances = get_current_performance(performances, j)
 
 				# pickling performance recording and iteration number
-				p.dump((j, performances), open(performance_dir + ending + '.p', 'wb'))
+				p.dump((j, performances), open(os.path.join(performance_dir, ending + '.p'), 'wb'))
 
 				for performance in performances:
 					print '\nClassification performance (' + performance + ')', performances[performance][1:int(j / float(update_interval)) + 1], \
@@ -982,22 +926,23 @@ def run_simulation():
 	# ensure weights don't grow without bound
 	normalize_weights()
 
+	print '\n'
+
 
 def save_results():
 	'''
-	Logic for saving and plotting results of the simulation.
+	Logic for saving results of the simulation.
 	'''
-	global fig_num
-	
-	print '...saving results'
+	print '...Saving results'
 
 	if not test_mode:
-		save_theta()
-	if not test_mode:
-		save_connections()
+		save_connections(weights_dir, connections, input_connections, ending)
+		save_theta(weights_dir, population_names, neuron_groups, ending)
 	else:
-		np.save(activity_dir + 'results_' + str(num_examples) + '_' + ending, result_monitor)
-		np.save(activity_dir + 'input_numbers_' + str(num_examples) + '_' + ending, input_numbers)
+		np.save(os.path.join(activity_dir, 'results_' + str(num_examples) + '_' + ending), result_monitor)
+		np.save(os.path.join(activity_dir, 'input_numbers_' + str(num_examples) + '_' + ending), input_numbers)
+
+	print '\n'
 
 
 def evaluate_results():
@@ -1015,7 +960,7 @@ def evaluate_results():
 	testing_result_monitor = result_monitor[end_time_training:]
 	testing_input_numbers = input_numbers[end_time_training:]
 
-	print '...getting assignments'
+	print '...Getting assignments'
 	test_results = np.zeros((10, end_time_testing - start_time_testing))
 	test_results_max = np.zeros((10, end_time_testing - start_time_testing))
 	test_results_top = np.zeros((10, end_time_testing - start_time_testing))
@@ -1099,32 +1044,29 @@ if __name__ == '__main__':
 	np.random.seed(0)
 
 	# setting test / train mode
-	if mode == 'test':
-		test_mode = True
-	else:
-		test_mode = False
-
+	test_mode = mode == 'test'
+	
 	if not test_mode:
 		start = time.time()
-		training = get_labeled_data(MNIST_data_path + 'training', b_train=True)
+		training = get_labeled_data(os.path.join(MNIST_data_path, 'training'), b_train=True)
 		end = time.time()
 		print 'time needed to load training set:', end - start
 
 	else:
 		start = time.time()
-		testing = get_labeled_data(MNIST_data_path + 'testing', b_train=False)
+		testing = get_labeled_data(os.path.join(MNIST_data_path, 'testing'), b_train=False)
 		end = time.time()
 		print 'time needed to load test set:', end - start
 
 	# set parameters for simulation based on train / test mode
 	if test_mode:
-		num_examples = 10000
+		num_examples = 100
 		use_testing_set = True
 		do_plot_performance = False
 		record_spikes = True
 		ee_STDP_on = False
 	else:
-		num_examples = 60000
+		num_examples = 100
 		use_testing_set = False
 		do_plot_performance = False
 		record_spikes = True
