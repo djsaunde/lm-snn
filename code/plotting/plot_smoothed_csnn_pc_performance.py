@@ -6,8 +6,9 @@ import numpy as np
 import os
 
 
-top_level_path = '../../'
-performance_dir = top_level_path + 'performance/csnn_pc/'
+top_level_path = os.path.join('..', '..')
+model_name = 'csnn_pc'
+performance_dir = os.path.join(top_level_path, 'performance', model_name)
 
 def window(size):
     return np.ones(size) / float(size)

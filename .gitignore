@@ -5,6 +5,7 @@
 *.txt
 *.pdf
 *.jpg
+*.swp
 performance/*
 weights/*
 activity/*
@@ -12,3 +13,4 @@ plots/*
 random/*
 time_series/*
 slurm*
+!requirements.txt

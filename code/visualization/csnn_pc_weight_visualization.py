@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.cm as cmap
-import time, os.path, scipy, math, sys, timeit
+import time, os, scipy, math, sys, timeit
 import cPickle as p
 import brian_no_units
 import brian as b
@@ -12,8 +12,13 @@ from brian import *
 fig_num = 0
 wmax_ee = 1
 
-top_level_path = '../../'
-weight_dir = top_level_path + 'weights/csnn_pc/'
+top_level_path = os.path.join('..', '..')
+model_name = 'csnn_pc'
+weight_dir = os.path.join(top_level_path, 'weights', model_name)
+plots_dir = os.path.join(top_level_path, 'plots', model_name)
+
+if not os.path.isdir(plots_dir):
+	os.makedirs(plots_dir)
 
 
 def get_matrix_from_file(file_name, n_src, n_tgt):
@@ -208,11 +213,12 @@ convolution_locations = {}
 for n in xrange(n_e):
 	convolution_locations[n] = [ ((n % n_e_sqrt) * conv_stride + (n // n_e_sqrt) * n_input_sqrt * conv_stride) + (x * n_input_sqrt) + y for y in xrange(conv_size) for x in xrange(conv_size) ]
 
-weight_matrix = get_matrix_from_file(weight_dir + file_name, n_input, conv_features * n_e)
+weight_matrix = get_matrix_from_file(os.path.join(weight_dir, file_name), n_input, conv_features * n_e)
+
 # weight_matrix[weight_matrix < 0.175] = 0
 # normalize_weights()
 
-patch_weight_matrix = get_matrix_from_file(weight_dir + file_name.replace('XeAe', 'AeAe'), conv_features * n_e, conv_features * n_e)
+patch_weight_matrix = get_matrix_from_file(os.path.join(weight_dir, file_name.replace('XeAe', 'AeAe')), conv_features * n_e, conv_features * n_e)
 patch_weight_matrix[patch_weight_matrix < np.percentile(patch_weight_matrix, 99.9)] = 0
 patch_weight_matrix[np.nonzero(patch_weight_matrix)] = 1
 
@@ -232,5 +238,5 @@ for i in xrange(ordering.size):
 					[(ordering[i % n_e, i // conv_features] // conv_features) * conv_size + (conv_size // 2), \
 					 (ordering[j % n_e, j // conv_features] // conv_features) * conv_size + (conv_size // 2)], color='gray', linestyle='--', linewidth=1)
 
-plt.savefig(top_level_path + 'plots/conv_patch_connectivity_plots/' + file_name[:-4] + '_patch_connectivity.png')
+plt.savefig(os.path.join(plots_dir, file_name[:-4] + '_patch_connectivity.png'))
 plt.show()
