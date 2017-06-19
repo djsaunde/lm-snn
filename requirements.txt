@@ -1,0 +1,10 @@
+numpy
+matplotlib
+scipy
+brian
+weave
+sympy
+networkx
+pandas
+sklearn
+brian2
