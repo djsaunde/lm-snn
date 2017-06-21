@@ -8,3 +8,4 @@ networkx
 pandas
 sklearn
 brian2
+libgcc
