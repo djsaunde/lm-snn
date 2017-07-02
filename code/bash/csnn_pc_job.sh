@@ -10,7 +10,7 @@ conv_size=${2:-16}
 conv_stride=${3:-4}
 conv_features=${4:-50}
 lattice_structure=${5:-4}
-weight_sharing=${6:-weight_sharing}
+weight_sharing=${6:-no_weight_sharing}
 top_percent=${7:-10}
 
 cd ../train/
