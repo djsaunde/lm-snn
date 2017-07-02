@@ -3,6 +3,9 @@ Convolutional spiking neural network training, testing, and evaluation script. E
 script with mode=train, then mode=test on HPC systems, where in the test mode, the network evaluation is written to disk.
 '''
 
+import warnings
+warnings.filterwarnings("ignore")
+
 import matplotlib.cm as cmap
 import brian_no_units
 import networkx as nx
@@ -1000,7 +1003,7 @@ def evaluate_results():
 		print '\n-', mechanism, 'accuracy:', accuracies[mechanism]
 
 	results = pd.DataFrame([ accuracies.values() ], index=[ str(num_examples) + '_' + ending ], columns=accuracies.keys())
-	if not model_name + '_accuracy_results.csv' in os.listdir(results_path):
+	if not 'accuracy_results.csv' in os.listdir(results_path):
 		results.to_csv(results_path + model_name + '.csv', )
 	else:
 		all_results = pd.read_csv(results_path + model_name + '.csv')
@@ -1032,6 +1035,7 @@ if __name__ == '__main__':
 																																				speedier, and possible to run on HPC resources.')
 	parser.add_argument('--sort_euclidean', type=bool, default=False, help='When plotting reshaped input -> excitatory weights, whether to plot each row (corresponding to locations in the input) \
 																																				sorted by Euclidean distance from the 0 matrix.')
+	parser.add_argument('--num_examples', type=int, default=10000, help='The number of examples for which to train or test the network on.')
 
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
@@ -1067,13 +1071,11 @@ if __name__ == '__main__':
 
 	# set parameters for simulation based on train / test mode
 	if test_mode:
-		num_examples = 10000
 		use_testing_set = True
 		do_plot_performance = False
 		record_spikes = True
 		ee_STDP_on = False
 	else:
-		num_examples = 60000
 		use_testing_set = False
 		do_plot_performance = False
 		record_spikes = True
