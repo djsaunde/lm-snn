@@ -23,6 +23,7 @@ b.log_level_error()
 top_level_path = os.path.join('..', '..')
 MNIST_data_path = os.path.join(top_level_path, 'data')
 model_name = 'csnn_pc_weight_habituation'
+
 results_path = os.path.join(top_level_path, 'results', model_name)
 
 performance_dir = os.path.join(top_level_path, 'performance', model_name)
@@ -1005,35 +1006,37 @@ def evaluate_results():
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
 
-	parser.add_argument('--mode', default='train')
-	parser.add_argument('--connectivity', default='all')
-	parser.add_argument('--weight_dependence', default='no_weight_dependence')
-	parser.add_argument('--post_pre', default='no_postpre')
-	parser.add_argument('--conv_size', type=int, default=16)
-	parser.add_argument('--conv_stride', type=int, default=4)
-	parser.add_argument('--conv_features', type=int, default=50)
-	parser.add_argument('--weight_sharing', default='no_weight_sharing')
-	parser.add_argument('--lattice_structure', default='8')
-	parser.add_argument('--random_lattice_prob', type=float, default=0.0)
-	parser.add_argument('--random_inhibition_prob', type=float, default=0.0)
-	parser.add_argument('--top_percent', type=int, default=10)
-	parser.add_argument('--do_plot', type=bool, default=False)
+	parser.add_argument('--mode', default='train', help='Network operating mode: "train" mode learns the synaptic weights of the network, and \
+														"test" mode holds the weights fixed and evaluates classification accuracy on the test dataset.')
+	parser.add_argument('--connectivity', default='none', help='Between-patch connectivity: choose from "none", "pairs", "linear", and "full".')
+	parser.add_argument('--weight_dependence', default='no_weight_dependence', help='Modifies the STDP rule to either use or not use the weight dependence mechanism.')
+	parser.add_argument('--post_pre', default='postpre', help='Modifies the STDP rule to incorporate both post- and pre-synaptic weight updates, rather than just post-synaptic updates.')
+	parser.add_argument('--conv_size', type=int, default=16, help='Side length of the square convolution window used by the input -> excitatory layer of the network.')
+	parser.add_argument('--conv_stride', type=int, default=4, help='Horizontal, vertical stride of the convolution window used by the input -> excitatory layer of the network.')
+	parser.add_argument('--conv_features', type=int, default=50, help='Number of excitatory convolutional features / filters / patches used in the network.')
+	parser.add_argument('--weight_sharing', default='no_weight_sharing', help='Whether to use within-patch weight sharing (each neuron in an excitatory patch shares a single set of weights).')
+	parser.add_argument('--lattice_structure', default='4', help='The lattice neighborhood to which connected patches project their connections: one of "none", "4", "8", or "all".')
+	parser.add_argument('--random_lattice_prob', type=float, default=0.0, help='Probability with which a neuron from an excitatory patch connects to a neuron in a neighboring excitatory patch \
+																												with which it is not already connected to via the between-patch wiring scheme.')
+	parser.add_argument('--random_inhibition_prob', type=float, default=0.0, help='Probability with which a neuron from the inhibitory layer connects to any given excitatory neuron with which \
+																															it is not already connected to via the inhibitory wiring scheme.')
+	parser.add_argument('--top_percent', type=int, default=10, help='The percentage of neurons which are allowed to cast "votes" in the "top_percent" labeling scheme.')
+	parser.add_argument('--do_plot', type=bool, default=False, help='Whether or not to display plots during network training / testing. Defaults to False, as this makes the network operation \
+																																				speedier, and possible to run on HPC resources.')
+	parser.add_argument('--sort_euclidean', type=bool, default=False, help='When plotting reshaped input -> excitatory weights, whether to plot each row (corresponding to locations in the input) \
+																																				sorted by Euclidean distance from the 0 matrix.')
+	parser.add_argument('--num_examples', type=int, default=10000, help='The number of examples for which to train or test the network on.')
 
+	# parse arguments and place them in local scope
 	args = parser.parse_args()
-	mode, connectivity, weight_dependence, post_pre, conv_size, conv_stride, conv_features, weight_sharing, lattice_structure, \
-		random_lattice_prob, random_inhibition_prob, top_percent, do_plot = args.mode, args.connectivity, args.weight_dependence, \
-		args.post_pre, args.conv_size, args.conv_stride, args.conv_features, args.weight_sharing, args.lattice_structure, \
-		args.random_lattice_prob, args.random_inhibition_prob, args.top_percent, args.do_plot
-
-	print '\n'
-
 	args = vars(args)
-	print 'Optional argument values:'
+	locals().update(args)
+
+	print '\nOptional argument values:'
 	for key, value in args.items():
 		print '-', key, ':', value
 
 	print '\n'
-
 
 	# set global preferences
 	b.set_global_preferences(defaultclock = b.Clock(dt=0.5*b.ms), useweave = True, gcc_options = ['-ffast-math -march=native'], usecodegen = True,
@@ -1060,13 +1063,11 @@ if __name__ == '__main__':
 
 	# set parameters for simulation based on train / test mode
 	if test_mode:
-		num_examples = 100
 		use_testing_set = True
 		do_plot_performance = False
 		record_spikes = True
 		ee_STDP_on = False
 	else:
-		num_examples = 100
 		use_testing_set = False
 		do_plot_performance = False
 		record_spikes = True
