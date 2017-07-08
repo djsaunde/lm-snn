@@ -6,19 +6,20 @@ import numpy as np
 import os
 
 
-top_level_path = '../../'
-performance_dir = top_level_path + 'performance/csnn_pc/'
+top_level_path = os.path.join('..', '..')
+performance_dir = os.path.join(top_level_path, 'performance', 'csnn_pc')
 
-if not os.path.isdir(performance_dir + 'performance_plots/'):
-    os.makedirs(performance_dir + 'performance_plots/')
+if not os.path.isdir(os.path.join(performance_dir, 'performance_plots')):
+    os.makedirs(os.path.join(performance_dir, 'performance_plots'))
 
-print '\n'.join([ str(idx + 1) + ' | ' + file_name for idx, file_name in enumerate(sorted(os.listdir(performance_dir))) if '.txt' in file_name ]), '\n'
+print '\n'
+print '\n'.join([ str(idx + 1) + ' | ' + file_name for idx, file_name in enumerate(sorted(os.listdir(performance_dir))) if '.p' in file_name ]), '\n'
 
 to_plot = raw_input('Enter the index of the file from above which you\'d like to plot: ')
-file_name = sorted([ file_name for file_name in os.listdir(performance_dir) if '.txt' in file_name ])[int(to_plot) - 1]
+file_name = sorted([ file_name for file_name in os.listdir(performance_dir) if '.p' in file_name ])[int(to_plot) - 1]
 
 # get pickled performances dictionary (voting mechanism, performance recordings over training)
-_, performances = p.load(open(performance_dir + file_name, 'rb'))
+_, performances = p.load(open(os.path.join(performance_dir, file_name), 'rb'))
 
 print '\n'
 
@@ -51,7 +52,7 @@ plt.title(str(conv_size) + 'x' + str(conv_size) + ' convolutions, stride ' + str
                         ' convolution patches, ' + ' '.join(weight_sharing.split('_')) + ', ' + str(lattice_structure) + '-lattice')
 plt.tight_layout()
 
-plt.savefig(performance_dir + 'performance_plots/' + file_name[:file_name.index('.')])
+plt.savefig(os.path.join(performance_dir, 'performance_plots', file_name[:file_name.index('.')]))
 plt.show()
 
 print '\n'
