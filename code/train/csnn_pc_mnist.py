@@ -4,7 +4,7 @@ script with mode=train, then mode=test on HPC systems, where in the test mode, t
 '''
 
 import warnings
-warnings.filterwarnings("ignore")
+warnings.filterwarnings('ignore')
 
 import matplotlib.cm as cmap
 import brian_no_units
@@ -1004,11 +1004,11 @@ def evaluate_results():
 
 	results = pd.DataFrame([ accuracies.values() ], index=[ str(num_examples) + '_' + ending ], columns=accuracies.keys())
 	if not 'accuracy_results.csv' in os.listdir(results_path):
-		results.to_csv(results_path + model_name + '.csv', )
+		results.to_csv(results_path + '.csv', )
 	else:
-		all_results = pd.read_csv(results_path + model_name + '.csv')
+		all_results = pd.read_csv(results_path + '.csv')
 		all_results.append(results)
-		all_results.to_csv(results_path + model_name + '.csv')
+		all_results.to_csv(results_path + '.csv')
 
 	print '\n'
 

@@ -994,11 +994,11 @@ def evaluate_results():
 
 	results = pd.DataFrame([ accuracies.values() ], index=[ str(num_examples) + '_' + ending ], columns=accuracies.keys())
 	if not 'all_accuracy_results_conv_patch_connectivity_contrasting.csv' in os.listdir(results_path):
-		results.to_csv(results_path + model_name + '.csv', )
+		results.to_csv(results_path + '.csv', )
 	else:
-		all_results = pd.read_csv(results_path + model_name + '.csv')
+		all_results = pd.read_csv(results_path + '.csv')
 		all_results.append(results)
-		all_results.to_csv(results_path + model_name + '.csv')
+		all_results.to_csv(results_path + '.csv')
 
 	print '\n'
 
