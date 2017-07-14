@@ -6,7 +6,7 @@ Our code is built on Peter Diehl's [research code](https://github.com/peter-u-di
 
 ## Setting Things Up
 
-First things first, download the MNIST handwritten digt dataset by running the bash script entitled `get_MNIST.sh` found in the `data` folder. You can run this file by entering `./get_MNIST.sh` in the terminal; if you don't have permission to, execute `chmod +x get_MNIST.sh`.
+First things first, download the MNIST handwritten digit dataset by running the bash script entitled `get_MNIST.sh` found in the `data` folder. You can run this file by entering `./get_MNIST.sh` in the terminal; if you don't have permission to, execute `chmod +x get_MNIST.sh`.
 
 __Important__: Make sure to change your matplotlibrc file (typically located in `~/.config/matplotlib/`) to include the line `backend : TKAgg`; otherwise, you may not be able to import `pylab` while importing `brian 1.4.3`. The default backend, `GKAgg`, will not work with this outdated module!
 
