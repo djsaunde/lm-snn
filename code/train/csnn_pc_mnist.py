@@ -103,7 +103,7 @@ def plot_input(rates):
 	Plot the current input example during the training procedure.
 	'''
 	fig = b.figure(fig_num, figsize = (5, 5))
-	im = b.imshow(rates.reshape((28, 28)), interpolation = 'nearest', vmin=0, vmax=64, cmap=cmap.get_cmap('gray'))
+	im = b.imshow(rates.reshape((28, 28)), interpolation = 'nearest', vmin=0, vmax=64, cmap='binary')
 	b.colorbar(im)
 	b.title('Current input example')
 	fig.canvas.draw()
@@ -175,7 +175,15 @@ def get_2d_input_weights():
 																temp[convolution_locations[n]].reshape((conv_size, conv_size))
 
 	# return the rearranged weights to display to the user
-	return rearranged_weights.T
+	if n_e == 1:
+		ceil_sqrt = int(math.ceil(math.sqrt(conv_features)))
+		square_weights = np.zeros((28 * ceil_sqrt, 28 * ceil_sqrt))
+		for n in xrange(conv_features):
+			square_weights[(n // ceil_sqrt) * 28 : ((n // ceil_sqrt) + 1) * 28, (n % ceil_sqrt) * 28 : ((n % ceil_sqrt) + 1) * 28] = rearranged_weights[n * 28 : (n + 1) * 28, :]
+
+		return square_weights.T
+	else:
+		return rearranged_weights.T
 
 
 def get_input_weights(weight_matrix):
@@ -201,17 +209,27 @@ def plot_2d_input_weights():
 	Plot the weights from input to excitatory layer to view during training.
 	'''
 	weights = get_2d_input_weights()
-	fig = plt.figure(fig_num, figsize=(18, 18))
+
+	if n_e != 1:
+		fig = plt.figure(fig_num, figsize=(18, 9))
+	else:
+		fig = plt.figure(fig_num, figsize=(9, 9))
+
 	im = plt.imshow(weights, interpolation='nearest', vmin=0, vmax=wmax_ee, cmap=cmap.get_cmap('hot_r'))
 	
-	plt.colorbar(im, fraction=0.016)
-	plt.title('Reshaped input -> convolution weights')
-	plt.xticks(xrange(conv_size, conv_size * (conv_features + 1), conv_size), xrange(1, conv_features + 1))
-	plt.yticks(xrange(conv_size, conv_size * (n_e + 1), conv_size), xrange(1, n_e + 1))
-	plt.xlabel('Convolution patch')
-	plt.ylabel('Location in input (from top left to bottom right')
-	plt.tight_layout()
+	if n_e != 1:
+		plt.colorbar(im, fraction=0.016)
+	else:
+		plt.colorbar(im, fraction=0.06)
 
+	plt.title('Reshaped input -> convolution weights')
+
+	if n_e != 1:
+		plt.xticks(xrange(conv_size, conv_size * (conv_features + 1), conv_size), xrange(1, conv_features + 1))
+		plt.yticks(xrange(conv_size, conv_size * (n_e + 1), conv_size), xrange(1, n_e + 1))
+		plt.xlabel('Convolution patch')
+		plt.ylabel('Location in input (from top left to bottom right')
+	
 	fig.canvas.draw()
 	return im, fig
 
@@ -284,8 +302,11 @@ def plot_neuron_votes(assignments, spike_rates):
 
 	fig = b.figure(fig_num, figsize=(6, 4))
 	rects = b.bar(xrange(10), [ 0.1 ] * 10)
-	b.ylim([0, 1])
-	b.title('Percentage votes per label')
+	
+	plt.ylim([0, 1])
+	plt.xticks(xrange(10))
+	plt.title('Percentage votes per label')
+	
 	fig.canvas.draw()
 	return rects, fig
 
@@ -582,13 +603,16 @@ def build_network():
 			spike_monitors[name + 'i'] = b.SpikeMonitor(neuron_groups[name + 'i'])
 
 	if record_spikes and do_plot:
-		b.figure(fig_num)
+		b.figure(fig_num, figsize=(8, 6))
+		
 		fig_num += 1
+		
 		b.ion()
 		b.subplot(211)
-		b.raster_plot(spike_monitors['Ae'], refresh=1000 * b.ms, showlast=1000 * b.ms)
+		b.raster_plot(spike_monitors['Ae'], refresh=1000 * b.ms, showlast=1000 * b.ms, title='Excitatory spikes per neuron')
 		b.subplot(212)
-		b.raster_plot(spike_monitors['Ai'], refresh=1000 * b.ms, showlast=1000 * b.ms)
+		b.raster_plot(spike_monitors['Ai'], refresh=1000 * b.ms, showlast=1000 * b.ms, title='Inhibitory spikes per neuron')
+		b.tight_layout()
 
 	# creating lattice locations for each patch
 	if connectivity == 'all':
@@ -922,6 +946,7 @@ if __name__ == '__main__':
 	parser.add_argument('--sort_euclidean', type=bool, default=False, help='When plotting reshaped input -> excitatory weights, whether to plot each row (corresponding to locations in the input) \
 																																				sorted by Euclidean distance from the 0 matrix.')
 	parser.add_argument('--num_examples', type=int, default=10000, help='The number of examples for which to train or test the network on.')
+	parser.add_argument('--random_seed', type=int, default=42, help='The random seed (any integer) from which to generate random numbers.')
 
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
@@ -940,7 +965,7 @@ if __name__ == '__main__':
 		magic_useframes = False, useweave_linear_diffeq = True)
 
 	# for reproducibility's sake
-	np.random.seed(0)
+	np.random.seed(random_seed)
 
 	# test or train mode
 	test_mode = mode == 'test'
@@ -972,7 +997,10 @@ if __name__ == '__main__':
 	n_input_sqrt = int(math.sqrt(n_input))
 
 	# number of neurons parameters
-	n_e = ((n_input_sqrt - conv_size) / conv_stride + 1) ** 2
+	if conv_size == 28 and conv_stride == 0:
+		n_e = 1
+	else:
+		n_e = ((n_input_sqrt - conv_size) / conv_stride + 1) ** 2
 	n_e_total = n_e * conv_features
 	n_e_sqrt = int(math.sqrt(n_e))
 	n_i = n_e
