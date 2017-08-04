@@ -119,23 +119,6 @@ def update_input(rates, im, fig):
 	return im
 
 
-def plot_cluster_centers(cluster_centers):
-	'''
-	Plot the cluster centers for the input to excitatory layer weights during training.
-	'''
-	fig = b.figure(fig_num, figsize=(8, 8))
-	centers_sqrt = int(math.sqrt(len(cluster_centers)))
-	to_show = np.zeros((conv_size * centers_sqrt, conv_size * centers_sqrt))
-	for i in xrange(centers_sqrt):
-		for j in xrange(centers_sqrt):
-			to_show[i * conv_size : (i + 1) * conv_size, j * conv_size : (j + 1) * conv_size] = cluster_centers[i * centers_sqrt + j].reshape((conv_size, conv_size))
-	im = b.imshow(to_show, interpolation='nearest', vmin=0, vmax=wmax_ee, cmap=cmap.get_cmap('hot_r'))
-	b.colorbar(im)
-	b.title('Cluster centers')
-	fig.canvas.draw()
-	return im, fig
-
-
 def update_cluster_centers(cluster_centers, im, fig):
 	'''
 	Update the plot of the cluster centers (input to excitatory weights).
@@ -218,14 +201,17 @@ def plot_2d_input_weights():
 	Plot the weights from input to excitatory layer to view during training.
 	'''
 	weights = get_2d_input_weights()
-	fig = b.figure(fig_num, figsize=(18, 18))
-	im = b.imshow(weights, interpolation='nearest', vmin=0, vmax=wmax_ee, cmap=cmap.get_cmap('hot_r'))
-	b.colorbar(im, fraction=0.016)
-	b.title('Reshaped input -> convolution weights')
-	b.xticks(xrange(conv_size, conv_size * (conv_features + 1), conv_size), xrange(1, conv_features + 1))
-	b.yticks(xrange(conv_size, conv_size * (n_e + 1), conv_size), xrange(1, n_e + 1))
-	b.xlabel('Convolution patch')
-	b.ylabel('Location in input (from top left to bottom right')
+	fig = plt.figure(fig_num, figsize=(18, 18))
+	im = plt.imshow(weights, interpolation='nearest', vmin=0, vmax=wmax_ee, cmap=cmap.get_cmap('hot_r'))
+	
+	plt.colorbar(im, fraction=0.016)
+	plt.title('Reshaped input -> convolution weights')
+	plt.xticks(xrange(conv_size, conv_size * (conv_features + 1), conv_size), xrange(1, conv_features + 1))
+	plt.yticks(xrange(conv_size, conv_size * (n_e + 1), conv_size), xrange(1, n_e + 1))
+	plt.xlabel('Convolution patch')
+	plt.ylabel('Location in input (from top left to bottom right')
+	plt.tight_layout()
+
 	fig.canvas.draw()
 	return im, fig
 
@@ -331,7 +317,7 @@ def get_current_performance(performances, current_example_num):
 	Evaluate the performance of the network on the past 'update_interval' training
 	examples.
 	'''
-	global all_output_numbers, most_spiked_output_numbers, top_percent_output_numbers, input_numbers
+	global input_numbers
 
 	current_evaluation = int(current_example_num / update_interval)
 	start_num = current_example_num - update_interval
@@ -351,30 +337,39 @@ def plot_performance(fig_num, performances, num_evaluations):
 	'''
 	time_steps = range(0, num_evaluations)
 
-	fig = b.figure(fig_num, figsize = (15, 5))
+	fig = plt.figure(fig_num, figsize = (12, 4))
 	fig_num += 1
 
-	for performance in performances.keys():
-		im, = plt.plot(time_steps, performances[performance])
+	for performance in performances:
+		plt.plot(time_steps, performances[performance], label=performance)
 
-	b.ylim(ymax = 100)
-	b.title('Classification performance')
+	lines = plt.gca().lines
+
+	plt.ylim(ymax=100)
+	plt.xticks(xrange(0, num_evaluations + 10, 10), xrange(0, ((num_evaluations + 10) * update_interval), 10))
+	plt.legend()
+	plt.title('Classification performance per update interval')
+	
 	fig.canvas.draw()
 
-	return im, fig_num, fig
+	return lines, fig_num, fig
 
 
-def update_performance_plot(im, performances, current_example_num, fig):
+def update_performance_plot(lines, performances, current_example_num, fig):
 	'''
 	Update the plot of the performance based on results thus far.
 	'''
 	performances = get_current_performance(performances, current_example_num)
-	im.set_ydata(performances.values())
+	
+	for line, performance in zip(lines, performances):
+		line.set_ydata(performances[performance])
+
 	fig.canvas.draw()
-	return im, performances
+
+	return lines, performances
 
 
-def predict_label(assignments, kmeans_assignments, kmeans, simple_clusters, index_matrix, input_numbers, spike_rates, average_firing_rate):
+def predict_label(assignments, input_numbers, spike_rates):
 	'''
 	Given the label assignments of the excitatory layer and their spike rates over
 	the past 'update_interval', get the ranking of each of the categories of input.
@@ -423,45 +418,7 @@ def predict_label(assignments, kmeans_assignments, kmeans, simple_clusters, inde
 			# sum the spike rates of all excitatory neurons with this label, which fired the most in its patch
 			top_percent_summed_rates[i] = len(spike_rates[np.where(np.logical_and(assignments == i, top_percent_array))])
 
-	spike_rates_flat = np.copy(np.ravel(spike_rates))
-
-	kmeans_summed_rates = [0] * 10
-	num_assignments = [0] * 10
-
-	for i in xrange(10):
-		num_assignments[i] = 0
-		for assignment in kmeans_assignments.keys():
-			if kmeans_assignments[assignment] == i:
-				num_assignments[i] += 1
-		if num_assignments[i] > 0:
-			for cluster, assignment in enumerate(kmeans_assignments.keys()):
-				if kmeans_assignments[assignment] == i:
-					kmeans_summed_rates[i] += sum([ spike_rates_flat[idx] for idx, label in enumerate(kmeans.labels_) if label == cluster ]) / float(len([ label for label in kmeans.labels_ if label == i ]))
-
-	simple_cluster_summed_rates = [0] * 10
-	num_assignments = [0] * 10
-
-	for i in xrange(10):
-		if i in simple_clusters.keys() and len(simple_clusters[i]) > 1:
-			this_spike_rates = spike_rates_flat[simple_clusters[i]]
-			simple_cluster_summed_rates[i] = np.sum(this_spike_rates[np.argpartition(this_spike_rates, -1)][-1:])
-
-	spatial_cluster_index_vector = np.empty(n_e)
-	spatial_cluster_index_vector[:] = np.nan
-
-	for idx in xrange(n_e):
-		this_spatial_location = spike_rates_flat[idx::n_e]
-		if np.size(np.where(this_spatial_location > 0.9 * np.max(spike_rates_flat))) > 0:
-			spatial_cluster_index_vector[idx] = np.argmax(this_spatial_location)
-
-	spatial_cluster_summed_rates = [0] * 10
-	if input_numbers != []:
-		if np.count_nonzero([[ x == y for (x, y) in zip(spatial_cluster_index_vector, index_matrix[idx]) ] for idx in xrange(update_interval) ]) > 0:
-			best_col_idx = np.argmax([ sum([ 1.0 if x == y else 0.0 for (x, y) in zip(spatial_cluster_index_vector, index_matrix[idx]) ]) for idx in xrange(update_interval) ])
-			spatial_cluster_summed_rates[input_numbers[best_col_idx]] = 1.0
-
-	return ( np.argsort(summed_rates)[::-1] for summed_rates in (all_summed_rates, most_spiked_summed_rates, top_percent_summed_rates, \
-																	kmeans_summed_rates, simple_cluster_summed_rates, spatial_cluster_summed_rates) )
+	return ( np.argsort(summed_rates)[::-1] for summed_rates in (all_summed_rates, most_spiked_summed_rates, top_percent_summed_rates) )
 
 
 def assign_labels(result_monitor, input_numbers):
@@ -482,64 +439,7 @@ def assign_labels(result_monitor, input_numbers):
 					maximum_rate[i] = rate[i // n_e, i % n_e]
 					assignments[i // n_e, i % n_e] = j
 
-	weight_matrix = np.copy(np.array(connections['AeAe'][:].todense()))
-
-	kmeans_assignments = {}
-	votes_vector = {}
-
-	# get the list of flattened input weights per neuron per feature
-	weights = get_input_weights(np.copy(input_connections['XeAe'][:].todense()))
-
-	# create and fit a KMeans model
-	kmeans = KMeans(n_clusters=25).fit(weights)
-
-	for cluster in xrange(kmeans.n_clusters):
-		kmeans_assignments[cluster] = -1
-		votes_vector[cluster] = np.zeros(10)
-
-	for j in xrange(10):
-		num_assignments = len(np.where(input_nums == j)[0])
-		if num_assignments > 0:
-			rate = np.sum(result_monitor[input_nums == j], axis=0) / float(num_assignments)
-			rate = np.ravel(rate)
-			for cluster in xrange(kmeans.n_clusters):
-				votes_vector[cluster][j] += sum([ rate[idx] for idx, label in enumerate(kmeans.labels_) if label == cluster ]) / \
-														float(len([ label for label in kmeans.labels_ if label == j ]))
-
-	for cluster in xrange(kmeans.n_clusters):
-		kmeans_assignments[cluster] = np.argmax(votes_vector[cluster])
-
-	simple_clusters = {}
-	votes_vector = {}
-
-	for cluster in simple_clusters.keys():
-		votes_vector[cluster] = np.zeros(10)
-
-	average_firing_rate = np.zeros(10)
-
-	for j in xrange(10):
-		this_result_monitor = result_monitor[input_nums == j]
-		average_firing_rate[j] = np.sum(this_result_monitor[np.nonzero(this_result_monitor)]) \
-							/ float(np.size(this_result_monitor[np.nonzero(this_result_monitor)]))
-
-	for j in xrange(10):
-		num_assignments = len(np.where(input_nums == j)[0])
-		if num_assignments > 0:
-			rate = np.sum(result_monitor[input_nums == j], axis=0) / float(num_assignments)
-			this_result_monitor = result_monitor[input_nums == j]
-			simple_clusters[j] = np.argsort(np.ravel(np.sum(this_result_monitor, axis=0)))[::-1][:int(0.025 * (np.size(result_monitor) / float(10000)))]
-
-	index_matrix = np.empty((update_interval, n_e))
-	index_matrix[:] = np.nan
-
-	for idx in xrange(update_interval):
-		this_result_monitor_flat = np.ravel(result_monitor[idx, :])
-		for n in xrange(n_e):
-			this_spatial_result_monitor_flat = this_result_monitor_flat[n::n_e]
-			if np.size(np.where(this_spatial_result_monitor_flat > 0.9 * np.max(this_result_monitor_flat))) > 0:
-				index_matrix[idx, n] = np.argmax(this_spatial_result_monitor_flat)
-
-	return assignments, kmeans, kmeans_assignments, simple_clusters, weights, average_firing_rate, index_matrix
+	return assignments
 
 
 def build_network():
@@ -792,22 +692,15 @@ def run_simulation():
 		neuron_rects, fig_neuron_votes = plot_neuron_votes(assignments, result_monitor[:])
 		fig_num += 1
 
-	average_firing_rate = np.ones(10)
-	if do_plot and not test_mode:
-		cluster_monitor, cluster_fig = plot_cluster_centers([ np.zeros((conv_size, conv_size)) ] * 25)
-		fig_num += 1
-
 	# plot input intensities
 	if do_plot:
 		input_image_monitor, input_image = plot_input(rates)
 		fig_num += 1
 
-	# plot performance
+	# set up performance recording and plotting
 	num_evaluations = int(num_examples / update_interval)
-	performances = {}
-	performances['all'], performances['most_spiked'], performances['top_percent'], performances['kmeans'], \
-										performances['simple_clusters'], performances['spatial_clusters'] = ( np.zeros(num_evaluations) for _ in xrange(6) )
-	if do_plot_performance and do_plot:
+	performances = { voting_scheme : np.zeros(num_evaluations) for voting_scheme in ['all', 'most_spiked', 'top_percent'] }
+	if not test_mode and do_plot:
 		performance_monitor, fig_num, fig_performance = plot_performance(fig_num, performances, num_evaluations)
 	else:
 		performances = get_current_performance(performances, 0)
@@ -851,10 +744,7 @@ def run_simulation():
 		
 		# get new neuron label assignments every 'update_interval'
 		if j % update_interval == 0 and j > 0:
-			assignments, kmeans, kmeans_assignments, simple_clusters, weights, average_firing_rate, index_matrix = \
-																assign_labels(result_monitor[:], input_numbers[j - update_interval : j])
-			if do_plot and not test_mode:
-				update_cluster_centers(kmeans.cluster_centers_, cluster_monitor, cluster_fig)
+			assignments = assign_labels(result_monitor[:], input_numbers[j - update_interval : j])
 
 		# get count of spikes over the past iteration
 		current_spike_count = np.copy(spike_counters['Ae'].count[:]).reshape((conv_features, n_e)) - previous_spike_count
@@ -898,10 +788,9 @@ def run_simulation():
 				input_numbers[j] = training['y'][j % 60000][0]
 			
 			# get the output classifications of the network
-			output_numbers['all'][j, :], output_numbers['most_spiked'][j, :], output_numbers['top_percent'][j, :], \
-							output_numbers['kmeans'][j, :], output_numbers['simple_clusters'][j, :], output_numbers['spatial_clusters'][j, :] = \
-							predict_label(assignments, kmeans_assignments, kmeans, simple_clusters, index_matrix, 
-							input_numbers[j - update_interval - (j % update_interval) : j - (j % update_interval)], result_monitor[j % update_interval, :], average_firing_rate)
+			output_numbers['all'][j, :], output_numbers['most_spiked'][j, :], output_numbers['top_percent'][j, :] = \
+							predict_label(assignments, input_numbers[j - update_interval - (j % update_interval) : j - \
+							(j % update_interval)], result_monitor[j % update_interval, :])
 			
 			# print progress
 			if j % print_progress_interval == 0 and j > 0:
@@ -910,7 +799,7 @@ def run_simulation():
 			
 			# plot performance if appropriate
 			if j % update_interval == 0 and j > 0:
-				if do_plot_performance and do_plot:
+				if not test_mode and do_plot:
 					# updating the performance plot
 					perf_plot, performances = update_performance_plot(performance_monitor, performances, j, fig_performance)
 				else:
@@ -976,11 +865,9 @@ def evaluate_results():
 
 	print '...Getting assignments'
 
-	assignments, kmeans, kmeans_assignments, simple_clusters, weights, average_firing_rate, index_matrix = \
-																assign_labels(training_result_monitor, training_input_numbers)
+	assignments = assign_labels(training_result_monitor, training_input_numbers)
 
-	voting_mechanisms = [ 'all', 'most-spiked (per patch)', 'most-spiked (overall)', 'KMeans patch weights clusters',
-												'activity clusters', 'spatial correlation clusters' ]
+	voting_mechanisms = [ 'all', 'most-spiked (per patch)', 'most-spiked (overall)', ]
 
 	test_results = {}
 	for mechanism in voting_mechanisms:
@@ -990,8 +877,7 @@ def evaluate_results():
 
 	# for idx in xrange(end_time_testing - end_time_training):
 	for idx in xrange(num_examples):
-		for (mechanism, label_ranking) in zip(voting_mechanisms, predict_label(assignments, kmeans_assignments, kmeans, simple_clusters, index_matrix,
-														training_input_numbers, testing_result_monitor[idx, :], average_firing_rate)):
+		for (mechanism, label_ranking) in zip(voting_mechanisms, predict_label(assignments, training_input_numbers, testing_result_monitor[idx, :])):
 			test_results[mechanism][:, idx] = label_ranking
 
 	differences = { mechanism : test_results[mechanism][0, :] - testing_input_numbers for mechanism in voting_mechanisms }
@@ -1077,7 +963,7 @@ if __name__ == '__main__':
 		ee_STDP_on = False
 	else:
 		use_testing_set = False
-		do_plot_performance = False
+		do_plot_performance = True
 		record_spikes = True
 		ee_STDP_on = True
 
