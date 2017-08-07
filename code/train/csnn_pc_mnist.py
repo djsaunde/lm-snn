@@ -943,7 +943,7 @@ if __name__ == '__main__':
 	parser.add_argument('--top_percent', type=int, default=10, help='The percentage of neurons which are allowed to cast "votes" in the "top_percent" labeling scheme.')
 	parser.add_argument('--do_plot', type=str, default='False', help='Whether or not to display plots during network training / testing. Defaults to False, as this makes the network operation \
 																																				speedier, and possible to run on HPC resources.')
-	parser.add_argument('--sort_euclidean', type=bool, default=False, help='When plotting reshaped input -> excitatory weights, whether to plot each row (corresponding to locations in the input) \
+	parser.add_argument('--sort_euclidean', type=str, default='False', help='When plotting reshaped input -> excitatory weights, whether to plot each row (corresponding to locations in the input) \
 																																				sorted by Euclidean distance from the 0 matrix.')
 	parser.add_argument('--num_examples', type=int, default=10000, help='The number of examples for which to train or test the network on.')
 	parser.add_argument('--random_seed', type=int, default=42, help='The random seed (any integer) from which to generate random numbers.')
@@ -965,6 +965,13 @@ if __name__ == '__main__':
 		do_plot = False
 	else:
 		raise Exception('Expecting True or False-valued command line argument "do_plot".')
+
+	if sort_euclidean == 'True':
+		sort_euclidean = True
+	elif sort_euclidean == 'False':
+		sort_euclidean = False
+	else:
+		raise Exception('Expecting True or False-valued command line argument "sort_euclidean".')
 
 	# set brian global preferences
 	b.set_global_preferences(defaultclock = b.Clock(dt=0.5*b.ms), useweave = True, gcc_options = ['-ffast-math -march=native'], usecodegen = True,
