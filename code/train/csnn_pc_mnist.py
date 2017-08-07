@@ -941,7 +941,7 @@ if __name__ == '__main__':
 	parser.add_argument('--random_inhibition_prob', type=float, default=0.0, help='Probability with which a neuron from the inhibitory layer connects to any given excitatory neuron with which \
 																															it is not already connected to via the inhibitory wiring scheme.')
 	parser.add_argument('--top_percent', type=int, default=10, help='The percentage of neurons which are allowed to cast "votes" in the "top_percent" labeling scheme.')
-	parser.add_argument('--do_plot', type=str, default=False, help='Whether or not to display plots during network training / testing. Defaults to False, as this makes the network operation \
+	parser.add_argument('--do_plot', type=str, default='False', help='Whether or not to display plots during network training / testing. Defaults to False, as this makes the network operation \
 																																				speedier, and possible to run on HPC resources.')
 	parser.add_argument('--sort_euclidean', type=bool, default=False, help='When plotting reshaped input -> excitatory weights, whether to plot each row (corresponding to locations in the input) \
 																																				sorted by Euclidean distance from the 0 matrix.')
