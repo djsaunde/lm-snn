@@ -5,7 +5,7 @@
 #SBATCH --mem=30000
 #SBATCH --account=rkozma
 
-connectivity=${1:-all}
+connectivity=${1:-none}
 conv_size=${2:-16}
 conv_stride=${3:-4}
 conv_features=${4:-50}
