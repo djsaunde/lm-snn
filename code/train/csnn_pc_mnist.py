@@ -941,7 +941,7 @@ if __name__ == '__main__':
 	parser.add_argument('--random_inhibition_prob', type=float, default=0.0, help='Probability with which a neuron from the inhibitory layer connects to any given excitatory neuron with which \
 																															it is not already connected to via the inhibitory wiring scheme.')
 	parser.add_argument('--top_percent', type=int, default=10, help='The percentage of neurons which are allowed to cast "votes" in the "top_percent" labeling scheme.')
-	parser.add_argument('--do_plot', type=bool, default=False, help='Whether or not to display plots during network training / testing. Defaults to False, as this makes the network operation \
+	parser.add_argument('--do_plot', type=str, default=False, help='Whether or not to display plots during network training / testing. Defaults to False, as this makes the network operation \
 																																				speedier, and possible to run on HPC resources.')
 	parser.add_argument('--sort_euclidean', type=bool, default=False, help='When plotting reshaped input -> excitatory weights, whether to plot each row (corresponding to locations in the input) \
 																																				sorted by Euclidean distance from the 0 matrix.')
@@ -958,6 +958,13 @@ if __name__ == '__main__':
 		print '-', key, ':', value
 
 	print '\n'
+
+	if do_plot == 'True':
+		do_plot = True
+	elif do_plot == 'False':
+		do_plot = False
+	else:
+		raise Exception('Expecting True or False-valued command line argument "do_plot".')
 
 	# set brian global preferences
 	b.set_global_preferences(defaultclock = b.Clock(dt=0.5*b.ms), useweave = True, gcc_options = ['-ffast-math -march=native'], usecodegen = True,
@@ -1041,7 +1048,10 @@ if __name__ == '__main__':
 	recurrent_conn_names = [ 'ei', 'ie', 'ee' ]
 	
 	# setting weight, delay, and intensity parameters
-	weight['ee_input'] = (conv_size ** 2) * 0.1625
+	if conv_size == 28 and conv_stride == 0:
+		weight['ee_input'] = (conv_size ** 2) * 0.15
+	else:
+		weight['ee_input'] = (conv_size ** 2) * 0.1625
 	delay['ee_input'] = (0 * b.ms, 10 * b.ms)
 	delay['ei_input'] = (0 * b.ms, 5 * b.ms)
 	input_intensity = start_input_intensity = 2.0
