@@ -119,20 +119,6 @@ def update_input(rates, im, fig):
 	return im
 
 
-def update_cluster_centers(cluster_centers, im, fig):
-	'''
-	Update the plot of the cluster centers (input to excitatory weights).
-	'''
-	centers_sqrt = int(math.sqrt(len(cluster_centers)))
-	to_show = np.zeros((conv_size * centers_sqrt, conv_size * centers_sqrt))
-	for i in xrange(centers_sqrt):
-		for j in xrange(centers_sqrt):
-			to_show[i * conv_size : (i + 1) * conv_size, j * conv_size : (j + 1) * conv_size] = cluster_centers[i * centers_sqrt + j].reshape((conv_size, conv_size)).T
-	im.set_array(to_show)
-	fig.canvas.draw()
-	return im
-
-
 def get_2d_input_weights():
 	'''
 	Get the weights from the input to excitatory layer and reshape it to be two
@@ -732,7 +718,7 @@ def run_simulation():
 	# set firing rates to zero initially
 	for name in input_population_names:
 		input_groups[name + 'e'].rate = 0
-
+	
 	# initialize network
 	j = 0
 	num_retries = 0
@@ -1015,6 +1001,7 @@ if __name__ == '__main__':
 		n_e = 1
 	else:
 		n_e = ((n_input_sqrt - conv_size) / conv_stride + 1) ** 2
+	
 	n_e_total = n_e * conv_features
 	n_e_sqrt = int(math.sqrt(n_e))
 	n_i = n_e
@@ -1156,7 +1143,8 @@ if __name__ == '__main__':
 	# creating convolution locations inside the input image
 	convolution_locations = {}
 	for n in xrange(n_e):
-		convolution_locations[n] = [ ((n % n_e_sqrt) * conv_stride + (n // n_e_sqrt) * n_input_sqrt * conv_stride) + (x * n_input_sqrt) + y for y in xrange(conv_size) for x in xrange(conv_size) ]
+		convolution_locations[n] = [ ((n % n_e_sqrt) * conv_stride + (n // n_e_sqrt) * n_input_sqrt * \
+						conv_stride) + (x * n_input_sqrt) + y for y in xrange(conv_size) for x in xrange(conv_size) ]
 
 	# instantiating neuron "vote" monitor
 	result_monitor = np.zeros((update_interval, conv_features, n_e))
@@ -1167,19 +1155,12 @@ if __name__ == '__main__':
 	# bookkeeping variables
 	previous_spike_count = np.zeros((conv_features, n_e))
 	assignments = np.zeros((conv_features, n_e))
-	kmeans = KMeans()
-	kmeans_assignments = {}
-	simple_clusters = {}
-	index_matrix = np.empty((update_interval, n_e))
-	index_matrix[:] = np.nan
 	input_numbers = [0] * num_examples
+	rates = np.zeros((n_input_sqrt, n_input_sqrt))
+
 	output_numbers['all'] = np.zeros((num_examples, 10))
 	output_numbers['most_spiked'] = np.zeros((num_examples, 10))
 	output_numbers['top_percent'] = np.zeros((num_examples, 10))
-	output_numbers['kmeans'] = np.zeros((num_examples, 10))
-	output_numbers['simple_clusters'] = np.zeros((num_examples, 10))
-	output_numbers['spatial_clusters'] = np.zeros((num_examples, 10))
-	rates = np.zeros((n_input_sqrt, n_input_sqrt))
 
 	# run the simulation of the network
 	run_simulation()
