@@ -32,7 +32,7 @@ b.log_level_error()
 # set these appropriate to your directory structure
 top_level_path = os.path.join('..', '..')
 MNIST_data_path = os.path.join(top_level_path, 'data')
-model_name = 'csnn_pc'
+model_name = 'csnn_pc_clustering'
 results_path = os.path.join(top_level_path, 'results', model_name)
 
 performance_dir = os.path.join(top_level_path, 'performance', model_name)
@@ -43,31 +43,6 @@ random_dir = os.path.join(top_level_path, 'random', model_name)
 for d in [ performance_dir, activity_dir, weights_dir, random_dir, MNIST_data_path, results_path ]:
 	if not os.path.isdir(d):
 		os.makedirs(d)
-
-
-def set_weights_most_fired(current_spike_count):
-	'''
-	For each convolutional patch, set the weights to those of the neuron which
-	fired the most in the last iteration.
-	'''
-
-	for conn_name in input_connections:
-		for feature in xrange(conv_features):
-			# count up the spikes for the neurons in this convolution patch
-			column_sums = np.sum(current_spike_count[feature : feature + 1, :], axis=0)
-
-			# find the excitatory neuron which spiked the most
-			most_spiked = np.argmax(column_sums)
-
-			# create a "dense" version of the most spiked excitatory neuron's weight
-			most_spiked_dense = input_connections[conn_name][:, feature * n_e + most_spiked].todense()
-
-			# set all other neurons' (in the same convolution patch) weights the same as the most-spiked neuron in the patch
-			for n in xrange(n_e):
-				if n != most_spiked:
-					other_dense = input_connections[conn_name][:, feature * n_e + n].todense()
-					other_dense[convolution_locations[n]] = most_spiked_dense[convolution_locations[most_spiked]]
-					input_connections[conn_name][:, feature * n_e + n] = other_dense
 
 
 def normalize_weights():
@@ -449,6 +424,45 @@ def assign_labels(result_monitor, input_numbers):
 	return assignments
 
 
+def assign_clusters(patches, result_monitor, input_numbers):
+	'''
+	Cluster the convolutional patches based on their Euclidean similarity.
+	'''
+	print np.nonzero(patches)
+
+	nonzeros = patches[np.nonzero(patches)]
+
+	print nonzeros.shape
+
+	patches = np.reshape(nonzeros, (n_input, conv_features ** 2	))
+
+	print patches.shape
+
+	# Cluster convolutional patches using `n_clusters` cluster centers.
+	kmeans = KMeans(n_clusters=n_clusters).fit(patches)
+
+	# Create dictionary mapping for clustering for ease of use
+	clusters = {}
+	for i in xrange(n_clusters):
+		clusters[i] = np.where(kmeans.labels_ == i)
+
+	# Assign labels to clusters based on members' spiking activity
+	cluster_labels = {}
+	maximum_rate = np.zeros(len(clusters))
+	input_nums = np.array(input_numbers)
+	for cluster in clusters:
+		for j in xrange(10):
+			num_assignments = len(np.where(input_nums == j)[0])
+			if num_assignments > 0:
+				cluster_rate = np.mean(result_monitor[input_nums == j, [i // n_e for i in n_e_total], [i % n_e for i in n_e_total]])
+				if cluster_rate > maximum_rate[cluster]:
+					maximum_rate[cluster] = cluster_rate
+					cluster_assignments[cluster] = j
+
+	# Return the dictionary mappings for use in the classification stage
+	return clusters, cluster_assignments
+
+
 def build_network():
 	global fig_num
 
@@ -731,12 +745,16 @@ def run_simulation():
 		# fetched rates depend on training / test phase, and whether we use the 
 		# testing dataset for the test phase
 		if test_mode:
-			rates = (data['x'][j % 10000, :, :] / 8.0) * input_intensity		
+			if use_testing_set:
+				rates = (testing['x'][j % 10000, :, :] / 8.0) * input_intensity
+			else:
+				rates = (training['x'][j % 60000, :, :] / 8.0) * input_intensity
+		
 		else:
 			# ensure weights don't grow without bound
 			normalize_weights()
 			# get the firing rates of the next input example
-			rates = (data['x'][j % 60000, :, :] / 8.0) * input_intensity
+			rates = (training['x'][j % 60000, :, :] / 8.0) * input_intensity
 		
 		# plot the input at this step
 		if do_plot:
@@ -747,18 +765,18 @@ def run_simulation():
 		
 		# run the network for a single example time
 		b.run(single_example_time)
+
+		temp = np.copy(input_connections['XeAe'][:].todense())
+		print temp[np.nonzero(temp)].shape
 		
 		# get new neuron label assignments every 'update_interval'
 		if j % update_interval == 0 and j > 0:
 			assignments = assign_labels(result_monitor[:], input_numbers[j - update_interval : j])
+			clusters, cluster_assignments = assign_clusters(np.copy(input_connections['XeAe'][:].todense()), result_monitor[:], input_numbers[j - update_interval : j])
 
 		# get count of spikes over the past iteration
 		current_spike_count = np.copy(spike_counters['Ae'].count[:]).reshape((conv_features, n_e)) - previous_spike_count
 		previous_spike_count = np.copy(spike_counters['Ae'].count[:]).reshape((conv_features, n_e))
-
-		# set weights to those of the most-fired neuron
-		if not test_mode and weight_sharing == 'weight_sharing':
-			set_weights_most_fired(current_spike_count)
 
 		# update weights every 'weight_update_interval'
 		if j % weight_update_interval == 0 and not test_mode and do_plot:
@@ -788,10 +806,10 @@ def run_simulation():
 			result_monitor[j % update_interval, :] = current_spike_count
 			
 			# decide whether to evaluate on test or training set
-			if test_mode:
-				input_numbers[j] = data['y'][j % 10000][0]
+			if test_mode and use_testing_set:
+				input_numbers[j] = testing['y'][j % 10000][0]
 			else:
-				input_numbers[j] = data['y'][j % 60000][0]
+				input_numbers[j] = training['y'][j % 60000][0]
 			
 			# get the output classifications of the network
 			output_numbers['all'][j, :], output_numbers['most_spiked'][j, :], output_numbers['top_percent'][j, :] = \
@@ -828,10 +846,6 @@ def run_simulation():
 			# bookkeeping
 			input_intensity = start_input_intensity
 			j += 1
-
-	# set weights to those of the most-fired neuron
-	if not test_mode and weight_sharing == 'weight_sharing':
-		set_weights_most_fired(current_spike_count)
 
 	# ensure weights don't grow without bound
 	normalize_weights()
@@ -916,7 +930,6 @@ if __name__ == '__main__':
 	parser.add_argument('--conv_size', type=int, default=16, help='Side length of the square convolution window used by the input -> excitatory layer of the network.')
 	parser.add_argument('--conv_stride', type=int, default=4, help='Horizontal, vertical stride of the convolution window used by the input -> excitatory layer of the network.')
 	parser.add_argument('--conv_features', type=int, default=50, help='Number of excitatory convolutional features / filters / patches used in the network.')
-	parser.add_argument('--weight_sharing', default='no_weight_sharing', help='Whether to use within-patch weight sharing (each neuron in an excitatory patch shares a single set of weights).')
 	parser.add_argument('--lattice_structure', default='4', help='The lattice neighborhood to which connected patches project their connections: one of "none", "4", "8", or "all".')
 	parser.add_argument('--random_lattice_prob', type=float, default=0.0, help='Probability with which a neuron from an excitatory patch connects to a neuron in a neighboring excitatory patch \
 																												with which it is not already connected to via the between-patch wiring scheme.')
@@ -929,9 +942,7 @@ if __name__ == '__main__':
 																																				sorted by Euclidean distance from the 0 matrix.')
 	parser.add_argument('--num_examples', type=int, default=10000, help='The number of examples for which to train or test the network on.')
 	parser.add_argument('--random_seed', type=int, default=42, help='The random seed (any integer) from which to generate random numbers.')
-	parser.add_argument('--reduced_dataset', type=str, default='False', help='Whether or not to use 9-digit reduced-size dataset (900 images).')
-	parser.add_argument('--num_classes', type=int, default=10, help='Number of classes to use in reduced dataset.')
-	parser.add_argument('--examples_per_class', type=int, default=100, help='Number of examples per class to use in reduced dataset.')
+	parser.add_argument('--n_clusters', type=int, default=30, help='The number of clusters to cluster convolutional patches into.')
 
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
@@ -958,13 +969,6 @@ if __name__ == '__main__':
 	else:
 		raise Exception('Expecting True or False-valued command line argument "sort_euclidean".')
 
-	if reduced_dataset == 'True':
-		reduced_dataset = True
-	elif reduced_dataset == 'False':
-		reduced_dataset = False
-	else:
-		raise Exception('Expecting True or False-valued command line argument "reduced_dataset".')
-
 	# set brian global preferences
 	b.set_global_preferences(defaultclock = b.Clock(dt=0.5*b.ms), useweave = True, gcc_options = ['-ffast-math -march=native'], usecodegen = True,
 		usecodegenweave = True, usecodegenstateupdate = True, usecodegenthreshold = False, usenewpropagate = True, usecstdp = True, openmp = False,
@@ -976,18 +980,24 @@ if __name__ == '__main__':
 	# test or train mode
 	test_mode = mode == 'test'
 
-	start = timeit.default_timer()
-	data = get_labeled_data(os.path.join(MNIST_data_path, 'testing' if test_mode else 'training'), 
-												not test_mode, reduced_dataset, num_classes, examples_per_class)
-	
-	print 'Time needed to load data:', timeit.default_timer() - start
+	if not test_mode:
+		start = timeit.default_timer()
+		training = get_labeled_data(os.path.join(MNIST_data_path, 'training'), b_train=True)
+		print 'time needed to load training set:', timeit.default_timer() - start
+
+	else:
+		start = timeit.default_timer()
+		testing = get_labeled_data(os.path.join(MNIST_data_path, 'testing'), b_train=False)
+		print 'time needed to load test set:', timeit.default_timer() - start
 
 	# set parameters for simulation based on train / test mode
 	if test_mode:
+		use_testing_set = True
 		do_plot_performance = False
 		record_spikes = True
 		ee_STDP_on = False
 	else:
+		use_testing_set = False
 		do_plot_performance = True
 		record_spikes = True
 		ee_STDP_on = True
@@ -1131,7 +1141,7 @@ if __name__ == '__main__':
 
 	# set ending of filename saves
 	ending = connectivity + '_' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e) + '_' + \
-					weight_dependence + '_' + post_pre + '_' + weight_sharing + '_' + lattice_structure + '_' + str(random_lattice_prob)
+					weight_dependence + '_' + post_pre + '_' + lattice_structure + '_' + str(random_lattice_prob)
 
 	b.ion()
 	fig_num = 1

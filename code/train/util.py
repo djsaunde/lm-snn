@@ -12,16 +12,19 @@ top_level_path = os.path.join('..', '..')
 MNIST_data_path = os.path.join(top_level_path, 'data')
 
 
-def get_labeled_data(picklename, b_train=True):
+def get_labeled_data(pickle_name, train=True, reduced_dataset=False, num_classes=10, examples_per_class=100):
 	'''
 	Read input-vector (image) and target class (label, 0-9) and return it as 
 	a list of tuples.
 	'''
-	if os.path.isfile('%s.pickle' % picklename):
-		data = p.load(open('%s.pickle' % picklename))
+	if reduced_dataset:
+		pickle_name = '_'.join([pickle_name, 'reduced'])
+
+	if os.path.isfile('%s.pickle' % pickle_name):
+		data = p.load(open('%s.pickle' % pickle_name))
 	else:
 		# Open the images with gzip in read binary mode
-		if b_train:
+		if train:
 			images = open(os.path.join(MNIST_data_path, 'train-images-idx3-ubyte'), 'rb')
 			labels = open(os.path.join(MNIST_data_path, 'train-labels-idx1-ubyte'), 'rb')
 		else:
@@ -42,20 +45,44 @@ def get_labeled_data(picklename, b_train=True):
 			raise Exception('number of labels did not match the number of images')
 
 		# Get the data
-		print '...Loading MNIST data from disk.\n'
+		print '...Loading MNIST data from disk.'
+		print '\n'
+
 		x = np.zeros((N, rows, cols), dtype=np.uint8)  # Initialize numpy array
 		y = np.zeros((N, 1), dtype=np.uint8)  # Initialize numpy array
+
 		for i in xrange(N):
 			if i % 1000 == 0:
 				print 'Progress :', i, '/', N
-			x[i] = [[unpack('>B', images.read(1))[0] for unused_col in xrange(cols)]  for unused_row in xrange(rows) ]
+			x[i] = [[unpack('>B', images.read(1))[0] for unused_col in xrange(cols)] for unused_row in xrange(rows) ]
 			y[i] = unpack('>B', labels.read(1))[0]
 
 		print 'Progress :', N, '/', N, '\n'
 
+		if reduced_dataset:
+			reduced_x = np.zeros((examples_per_class * num_classes, rows, cols), dtype=np.uint8)
+			for class_index in xrange(num_classes):
+				current = examples_per_class * class_index
+				for example_index, example in enumerate(x):
+					if y[example_index] == class_index:
+						reduced_x[current, :, :] = x[example_index, :, :]
+						current += 1
+						if current == examples_per_class * (class_index + 1):
+							break
+
+			reduced_y = np.array([ label // examples_per_class for label in xrange(examples_per_class * num_classes) ],
+															dtype=np.uint8).reshape((examples_per_class * num_classes, 1))
+
+			# Randomize order of data examples
+			np.random.shuffle(reduced_x)
+
+			# Set data to reduced data
+			x, y = reduced_x, reduced_y
+
 		data = {'x': x, 'y': y, 'rows': rows, 'cols': cols}
-		p.dump(data, open("%s.pickle" % picklename, "wb"))
-	
+
+		p.dump(data, open("%s.pickle" % pickle_name, "wb"))
+
 	return data
 
 

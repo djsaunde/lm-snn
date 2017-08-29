@@ -18,6 +18,7 @@ import timeit
 import math
 import os
 
+from scipy.spatial.distance import cityblock
 from sklearn.cluster import KMeans
 from struct import unpack
 from brian import *
@@ -483,7 +484,8 @@ def build_network():
 				# create connection name (composed of population and connection types)
 				conn_name = name + conn_type[0] + name + conn_type[1]
 				# create a connection from the first group in conn_name with the second group
-				connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
+				connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], 
+											neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
 				# instantiate the created connection
 				for feature in xrange(conv_features):
 					for n in xrange(n_e):
@@ -493,13 +495,19 @@ def build_network():
 				# create connection name (composed of population and connection types)
 				conn_name = name + conn_type[0] + name + conn_type[1]
 				# create a connection from the first group in conn_name with the second group
-				connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
+				connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]],
+											neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
 				# instantiate the created connection
 				for feature in xrange(conv_features):
 					for other_feature in xrange(conv_features):
 						if feature != other_feature:
+							# Implementing "Mexican hat"-esque inhibition scheme (rather than homogeneous inhibition)
+							x, y = feature // n_e_sqrt, feature % n_e_sqrt
+							x_, y_ = other_feature // n_e_sqrt, other_feature % n_e_sqrt
+							
 							for n in xrange(n_e):
-								connections[conn_name][feature * n_e + n, other_feature * n_e + n] = 17.4
+								print np.sqrt(cityblock([x, y], [x_, y_])) / inhib_const
+								connections[conn_name][feature * n_e + n, other_feature * n_e + n] = np.sqrt(cityblock([x, y], [x_, y_])) / inhib_const
 
 				if random_inhibition_prob != 0.0:
 					for feature in xrange(conv_features):
@@ -517,7 +525,8 @@ def build_network():
 				if test_mode:
 					weight_matrix = np.load(os.path.join(weights_dir, conn_name + '_' + ending + '.npy'))
 				# create a connection from the first group in conn_name with the second group
-				connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
+				connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]],
+											neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
 				# instantiate the created connection
 				if connectivity == 'all':
 					for feature in xrange(conv_features):
@@ -527,7 +536,8 @@ def build_network():
 									for other_n in xrange(n_e):
 										if is_lattice_connection(n_e_sqrt, this_n, other_n, lattice_structure):
 											if test_mode:
-												connections[conn_name][feature * n_e + this_n, other_feature * n_e + other_n] = weight_matrix[feature * n_e + this_n, other_feature * n_e + other_n]
+												connections[conn_name][feature * n_e + this_n, other_feature * n_e + other_n] = \
+																				weight_matrix[feature * n_e + this_n, other_feature * n_e + other_n]
 											else:
 												connections[conn_name][feature * n_e + this_n, other_feature * n_e + other_n] = (b.random() + 0.01) * 0.3
 
@@ -538,7 +548,8 @@ def build_network():
 								for other_n in xrange(n_e):
 									if is_lattice_connection(n_e_sqrt, this_n, other_n, lattice_structure):
 										if test_mode:
-											connections[conn_name][feature * n_e + this_n, (feature + 1) * n_e + other_n] = weight_matrix[feature * n_e + this_n, (feature + 1) * n_e + other_n]
+											connections[conn_name][feature * n_e + this_n, (feature + 1) * n_e + other_n] = \
+																				weight_matrix[feature * n_e + this_n, (feature + 1) * n_e + other_n]
 										else:
 											connections[conn_name][feature * n_e + this_n, (feature + 1) * n_e + other_n] = (b.random() + 0.01) * 0.3
 						elif feature % 2 == 1:
@@ -546,7 +557,8 @@ def build_network():
 								for other_n in xrange(n_e):
 									if is_lattice_connection(n_e_sqrt, this_n, other_n, lattice_structure):
 										if test_mode:
-											connections[conn_name][feature * n_e + this_n, (feature - 1) * n_e + other_n] = weight_matrix[feature * n_e + this_n, (feature - 1) * n_e + other_n]
+											connections[conn_name][feature * n_e + this_n, (feature - 1) * n_e + other_n] = \
+																				weight_matrix[feature * n_e + this_n, (feature - 1) * n_e + other_n]
 										else:
 											connections[conn_name][feature * n_e + this_n, (feature - 1) * n_e + other_n] = (b.random() + 0.01) * 0.3
 
@@ -557,7 +569,8 @@ def build_network():
 								for other_n in xrange(n_e):
 									if is_lattice_connection(n_e_sqrt, this_n, other_n, lattice_structure):
 										if test_mode:
-											connections[conn_name][feature * n_e + this_n, (feature + 1) * n_e + other_n] = weight_matrix[feature * n_e + this_n, (feature + 1) * n_e + other_n]
+											connections[conn_name][feature * n_e + this_n, (feature + 1) * n_e + other_n] = \
+																				weight_matrix[feature * n_e + this_n, (feature + 1) * n_e + other_n]
 										else:
 											connections[conn_name][feature * n_e + this_n, (feature + 1) * n_e + other_n] = (b.random() + 0.01) * 0.3
 						if feature != 0:
@@ -565,7 +578,8 @@ def build_network():
 								for other_n in xrange(n_e):
 									if is_lattice_connection(n_e_sqrt, this_n, other_n, lattice_structure):
 										if test_mode:
-											connections[conn_name][feature * n_e + this_n, (feature - 1) * n_e + other_n] = weight_matrix[feature * n_e + this_n, (feature - 1) * n_e + other_n]
+											connections[conn_name][feature * n_e + this_n, (feature - 1) * n_e + other_n] = \
+																				weight_matrix[feature * n_e + this_n, (feature - 1) * n_e + other_n]
 										else:
 											connections[conn_name][feature * n_e + this_n, (feature - 1) * n_e + other_n] = (b.random() + 0.01) * 0.3
 
@@ -574,7 +588,8 @@ def build_network():
 
 		# if STDP from excitatory -> excitatory is on and this connection is excitatory -> excitatory
 		if ee_STDP_on and 'ee' in recurrent_conn_names:
-			stdp_methods[name + 'e' + name + 'e'] = b.STDP(connections[name + 'e' + name + 'e'], eqs=eqs_stdp_ee, pre=eqs_stdp_pre_ee, post=eqs_stdp_post_ee, wmin=0., wmax=wmax_ee)
+			stdp_methods[name + 'e' + name + 'e'] = b.STDP(connections[name + 'e' + name + 'e'],
+										eqs=eqs_stdp_ee, pre=eqs_stdp_pre_ee, post=eqs_stdp_post_ee, wmin=0., wmax=wmax_ee)
 
 		print '...Creating monitors for:', name
 
@@ -604,7 +619,8 @@ def build_network():
 	if connectivity == 'all':
 		lattice_locations = {}
 		for this_n in xrange(conv_features * n_e):
-			lattice_locations[this_n] = [ other_n for other_n in xrange(conv_features * n_e) if is_lattice_connection(n_e_sqrt, this_n % n_e, other_n % n_e, lattice_structure) ]
+			lattice_locations[this_n] = [ other_n for other_n in xrange(conv_features * n_e) if \
+														is_lattice_connection(n_e_sqrt, this_n % n_e, other_n % n_e, lattice_structure) ]
 	elif connectivity == 'pairs':
 		lattice_locations = {}
 		for this_n in xrange(conv_features * n_e):
@@ -654,13 +670,15 @@ def build_network():
 				# weight_matrix[weight_matrix < 0.20] = 0
 
 			# create connections from the windows of the input group to the neuron population
-			input_connections[conn_name] = b.Connection(input_groups['Xe'], neuron_groups[name[1] + conn_type[1]], structure='sparse', state='g' + conn_type[0], delay=True, max_delay=delay[conn_type][1])
+			input_connections[conn_name] = b.Connection(input_groups['Xe'], neuron_groups[name[1] + conn_type[1]],
+												structure='sparse', state='g' + conn_type[0], delay=True, max_delay=delay[conn_type][1])
 			
 			if test_mode:
 				for feature in xrange(conv_features):
 					for n in xrange(n_e):
 						for idx in xrange(conv_size ** 2):
-							input_connections[conn_name][convolution_locations[n][idx], feature * n_e + n] = weight_matrix[convolution_locations[n][idx], feature * n_e + n]
+							input_connections[conn_name][convolution_locations[n][idx], feature * n_e + n] = \
+																		weight_matrix[convolution_locations[n][idx], feature * n_e + n]
 			else:
 				for feature in xrange(conv_features):
 					for n in xrange(n_e):
@@ -731,12 +749,16 @@ def run_simulation():
 		# fetched rates depend on training / test phase, and whether we use the 
 		# testing dataset for the test phase
 		if test_mode:
-			rates = (data['x'][j % 10000, :, :] / 8.0) * input_intensity		
+			if use_testing_set:
+				rates = (testing['x'][j % 10000, :, :] / 8.0) * input_intensity
+			else:
+				rates = (training['x'][j % 60000, :, :] / 8.0) * input_intensity
+		
 		else:
 			# ensure weights don't grow without bound
 			normalize_weights()
 			# get the firing rates of the next input example
-			rates = (data['x'][j % 60000, :, :] / 8.0) * input_intensity
+			rates = (training['x'][j % 60000, :, :] / 8.0) * input_intensity
 		
 		# plot the input at this step
 		if do_plot:
@@ -788,10 +810,10 @@ def run_simulation():
 			result_monitor[j % update_interval, :] = current_spike_count
 			
 			# decide whether to evaluate on test or training set
-			if test_mode:
-				input_numbers[j] = data['y'][j % 10000][0]
+			if test_mode and use_testing_set:
+				input_numbers[j] = testing['y'][j % 10000][0]
 			else:
-				input_numbers[j] = data['y'][j % 60000][0]
+				input_numbers[j] = training['y'][j % 60000][0]
 			
 			# get the output classifications of the network
 			output_numbers['all'][j, :], output_numbers['most_spiked'][j, :], output_numbers['top_percent'][j, :] = \
@@ -911,27 +933,34 @@ if __name__ == '__main__':
 	parser.add_argument('--mode', default='train', help='Network operating mode: "train" mode learns the synaptic weights of the network, and \
 														"test" mode holds the weights fixed and evaluates classification accuracy on the test dataset.')
 	parser.add_argument('--connectivity', default='none', help='Between-patch connectivity: choose from "none", "pairs", "linear", and "full".')
-	parser.add_argument('--weight_dependence', default='no_weight_dependence', help='Modifies the STDP rule to either use or not use the weight dependence mechanism.')
-	parser.add_argument('--post_pre', default='postpre', help='Modifies the STDP rule to incorporate both post- and pre-synaptic weight updates, rather than just post-synaptic updates.')
-	parser.add_argument('--conv_size', type=int, default=16, help='Side length of the square convolution window used by the input -> excitatory layer of the network.')
-	parser.add_argument('--conv_stride', type=int, default=4, help='Horizontal, vertical stride of the convolution window used by the input -> excitatory layer of the network.')
-	parser.add_argument('--conv_features', type=int, default=50, help='Number of excitatory convolutional features / filters / patches used in the network.')
-	parser.add_argument('--weight_sharing', default='no_weight_sharing', help='Whether to use within-patch weight sharing (each neuron in an excitatory patch shares a single set of weights).')
-	parser.add_argument('--lattice_structure', default='4', help='The lattice neighborhood to which connected patches project their connections: one of "none", "4", "8", or "all".')
-	parser.add_argument('--random_lattice_prob', type=float, default=0.0, help='Probability with which a neuron from an excitatory patch connects to a neuron in a neighboring excitatory patch \
-																												with which it is not already connected to via the between-patch wiring scheme.')
-	parser.add_argument('--random_inhibition_prob', type=float, default=0.0, help='Probability with which a neuron from the inhibitory layer connects to any given excitatory neuron with which \
-																															it is not already connected to via the inhibitory wiring scheme.')
-	parser.add_argument('--top_percent', type=int, default=10, help='The percentage of neurons which are allowed to cast "votes" in the "top_percent" labeling scheme.')
-	parser.add_argument('--do_plot', type=str, default='False', help='Whether or not to display plots during network training / testing. Defaults to False, as this makes the network operation \
-																																				speedier, and possible to run on HPC resources.')
-	parser.add_argument('--sort_euclidean', type=str, default='False', help='When plotting reshaped input -> excitatory weights, whether to plot each row (corresponding to locations in the input) \
-																																				sorted by Euclidean distance from the 0 matrix.')
+	parser.add_argument('--weight_dependence', default='no_weight_dependence', help='Modifies the STDP rule to either use or not \
+																								use the weight dependence mechanism.')
+	parser.add_argument('--post_pre', default='postpre', help='Modifies the STDP rule to incorporate both post- and pre-synaptic \
+																				weight updates, rather than just post-synaptic updates.')
+	parser.add_argument('--conv_size', type=int, default=28, help='Side length of the square convolution window used by \
+																					the input -> excitatory layer of the network.')
+	parser.add_argument('--conv_stride', type=int, default=0, help='Horizontal, vertical stride of the convolution window used \
+																					by the input \-> excitatory layer of the network.')
+	parser.add_argument('--conv_features', type=int, default=100, help='Number of excitatory convolutional features / filters / patches used in the network. \
+																						Must be a square number (to be arranged in a 2-dimensional lattice.')
+	parser.add_argument('--weight_sharing', default='no_weight_sharing', help='Whether to use within-patch weight \
+													sharing (each neuron in an excitatory patch shares a single set of weights).')
+	parser.add_argument('--lattice_structure', default='4', help='The lattice neighborhood to which connected patches \
+																	project their connections: one of "none", "4", "8", or "all".')
+	parser.add_argument('--random_lattice_prob', type=float, default=0.0, help='Probability with which a neuron from an excitatory patch connects to a \
+									neuron in a neighboring excitatory patch with which it is not already connected to via the between-patch wiring scheme.')
+	parser.add_argument('--random_inhibition_prob', type=float, default=0.0, help='Probability with which a neuron from the inhibitory layer connects \
+												to any given excitatory neuron with which it is not already connected to via the inhibitory wiring scheme.')
+	parser.add_argument('--top_percent', type=int, default=10, help='The percentage of neurons which are allowed \
+																	to cast "votes" in the "top_percent" labeling scheme.')
+	parser.add_argument('--do_plot', type=str, default='False', help='Whether or not to display plots during network training / testing. \
+											Defaults to False, as this makes the network operation speedier, and possible to run on HPC resources.')
+	parser.add_argument('--sort_euclidean', type=str, default='False', help='When plotting reshaped input -> excitatory weights, whether to plot \
+													each row (corresponding to locations in the input) sorted by Euclidean distance from the 0 matrix.')
 	parser.add_argument('--num_examples', type=int, default=10000, help='The number of examples for which to train or test the network on.')
 	parser.add_argument('--random_seed', type=int, default=42, help='The random seed (any integer) from which to generate random numbers.')
-	parser.add_argument('--reduced_dataset', type=str, default='False', help='Whether or not to use 9-digit reduced-size dataset (900 images).')
-	parser.add_argument('--num_classes', type=int, default=10, help='Number of classes to use in reduced dataset.')
-	parser.add_argument('--examples_per_class', type=int, default=100, help='Number of examples per class to use in reduced dataset.')
+	parser.add_argument('--inhib_const', type=float, default=0.1, help='A constant controlling how the inhibition grows as the distance between two \
+																					convolution features in the 2-dimensional lattice grows.')
 
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
@@ -958,12 +987,8 @@ if __name__ == '__main__':
 	else:
 		raise Exception('Expecting True or False-valued command line argument "sort_euclidean".')
 
-	if reduced_dataset == 'True':
-		reduced_dataset = True
-	elif reduced_dataset == 'False':
-		reduced_dataset = False
-	else:
-		raise Exception('Expecting True or False-valued command line argument "reduced_dataset".')
+	if not np.equal(np.mod(np.sqrt(conv_features), 1), 0):
+		raise Exception('Expecting a number of features which is a square number.')
 
 	# set brian global preferences
 	b.set_global_preferences(defaultclock = b.Clock(dt=0.5*b.ms), useweave = True, gcc_options = ['-ffast-math -march=native'], usecodegen = True,
@@ -976,18 +1001,24 @@ if __name__ == '__main__':
 	# test or train mode
 	test_mode = mode == 'test'
 
-	start = timeit.default_timer()
-	data = get_labeled_data(os.path.join(MNIST_data_path, 'testing' if test_mode else 'training'), 
-												not test_mode, reduced_dataset, num_classes, examples_per_class)
-	
-	print 'Time needed to load data:', timeit.default_timer() - start
+	if not test_mode:
+		start = timeit.default_timer()
+		training = get_labeled_data(os.path.join(MNIST_data_path, 'training'), b_train=True)
+		print 'time needed to load training set:', timeit.default_timer() - start
+
+	else:
+		start = timeit.default_timer()
+		testing = get_labeled_data(os.path.join(MNIST_data_path, 'testing'), b_train=False)
+		print 'time needed to load test set:', timeit.default_timer() - start
 
 	# set parameters for simulation based on train / test mode
 	if test_mode:
+		use_testing_set = True
 		do_plot_performance = False
 		record_spikes = True
 		ee_STDP_on = False
 	else:
+		use_testing_set = False
 		do_plot_performance = True
 		record_spikes = True
 		ee_STDP_on = True
@@ -1043,7 +1074,7 @@ if __name__ == '__main__':
 	
 	# setting weight, delay, and intensity parameters
 	if conv_size == 28 and conv_stride == 0:
-		weight['ee_input'] = (conv_size ** 2) * 0.15
+		weight['ee_input'] = (conv_size ** 2) * 0.125
 	else:
 		weight['ee_input'] = (conv_size ** 2) * 0.1625
 	delay['ee_input'] = (0 * b.ms, 10 * b.ms)
