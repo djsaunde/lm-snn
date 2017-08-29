@@ -18,7 +18,7 @@ def get_labeled_data(pickle_name, train=True, reduced_dataset=False, num_classes
 	a list of tuples.
 	'''
 	if reduced_dataset:
-		pickle_name = '_'.join([pickle_name, 'reduced'])
+		pickle_name = '_'.join([pickle_name, 'reduced', str(num_classes), str(examples_per_class)])
 
 	if os.path.isfile('%s.pickle' % pickle_name):
 		data = p.load(open('%s.pickle' % pickle_name))
@@ -74,7 +74,10 @@ def get_labeled_data(pickle_name, train=True, reduced_dataset=False, num_classes
 															dtype=np.uint8).reshape((examples_per_class * num_classes, 1))
 
 			# Randomize order of data examples
+			rng_state = np.random.get_state()
 			np.random.shuffle(reduced_x)
+			np.random.set_state(rng_state)
+			np.random.shuffle(reduced_y)
 
 			# Set data to reduced data
 			x, y = reduced_x, reduced_y

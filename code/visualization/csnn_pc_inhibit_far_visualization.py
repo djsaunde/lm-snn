@@ -13,7 +13,7 @@ fig_num = 0
 wmax_ee = 1
 
 top_level_path = os.path.join('..', '..')
-model_name = 'csnn_pc'
+model_name = 'csnn_pc_inhibit_far'
 weight_dir = os.path.join(top_level_path, 'weights', model_name)
 plots_dir = os.path.join(top_level_path, 'plots', model_name)
 

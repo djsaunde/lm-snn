@@ -18,6 +18,7 @@ import timeit
 import math
 import os
 
+from scipy.spatial.distance import euclidean
 from sklearn.cluster import KMeans
 from struct import unpack
 from brian import *
@@ -32,7 +33,7 @@ b.log_level_error()
 # set these appropriate to your directory structure
 top_level_path = os.path.join('..', '..')
 MNIST_data_path = os.path.join(top_level_path, 'data')
-model_name = 'csnn_pc'
+model_name = 'csnn_pc_inhibit_far'
 results_path = os.path.join(top_level_path, 'results', model_name)
 
 performance_dir = os.path.join(top_level_path, 'performance', model_name)
@@ -497,7 +498,10 @@ def build_network():
 				# instantiate the created connection
 				for feature in xrange(conv_features):
 					for other_feature in xrange(conv_features):
-						if feature != other_feature:
+						x, y = feature // np.sqrt(n_e_total), feature % np.sqrt(n_e_total)
+						x_, y_ = other_feature // np.sqrt(n_e_total), other_feature % np.sqrt(n_e_total)
+
+						if feature != other_feature and euclidean([x, y], [x_, y_]) >= 2.0:
 							for n in xrange(n_e):
 								connections[conn_name][feature * n_e + n, other_feature * n_e + n] = 17.4
 
@@ -730,14 +734,13 @@ def run_simulation():
 	while j < num_examples:
 		# fetched rates depend on training / test phase, and whether we use the 
 		# testing dataset for the test phase
-		if test_mode:
-			rates = (data['x'][j % data_size, :, :] / 8.0) * input_intensity		
-		else:
+		if not test_mode:
 			# ensure weights don't grow without bound
 			normalize_weights()
-			# get the firing rates of the next input example
-			rates = (data['x'][j % data_size, :, :] / 8.0) * input_intensity
-		
+
+		# get the firing rates of the next input example
+		rates = (data['x'][j % data_size, :, :] / 8.0) * input_intensity
+
 		# plot the input at this step
 		if do_plot:
 			input_image_monitor = update_input(rates, input_image_monitor, input_image)
@@ -788,10 +791,7 @@ def run_simulation():
 			result_monitor[j % update_interval, :] = current_spike_count
 			
 			# decide whether to evaluate on test or training set
-			if test_mode:
-				input_numbers[j] = data['y'][j % data_size][0]
-			else:
-				input_numbers[j] = data['y'][j % data_size][0]
+			input_numbers[j] = data['y'][j % data_size][0]
 			
 			# get the output classifications of the network
 			output_numbers['all'][j, :], output_numbers['most_spiked'][j, :], output_numbers['top_percent'][j, :] = \
