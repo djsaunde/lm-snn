@@ -943,7 +943,7 @@ if __name__ == '__main__':
 	parser.add_argument('--neighborhood', type=str, default='8', help='The structure of neighborhood not to inhibit on firing. One of "4", "8".')
 	parser.add_argument('--inhib_scheme', type=str, default='far', help='The scheme with which one excitatory neuron\'s firing activity \
 																			inhibits others. One of "far", "increasing".')
-	parser.add_argument('--inhib_const', type=str, default=2.5, help='A constant which controls how quickly inhibition strengthens \
+	parser.add_argument('--inhib_const', type=str, default=5.0, help='A constant which controls how quickly inhibition strengthens \
 																			between two neurons as their relative distance increases.')
 
 	# parse arguments and place them in local scope
