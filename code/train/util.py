@@ -12,13 +12,13 @@ top_level_path = os.path.join('..', '..')
 MNIST_data_path = os.path.join(top_level_path, 'data')
 
 
-def get_labeled_data(pickle_name, train=True, reduced_dataset=False, num_classes=10, examples_per_class=100):
+def get_labeled_data(pickle_name, train=True, reduced_dataset=False, classes=range(10), examples_per_class=100):
 	'''
 	Read input-vector (image) and target class (label, 0-9) and return it as 
 	a list of tuples.
 	'''
 	if reduced_dataset:
-		pickle_name = '_'.join([pickle_name, 'reduced', str(num_classes), str(examples_per_class)])
+		pickle_name = '_'.join([pickle_name, 'reduced', '_'.join([ str(class_) for class_ in classes ]), str(examples_per_class)])
 
 	if os.path.isfile('%s.pickle' % pickle_name):
 		data = p.load(open('%s.pickle' % pickle_name))
@@ -60,19 +60,19 @@ def get_labeled_data(pickle_name, train=True, reduced_dataset=False, num_classes
 		print 'Progress :', N, '/', N, '\n'
 
 		if reduced_dataset:
-			reduced_x = np.zeros((examples_per_class * num_classes, rows, cols), dtype=np.uint8)
-			for class_index in xrange(num_classes):
-				current = examples_per_class * class_index
+			reduced_x = np.zeros((examples_per_class * len(classes), rows, cols), dtype=np.uint8)
+			for idx, class_index in enumerate(classes):
+				current = examples_per_class * idx
 				for example_index, example in enumerate(x):
 					if y[example_index] == class_index:
 						reduced_x[current, :, :] = x[example_index, :, :]
 						current += 1
-						if current == examples_per_class * (class_index + 1):
+						if current == examples_per_class * (idx + 1):
 							break
 
-			reduced_y = np.array([ label // examples_per_class for label in xrange(examples_per_class * num_classes) ],
-															dtype=np.uint8).reshape((examples_per_class * num_classes, 1))
-
+			reduced_y = np.array([ label // examples_per_class for label in xrange(examples_per_class * len(classes)) ],
+															dtype=np.uint8).reshape((examples_per_class * len(classes), 1))
+	
 			# Randomize order of data examples
 			rng_state = np.random.get_state()
 			np.random.shuffle(reduced_x)
