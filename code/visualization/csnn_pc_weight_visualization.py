@@ -178,7 +178,7 @@ if to_plot == '':
 else:
 	file_name = [ file_name for file_name in sorted(os.listdir(weight_dir)) if 'XeAe' in file_name ][int(to_plot)]
 
-sort_euclidean = raw_input('Sort plot by Euclidean distance? (y / n; default no: ')
+sort_euclidean = raw_input('Sort plot by Euclidean distance? (y / n, default no): ')
 if sort_euclidean in ['', 'n']:
 	sort_euclidean = False
 elif sort_euclidean == 'y':

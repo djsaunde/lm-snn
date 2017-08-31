@@ -29,3 +29,11 @@ python csnn_pc_mnist.py --help
 Perhaps the most useful command-line argument is `do_plot`, which, when set as `do_plot=True`, allows you to visualize network training progress, learned convolution filters and between-patch connection weights, current input to the network, and the distribution of "votes" (i.e., individual excitatory neuron classifications) over the last minibatch (`update_interval`) of data.
 
 There are various supporting scripts in other subfolders of the project repository which allow a user to test or visualize parameters of trained models, plot performance curves, and run jobs on the CICS swarm2 high performance computing cluster. As the project is currently under heavy development, much of the code is fragmented, disorganized, and / or broken, but the state of things will hopefully improve as the project develops.
+
+## Team Members
+
+- Dan Saunders (djsaunde@cs.umass.edu)
+
+- Pegah Taheri (pegahtaheri@gmail.comp)
+
+- Hananel Hazan (hananel@hazan.org.il)
