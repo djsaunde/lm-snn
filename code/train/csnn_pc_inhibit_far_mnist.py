@@ -474,7 +474,7 @@ def build_network():
 		# if we're in test mode / using some stored weights
 		if test_mode:
 			# load up adaptive threshold parameters
-			neuron_groups['e'].theta = np.load(os.path.join(weights_dir, 'theta_A' + '_' + ending +'.npy'))
+			neuron_groups['e'].theta = np.load(os.path.join(weights_dir, '_'.join(['theta_A', ending +'.npy'])))
 		else:
 			# otherwise, set the adaptive additive threshold parameter at 20mV
 			neuron_groups['e'].theta = np.ones((n_e_total)) * 20.0 * b.mV
@@ -519,7 +519,7 @@ def build_network():
 				conn_name = name + conn_type[0] + name + conn_type[1]
 				# get weights from file if we are in test mode
 				if test_mode:
-					weight_matrix = np.load(os.path.join(weights_dir, conn_name + '_' + ending + '.npy'))
+					weight_matrix = np.load(os.path.join(weights_dir, '_'.join([conn_name, ending + '.npy'])))
 				# create a connection from the first group in conn_name with the second group
 				connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
 				# instantiate the created connection
@@ -654,7 +654,7 @@ def build_network():
 
 			# get weight matrix depending on training or test phase
 			if test_mode:
-				weight_matrix = np.load(os.path.join(weights_dir, conn_name + '_' + ending + '.npy'))
+				weight_matrix = np.load(os.path.join(weights_dir, '_'.join([conn_name, ending + '.npy'])))
 				# weight_matrix[weight_matrix < 0.20] = 0
 
 			# create connections from the windows of the input group to the neuron population
@@ -849,8 +849,8 @@ def save_results():
 		save_connections(weights_dir, connections, input_connections, ending)
 		save_theta(weights_dir, population_names, neuron_groups, ending)
 	else:
-		np.save(os.path.join(activity_dir, 'results_' + str(num_examples) + '_' + ending), result_monitor)
-		np.save(os.path.join(activity_dir, 'input_numbers_' + str(num_examples) + '_' + ending), input_numbers)
+		np.save(os.path.join(activity_dir, '_'.join(['results', str(num_examples), ending])), result_monitor)
+		np.save(os.path.join(activity_dir, '_'.join(['input_numbers', str(num_examples), ending])), input_numbers)
 
 	print '\n'
 
@@ -894,7 +894,7 @@ def evaluate_results():
 	for mechanism in voting_mechanisms:
 		print '\n-', mechanism, 'accuracy:', accuracies[mechanism]
 
-	results = pd.DataFrame([ accuracies.values() ], index=[ str(num_examples) + '_' + ending ], columns=accuracies.keys())
+	results = pd.DataFrame([ accuracies.values() ], index=[ '_'.join([ str(num_examples), ending ]) ], columns=accuracies.keys())
 	if not 'accuracy_results.csv' in os.listdir(results_path):
 		results.to_csv(results_path + '.csv', )
 	else:
@@ -1108,7 +1108,7 @@ if __name__ == '__main__':
 			'''
 
 	# STDP rule
-	stdp_input = weight_dependence + '_' + post_pre
+	stdp_input = '_'.join([ weight_dependence, post_pre ])
 	if weight_dependence == 'weight_dependence':
 		use_weight_dependence = True
 	else:
@@ -1146,8 +1146,9 @@ if __name__ == '__main__':
 	print '\n'
 
 	# set ending of filename saves
-	ending = connectivity + '_' + str(conv_size) + '_' + str(conv_stride) + '_' + str(conv_features) + '_' + str(n_e) + '_' + \
-					weight_dependence + '_' + post_pre + '_' + weight_sharing + '_' + lattice_structure + '_' + str(random_lattice_prob)
+	ending = '_'.join([ connectivity, str(conv_size), str(conv_stride), str(conv_features), str(n_e),
+						weight_dependence, post_pre, weight_sharing, lattice_structure, str(random_lattice_prob), str(reduced_dataset),
+						'_'.join([ str(class_) for class_ in classes ]), str(examples_per_class), str(num_examples) ])
 
 	b.ion()
 	fig_num = 1
