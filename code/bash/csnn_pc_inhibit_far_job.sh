@@ -8,11 +8,11 @@
 connectivity=${1:-none}
 conv_size=${2:-28}
 conv_stride=${3:-0}
-conv_features=${4:-9}
+conv_features=${4:-100}
 lattice_structure=${5:-4}
 weight_sharing=${6:-no_weight_sharing}
 top_percent=${7:-10}
-num_examples=${8:-1000}
+num_examples=${8:-10000}
 reduced_dataset=${9:-True}
 num_classes=${10:-9}
 examples_per_class=${11:-100}
