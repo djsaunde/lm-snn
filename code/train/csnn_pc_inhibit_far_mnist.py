@@ -501,18 +501,21 @@ def build_network():
 						x, y = feature // np.sqrt(n_e_total), feature % np.sqrt(n_e_total)
 						x_, y_ = other_feature // np.sqrt(n_e_total), other_feature % np.sqrt(n_e_total)
 
-						if feature != other_feature and euclidean([x, y], [x_, y_]) >= 2.0:
-							for n in xrange(n_e):
-								connections[conn_name][feature * n_e + n, other_feature * n_e + n] = 17.4
+						if inhib_scheme == 'far':
+							if neighborhood == '8':
+								if feature != other_feature and euclidean([x, y], [x_, y_]) >= 2.0:
+									for n in xrange(n_e):
+										connections[conn_name][feature * n_e + n, other_feature * n_e + n] = 17.4
+							elif neighborhood == '4':
+								if feature != other_feature and euclidean([x, y], [x_, y_]) > 1.0:
+									for n in xrange(n_e):
+										connections[conn_name][feature * n_e + n, other_feature * n_e + n] = 17.4
+							else:
+								raise Exception('Expecting one of "8" or "4" for argument "neighborhood".')
 
-				if random_inhibition_prob != 0.0:
-					for feature in xrange(conv_features):
-						for other_feature in xrange(conv_features):
-							for n_this in xrange(n_e):
-								for n_other in xrange(n_e):
-									if n_this != n_other:
-										if b.random() < random_inhibition_prob:
-											connections[conn_name][feature * n_e + n_this, other_feature * n_e + n_other] = 17.4
+						elif inhib_scheme == 'increasing':
+							for n in xrange(n_e):
+								connections[conn_name][feature * n_e + n, other_feature * n_e + n] = inhib_const * np.sqrt(euclidean([x, y], [x_, y_]))
 
 			elif conn_type == 'ee':
 				# create connection name (composed of population and connection types)
@@ -915,21 +918,15 @@ if __name__ == '__main__':
 																					use or not use the weight dependence mechanism.')
 	parser.add_argument('--post_pre', default='postpre', help='Modifies the STDP rule to incorporate both \
 																post- and pre-synaptic weight updates, rather than just post-synaptic updates.')
-	parser.add_argument('--conv_size', type=int, default=16, help='Side length of the square convolution \
+	parser.add_argument('--conv_size', type=int, default=28, help='Side length of the square convolution \
 																			window used by the input -> excitatory layer of the network.')
-	parser.add_argument('--conv_stride', type=int, default=4, help='Horizontal, vertical stride \
+	parser.add_argument('--conv_stride', type=int, default=0, help='Horizontal, vertical stride \
 														of the convolution window used by the input -> excitatory layer of the network.')
-	parser.add_argument('--conv_features', type=int, default=50, help='Number of excitatory convolutional features / filters / patches used in the network.')
+	parser.add_argument('--conv_features', type=int, default=100, help='Number of excitatory convolutional features / filters / patches used in the network.')
 	parser.add_argument('--weight_sharing', default='no_weight_sharing', help='Whether to use within-patch \
 													weight sharing (each neuron in an excitatory patch shares a single set of weights).')
 	parser.add_argument('--lattice_structure', default='4', help='The lattice neighborhood to which connected \
 															patches project their connections: one of "none", "4", "8", or "all".')
-	parser.add_argument('--random_lattice_prob', type=float, default=0.0, help='Probability with which a neuron \
-																from an excitatory patch connects to a neuron in a neighboring excitatory patch \
-																with which it is not already connected to via the between-patch wiring scheme.')
-	parser.add_argument('--random_inhibition_prob', type=float, default=0.0, help='Probability with which a neuron from the \
-																		inhibitory layer connects to any given excitatory neuron with which \
-																		it is not already connected to via the inhibitory wiring scheme.')
 	parser.add_argument('--top_percent', type=int, default=10, help='The percentage of neurons which are allowed \
 																to cast "votes" in the "top_percent" labeling scheme.')
 	parser.add_argument('--do_plot', type=str, default='False', help='Whether or not to display plots during network \
@@ -943,6 +940,11 @@ if __name__ == '__main__':
 	parser.add_argument('--reduced_dataset', type=str, default='False', help='Whether or not to use 9-digit reduced-size dataset (900 images).')
 	parser.add_argument('--classes', type=int, default=range(10), nargs='+', help='List of classes to use in reduced dataset.')
 	parser.add_argument('--examples_per_class', type=int, default=100, help='Number of examples per class to use in reduced dataset.')
+	parser.add_argument('--neighborhood', type=str, default='8', help='The structure of neighborhood not to inhibit on firing. One of "4", "8".')
+	parser.add_argument('--inhib_scheme', type=str, default='far', help='The scheme with which one excitatory neuron\'s firing activity \
+																			inhibits others. One of "far", "increasing".')
+	parser.add_argument('--inhib_const', type=str, default=2.5, help='A constant which controls how quickly inhibition strengthens \
+																			between two neurons as their relative distance increases.')
 
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
@@ -1146,9 +1148,9 @@ if __name__ == '__main__':
 	print '\n'
 
 	# set ending of filename saves
-	ending = '_'.join([ connectivity, str(conv_size), str(conv_stride), str(conv_features), str(n_e),
-						weight_dependence, post_pre, weight_sharing, lattice_structure, str(random_lattice_prob), str(reduced_dataset),
-						'_'.join([ str(class_) for class_ in classes ]), str(examples_per_class), str(num_examples) ])
+	ending = '_'.join([ connectivity, str(conv_size), str(conv_stride), str(conv_features), str(n_e), weight_dependence, post_pre, 
+						weight_sharing, lattice_structure, str(reduced_dataset), '_'.join([ str(class_) for class_ in classes ]),
+						str(examples_per_class), neighborhood, inhib_scheme, str(inhib_const), str(num_examples) ])
 
 	b.ion()
 	fig_num = 1
