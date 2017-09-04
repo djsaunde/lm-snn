@@ -937,13 +937,14 @@ def evaluate_results():
 	for mechanism in voting_mechanisms:
 		print '\n-', mechanism, 'accuracy:', accuracies[mechanism]
 
-	results = pd.DataFrame([ accuracies.values() ], index=[ '_'.join([ str(num_examples), ending ]) ], columns=accuracies.keys())
+	results = pd.DataFrame([ [ ending ] + accuracies.values() ], columns=[ 'Model' ] + accuracies.keys())
 	if not 'results.csv' in os.listdir(results_path):
-		results.to_csv(os.path.join(results_path, 'results.csv'))
+		results.to_csv(os.path.join(results_path, 'results.csv'), index=False)
 	else:
 		all_results = pd.read_csv(os.path.join(results_path, 'results.csv'))
-		all_results.append(results)
-		all_results.to_csv(os.path.join(results_path, 'results.csv'))
+		all_results = pd.concat([all_results, results], ignore_index=True)
+		print all_results
+		all_results.to_csv(os.path.join(results_path, 'results.csv'), index=False)
 
 	print '\n'
 
@@ -982,7 +983,7 @@ if __name__ == '__main__':
 	parser.add_argument('--strengthen_const', type=float, default=0.5, help='A constant which controls how much weights learned in one iteration \
 																				are transferred over to neighboring excitatory neurons\' weights.')
 	parser.add_argument('--noise', type=str, default='True', help='Whether or not to add Gaussian noise to input images.')
-	parser.add_argument('--noise_const', type=float, default=0.15, help='A constant which gives the mean of the Gaussian noise \
+	parser.add_argument('--noise_const', type=float, default=0.1, help='A constant which gives the mean of the Gaussian noise \
 																			added to the input images (fraction of maximum firing rate.')
 
 	# parse arguments and place them in local scope
