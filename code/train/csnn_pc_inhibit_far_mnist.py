@@ -123,14 +123,14 @@ def update_input(rates, im, fig):
 
 def plot_labels(labels):
 	fig = plt.figure(fig_num, figsize = (5, 5))
-	im = plt.matshow(labels.reshape((np.sqrt(n_e_total), np.sqrt(n_e_total))), cmap='seismic')
+	im = plt.matshow(labels.reshape((int(np.sqrt(n_e_total)), int(np.sqrt(n_e_total)))), cmap='seismic')
 	plt.title('Neuron labels')
 	fig.canvas.draw()
 	return im, fig
 
 
 def update_labels(labels, im, fig):
-	im.set_array(labels.reshape((np.sqrt(n_e_total), np.sqrt(n_e_total))))
+	im.set_array(labels.reshape((int(np.sqrt(n_e_total)), int(np.sqrt(n_e_total)))))
 	fig.canvas.draw()
 	return im
 
@@ -527,8 +527,9 @@ def build_network():
 								x, y = feature // np.sqrt(n_e_total), feature % np.sqrt(n_e_total)
 								x_, y_ = other_feature // np.sqrt(n_e_total), other_feature % np.sqrt(n_e_total)
 								for n in xrange(n_e):
-									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = min(17.4, 
-																				inhib_const * np.sqrt(euclidean([x, y], [x_, y_])))
+									# connections[conn_name][feature * n_e + n, other_feature * n_e + n] = min(17.4, 
+									# 											inhib_const * np.sqrt(euclidean([x, y], [x_, y_])))
+									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = inhib_const * np.sqrt(euclidean([x, y], [x_, y_]))
 
 					elif inhib_scheme == 'increasing':
 						for other_feature in xrange(conv_features):
@@ -536,8 +537,9 @@ def build_network():
 							x_, y_ = other_feature // np.sqrt(n_e_total), other_feature % np.sqrt(n_e_total)
 							if feature != other_feature:
 								for n in xrange(n_e):
-									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = min(17.4, 
-																				inhib_const * np.sqrt(euclidean([x, y], [x_, y_])))
+									# connections[conn_name][feature * n_e + n, other_feature * n_e + n] = min(17.4, 
+									# 											inhib_const * np.sqrt(euclidean([x, y], [x_, y_])))
+									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = inhib_const * np.sqrt(euclidean([x, y], [x_, y_]))
 
 					else:
 						raise Exception('Expecting one of "far", "increasing", or "strengthen" for argument "inhib_scheme".')
@@ -936,12 +938,12 @@ def evaluate_results():
 		print '\n-', mechanism, 'accuracy:', accuracies[mechanism]
 
 	results = pd.DataFrame([ accuracies.values() ], index=[ '_'.join([ str(num_examples), ending ]) ], columns=accuracies.keys())
-	if not 'accuracy_results.csv' in os.listdir(results_path):
-		results.to_csv(results_path + '.csv', )
+	if not 'results.csv' in os.listdir(results_path):
+		results.to_csv(os.path.join(results_path, 'results.csv'))
 	else:
-		all_results = pd.read_csv(results_path + '.csv')
+		all_results = pd.read_csv(os.path.join(results_path, 'results.csv'))
 		all_results.append(results)
-		all_results.to_csv(results_path + '.csv')
+		all_results.to_csv(os.path.join(results_path, 'results.csv'))
 
 	print '\n'
 
