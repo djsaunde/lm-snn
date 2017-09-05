@@ -23,8 +23,8 @@ noise_const=${15:-0.1}
 
 cd ../train/
 
-echo 1 $connectivity 2 $conv_size 3 $conv_stride 4 $conv_features 5 $lattice_structure 6 $top_percent 7 $num_examples 8 $reduced_dataset 9 $num_classes 10 $examples_per_class 11 \
-	$neighborhood 12 $inhib_scheme 13 $inhib_const 14 $strengthen_const 15 $noise 16 $noise_const
+echo 1 $connectivity 2 $conv_size 3 $conv_stride 4 $conv_features 5 $lattice_structure 6 $top_percent 7 $num_examples 8 $reduced_dataset 9 $examples_per_class 10 \
+	$neighborhood 11 $inhib_scheme 12 $inhib_const 13 $strengthen_const 14 $noise 15 $noise_const
 
 python csnn_pc_inhibit_far_mnist.py --mode=train --connectivity=$connectivity --conv_size=$conv_size \
 	--conv_stride=$conv_stride --conv_features=$conv_features --lattice_structure=$lattice_structure --top_percent=$top_percent \
