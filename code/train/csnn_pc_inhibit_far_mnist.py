@@ -988,7 +988,7 @@ if __name__ == '__main__':
 																			between two neurons as their relative distance increases.')
 	parser.add_argument('--strengthen_const', type=float, default=0.5, help='A constant which controls how much weights learned in one iteration \
 																				are transferred over to neighboring excitatory neurons\' weights.')
-	parser.add_argument('--noise', type=str, default='True', help='Whether or not to add Gaussian noise to input images.')
+	parser.add_argument('--noise', type=str, default='False', help='Whether or not to add Gaussian noise to input images.')
 	parser.add_argument('--noise_const', type=float, default=0.1, help='A constant which gives the mean of the Gaussian noise \
 																			added to the input images (fraction of maximum firing rate.')
 	parser.add_argument('--save_weights', type=str, default='False', help='Whether or not to save the weights of the model every `weight_update_interval`.')
