@@ -1177,7 +1177,7 @@ if __name__ == '__main__':
 	# set ending of filename saves
 	ending = '_'.join([ connectivity, str(conv_size), str(conv_stride), str(conv_features), str(n_e), \
 						str(reduced_dataset), '_'.join([ str(class_) for class_ in classes ]), str(examples_per_class), \
-						neighborhood, inhib_scheme, str(inhib_const), str(strengthen_const), str(num_examples) ])
+						neighborhood, inhib_scheme, str(inhib_const), str(strengthen_const), str(num_examples), str(random_seed) ])
 
 	b.ion()
 	fig_num = 1
