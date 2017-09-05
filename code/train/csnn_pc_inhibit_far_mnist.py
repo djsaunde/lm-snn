@@ -769,6 +769,7 @@ def run_simulation():
 		# update weights every 'weight_update_interval'
 		if j % weight_update_interval == 0 and not test_mode and do_plot:
 			update_2d_input_weights(input_weight_monitor, fig_weights)
+			save_connections(weights_dir, connections, input_connections, ending, j)
 			if connectivity != 'none':
 				update_patch_weights(patch_weight_monitor, fig2_weights)
 			
@@ -849,7 +850,7 @@ def save_results():
 	print '...Saving results'
 
 	if not test_mode:
-		save_connections(weights_dir, connections, input_connections, ending)
+		save_connections(weights_dir, connections, input_connections, ending, j)
 		save_theta(weights_dir, population_names, neuron_groups, ending)
 	else:
 		np.save(os.path.join(activity_dir, '_'.join(['results', str(num_examples), ending])), result_monitor)
@@ -938,7 +939,7 @@ if __name__ == '__main__':
 	parser.add_argument('--num_examples', type=int, default=10000, help='The number of examples for which to train or test the network on.')
 	parser.add_argument('--random_seed', type=int, default=42, help='The random seed (any integer) from which to generate random numbers.')
 	parser.add_argument('--reduced_dataset', type=str, default='False', help='Whether or not to use 9-digit reduced-size dataset (900 images).')
-	parser.add_argument('--classes', type=int, default=range(10), nargs='+', help='List of classes to use in reduced dataset.')
+	parser.add_argument('--classes', type=int, default=range(10), nargs='*', help='List of classes to use in reduced dataset.')
 	parser.add_argument('--examples_per_class', type=int, default=100, help='Number of examples per class to use in reduced dataset.')
 	parser.add_argument('--neighborhood', type=str, default='8', help='The structure of neighborhood not to inhibit on firing. One of "4", "8".')
 	parser.add_argument('--inhib_scheme', type=str, default='far', help='The scheme with which one excitatory neuron\'s firing activity \
