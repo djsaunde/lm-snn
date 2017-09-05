@@ -123,7 +123,9 @@ def update_input(rates, im, fig):
 
 def plot_labels(labels):
 	fig = plt.figure(fig_num, figsize = (5, 5))
-	im = plt.matshow(labels.reshape((int(np.sqrt(n_e_total)), int(np.sqrt(n_e_total)))), cmap='seismic')
+	cmap = plt.get_cmap('RdBu', 10)
+	im = plt.matshow(labels.reshape((int(np.sqrt(n_e_total)), int(np.sqrt(n_e_total)))), cmap=cmap, vmin=-0.5, vmax=9.5)
+	plt.colorbar(im, ticks=np.arange(0, 10))
 	plt.title('Neuron labels')
 	fig.canvas.draw()
 	return im, fig
@@ -740,7 +742,7 @@ def run_simulation():
 		fig_num += 1
 
 		label_image, label_figure = plot_labels(assignments)
-		fig_num += 1
+		fig_num += 2
 
 	# plot input intensities
 	if do_plot:
@@ -750,6 +752,7 @@ def run_simulation():
 	# set up performance recording and plotting
 	num_evaluations = int(num_examples / update_interval)
 	performances = { voting_scheme : np.zeros(num_evaluations) for voting_scheme in ['all', 'most_spiked', 'top_percent'] }
+
 	if not test_mode and do_plot:
 		performance_monitor, fig_num, fig_performance = plot_performance(fig_num, performances, num_evaluations)
 	else:
@@ -808,6 +811,9 @@ def run_simulation():
 		if not test_mode:
 			# ensure weights don't grow without bound
 			normalize_weights()
+
+		if not test_mode and j % weight_update_interval == 0:
+			save_connections(weights_dir, connections, input_connections, ending, j)
 
 		# update weights every 'weight_update_interval'
 		if j % weight_update_interval == 0 and not test_mode and do_plot:
@@ -889,7 +895,7 @@ def save_results():
 	print '...Saving results'
 
 	if not test_mode:
-		save_connections(weights_dir, connections, input_connections, ending)
+		save_connections(weights_dir, connections, input_connections, ending, 'end')
 		save_theta(weights_dir, population_names, neuron_groups, ending)
 	else:
 		np.save(os.path.join(activity_dir, '_'.join(['results', str(num_examples), ending])), result_monitor)
@@ -1084,7 +1090,7 @@ if __name__ == '__main__':
 		update_interval = 100
 
 	# weight updates and progress printing intervals
-	weight_update_interval = 1
+	weight_update_interval = 10
 	print_progress_interval = 10
 
 	# rest potential parameters, reset potential parameters, threshold potential parameters, and refractory periods
@@ -1171,7 +1177,7 @@ if __name__ == '__main__':
 	# set ending of filename saves
 	ending = '_'.join([ connectivity, str(conv_size), str(conv_stride), str(conv_features), str(n_e), \
 						str(reduced_dataset), '_'.join([ str(class_) for class_ in classes ]), str(examples_per_class), \
-						neighborhood, inhib_scheme, str(inhib_const), str(strengthen_const), str(num_examples) ])
+						neighborhood, inhib_scheme, str(inhib_const), str(strengthen_const), str(num_examples), str(random_seed) ])
 
 	b.ion()
 	fig_num = 1
