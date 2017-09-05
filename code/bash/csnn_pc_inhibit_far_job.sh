@@ -10,17 +10,17 @@ conv_size=${2:-28}
 conv_stride=${3:-0}
 conv_features=${4:-100}
 lattice_structure=${5:-4}
-top_percent=${7:-10}
-num_examples=${8:-10000}
-reduced_dataset=${9:-True}
-num_classes=${10:-10}
-examples_per_class=${11:-500}
-neighborhood=${12:-8}
-inhib_scheme=${13:-far}
-inhib_const=${14:-5.0}
-strengthen_const=${15:-0.5}
-noise=${16:-True}
-noise_const=${17:-0.1}
+top_percent=${6:-10}
+num_examples=${7:-10000}
+reduced_dataset=${8:-True}
+num_classes=${9:-10}
+examples_per_class=${10:-500}
+neighborhood=${11:-8}
+inhib_scheme=${12:-far}
+inhib_const=${13:-5.0}
+strengthen_const=${14:-0.5}
+noise=${15:-True}
+noise_const=${16:-0.1}
 
 cd ../train/
 
