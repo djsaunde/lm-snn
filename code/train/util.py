@@ -110,7 +110,7 @@ def is_lattice_connection(sqrt, i, j, lattice_structure):
 		return True
 
 
-def save_connections(weights_dir, connections, input_connections, ending):
+def save_connections(weights_dir, connections, input_connections, ending, j):
 	'''
 	Save all synaptic connection parameters out to disk.
 	'''
@@ -119,13 +119,11 @@ def save_connections(weights_dir, connections, input_connections, ending):
 	connections.update(input_connections)
 
 	# save out each connection's parameters to disk
-	for connection_name in connections.keys():
-		print '...Saving connection: ' + os.path.join(weights_dir, connection_name + '_' + ending)
-		
+	for connection_name in connections.keys():		
 		# get parameters of this connection
 		connection_matrix = connections[connection_name][:].todense()
 		# save it out to disk
-		np.save(os.path.join(weights_dir, connection_name + '_' + ending), connection_matrix)
+		np.save(os.path.join(weights_dir, connection_name + '_' + ending + '_' + str(j)), connection_matrix)
 
 
 def save_theta(weights_dir, populations, neuron_groups, ending):
@@ -135,8 +133,5 @@ def save_theta(weights_dir, populations, neuron_groups, ending):
 
 	# iterate over population for which to save theta parameters
 	for population in populations:
-		# print out saved theta populations
-		print '...Saving theta: ' + os.path.join(weights_dir, 'theta_' + population + '_' + ending)
-
 		# save out the theta parameters to file
 		np.save(os.path.join(weights_dir, 'theta_' + population + '_' + ending), neuron_groups[population + 'e'].theta)
