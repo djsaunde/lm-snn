@@ -328,7 +328,7 @@ def plot_performance(perf_file_name):
 # --------------------------
 print '\n'
 print '\n'.join([str(idx) + ' | ' + file_name for idx, file_name in
-                 enumerate([file_name for file_name in sorted(os.listdir(weight_dir)) if 'XeAe' in file_name])])
+                 enumerate([file_name for file_name in sorted(os.listdir(weight_dir)) if ('XeAe' in file_name and 'end' in file_name)])])
 print '\n'
 
 to_plot = raw_input('Enter the index of the file from above which you\'d like to plot: ')

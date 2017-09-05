@@ -839,6 +839,8 @@ def run_simulation():
 
 	# ensure weights don't grow without bound
 	normalize_weights()
+	if j % weight_update_interval == 0 and not test_mode:
+		save_connections(weights_dir, connections, input_connections, ending, j)
 
 	print '\n'
 
@@ -850,7 +852,7 @@ def save_results():
 	print '...Saving results'
 
 	if not test_mode:
-		save_connections(weights_dir, connections, input_connections, ending, j)
+		save_connections(weights_dir, connections, input_connections, ending, 'end')
 		save_theta(weights_dir, population_names, neuron_groups, ending)
 	else:
 		np.save(os.path.join(activity_dir, '_'.join(['results', str(num_examples), ending])), result_monitor)
@@ -947,6 +949,7 @@ if __name__ == '__main__':
 	parser.add_argument('--inhib_const', type=str, default=5.0, help='A constant which controls how quickly inhibition strengthens \
 																			between two neurons as their relative distance increases.')
 
+	parser.add_argument('--save_weights', type=str, default='False', help='')
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
 	args = vars(args)
