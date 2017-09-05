@@ -2,7 +2,6 @@
 
 num_examples=10000
 reduced_dataset="True"
-num_classes=10
 examples_per_class=500
 
 for conv_features in 49 81 100 144 196 225 324 400
@@ -19,7 +18,7 @@ do
 					then
 						for inhib_const in 1.0 2.5 5.0 10.0
 						do
-							sbatch csnn_pc_inhibit_far_job.sh none 28 0 $conv_features 4 10 $num_examples $reduced_dataset $num_classes \
+							sbatch csnn_pc_inhibit_far_job.sh none 28 0 $conv_features 4 10 $num_examples $reduced_dataset \
 								$examples_per_class 8 $inhib_scheme $inhib_const 0.5 $noise $noise_const
 						done
 					fi
@@ -27,7 +26,7 @@ do
 					then
 						for strengthen_const in 0.05 0.1 0.225 0.375 0.5 0.625
 						do
-							sbatch csnn_pc_inhibit_far_job.sh none 28 0 $conv_features 4 10 $num_examples $reduced_dataset $num_classes \
+							sbatch csnn_pc_inhibit_far_job.sh none 28 0 $conv_features 4 10 $num_examples $reduced_dataset \
                                                                 $examples_per_class 8 $inhib_scheme $inhib_const $strengthen_const $noise $noise_const
 						done    
 					fi
@@ -37,16 +36,16 @@ do
 				then
 					for inhib_const in 1.0 2.5 5.0 10.0
 					do
-						sbatch csnn_pc_inhibit_far_job.sh none 28 0 $conv_features 4 10 $num_examples $reduced_dataset $num_classes \
-                                                	$examples_per_class 8 $inhib_scheme $inhib_const 0.5 False 0.0
+						sbatch csnn_pc_inhibit_far_job.sh none 28 0 $conv_features 4 10 $num_examples $reduced_dataset \
+                                                	$examples_per_class 8 $inhib_scheme $inhib_const 0.5 $noise 0.0
 					done
 				fi
 				if [ "$inhib_scheme" -eq "strengthen" ]
 				then
 					for strengthen_const in 0.05 0.1 0.225 0.375 0.5 0.625
 					do
-						sbatch csnn_pc_inhibit_far_job.sh none 28 0 $conv_features 4 10 $num_examples $reduced_dataset $num_classes \
-                                                                $examples_per_class 8 $inhib_scheme $inhib_const $strengthen_const False 0.0
+						sbatch csnn_pc_inhibit_far_job.sh none 28 0 $conv_features 4 10 $num_examples $reduced_dataset \
+                                                        $examples_per_class 8 $inhib_scheme $inhib_const $strengthen_const $noise 0.0
 					done
 				fi
 			fi
