@@ -812,7 +812,7 @@ def run_simulation():
 			# ensure weights don't grow without bound
 			normalize_weights()
 
-		if not test_mode and j % weight_update_interval == 0:
+		if not test_mode and j % weight_update_interval == 0 and save_weights:
 			save_connections(weights_dir, connections, input_connections, ending, j)
 
 		# update weights every 'weight_update_interval'
@@ -988,9 +988,10 @@ if __name__ == '__main__':
 																			between two neurons as their relative distance increases.')
 	parser.add_argument('--strengthen_const', type=float, default=0.5, help='A constant which controls how much weights learned in one iteration \
 																				are transferred over to neighboring excitatory neurons\' weights.')
-	parser.add_argument('--noise', type=str, default='True', help='Whether or not to add Gaussian noise to input images.')
+	parser.add_argument('--noise', type=str, default='False', help='Whether or not to add Gaussian noise to input images.')
 	parser.add_argument('--noise_const', type=float, default=0.1, help='A constant which gives the mean of the Gaussian noise \
 																			added to the input images (fraction of maximum firing rate.')
+	parser.add_argument('--save_weights', type=str, default='False', help='Whether or not to save the weights of the model every `weight_update_interval`.')
 
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
@@ -1030,6 +1031,13 @@ if __name__ == '__main__':
 		noise = False
 	else:
 		raise Exception('Expecting True or False-valued command line argument "noise".')
+
+	if save_weights == 'True':
+		save_weights = True
+	elif save_weights == 'False':
+		save_weights = False
+	else:
+		raise Exception('Expecting True or False-valued command line argument "save_weights".')
 
 	# test or training mode
 	test_mode = mode == 'test'
