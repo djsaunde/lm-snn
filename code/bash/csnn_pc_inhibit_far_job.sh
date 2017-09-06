@@ -20,7 +20,7 @@ inhib_const=${12:-5.0}
 strengthen_const=${13:-0.5}
 noise=${14:-True}
 noise_const=${15:-0.1}
-random_seed=$16:-42}
+random_seed=${16:-42}
 
 cd ../train/
 
