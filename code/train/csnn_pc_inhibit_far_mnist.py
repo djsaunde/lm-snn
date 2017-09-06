@@ -124,7 +124,7 @@ def update_input(rates, im, fig):
 def plot_labels(labels):
 	fig = plt.figure(fig_num, figsize = (5, 5))
 	cmap = plt.get_cmap('RdBu', 10)
-	im = plt.matshow(labels.reshape((int(np.sqrt(n_e_total)), int(np.sqrt(n_e_total)))), cmap=cmap, vmin=-0.5, vmax=9.5)
+	im = plt.matshow(labels.reshape((int(np.sqrt(n_e_total)), int(np.sqrt(n_e_total)))).T, cmap=cmap, vmin=-0.5, vmax=9.5)
 	plt.colorbar(im, ticks=np.arange(0, 10))
 	plt.title('Neuron labels')
 	fig.canvas.draw()
@@ -132,7 +132,7 @@ def plot_labels(labels):
 
 
 def update_labels(labels, im, fig):
-	im.set_array(labels.reshape((int(np.sqrt(n_e_total)), int(np.sqrt(n_e_total)))))
+	im.set_array(labels.reshape((int(np.sqrt(n_e_total)), int(np.sqrt(n_e_total)))).T)
 	fig.canvas.draw()
 	return im
 
@@ -836,7 +836,15 @@ def run_simulation():
 				input_groups[name + 'e'].rate = 0
 
 			# let the network relax back to equilibrium
-			b.run(resting_time)
+			if homeostasis:
+				b.run(resting_time)
+			else:
+				for connection in connections:
+					connections[connection].reinit()
+				for input_connection in input_connections:
+					input_connections[input_connection].reinit()
+				for group in neuron_groups:
+					neuron_groups[group].reinit()
 		# otherwise, record results and continue simulation
 		else:
 			num_retries = 0
@@ -877,7 +885,16 @@ def run_simulation():
 				input_groups[name + 'e'].rate = 0
 			
 			# run the network for 'resting_time' to relax back to rest potentials
-			b.run(resting_time)
+			if homeostasis:
+				b.run(resting_time)
+			else:
+				for connection in connections:
+					connections[connection].reinit()
+				for input_connection in input_connections:
+					input_connections[input_connection].reinit()
+				for group in neuron_groups:
+					neuron_groups[group].reinit()
+
 			# bookkeeping
 			input_intensity = start_input_intensity
 			j += 1
@@ -992,6 +1009,8 @@ if __name__ == '__main__':
 	parser.add_argument('--noise_const', type=float, default=0.1, help='A constant which gives the mean of the Gaussian noise \
 																			added to the input images (fraction of maximum firing rate.')
 	parser.add_argument('--save_weights', type=str, default='False', help='Whether or not to save the weights of the model every `weight_update_interval`.')
+	parser.add_argument('--homeostasis', type=str, default='False', help='Whether or not to use the homeostasis mechanism.')
+	parser.add_argument('--weight_update_interval', type=int, default=10, help='How often to update the plot of network filter weights.')
 
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
@@ -1038,6 +1057,13 @@ if __name__ == '__main__':
 		save_weights = False
 	else:
 		raise Exception('Expecting True or False-valued command line argument "save_weights".')
+
+	if homeostasis == 'True':
+		homeostasis = True
+	elif homeostasis == 'False':
+		homeostasis = False
+	else:
+		raise Exception('Expecting True or False-valued command line argument "homeostasis".')
 
 	# test or training mode
 	test_mode = mode == 'test'
@@ -1098,7 +1124,6 @@ if __name__ == '__main__':
 		update_interval = 100
 
 	# weight updates and progress printing intervals
-	weight_update_interval = 10
 	print_progress_interval = 10
 
 	# rest potential parameters, reset potential parameters, threshold potential parameters, and refractory periods
@@ -1137,12 +1162,11 @@ if __name__ == '__main__':
 	w_mu_pre, w_mu_post = 0.2, 0.2
 
 	# setting up differential equations (depending on train / test mode)
-	if test_mode:
+	if test_mode or not homeostasis:
 		scr_e = 'v = v_reset_e; timer = 0*ms'
 	else:
 		tc_theta = 1e7 * b.ms
 		theta_plus_e = 0.05 * b.mV
-		scr_e = 'v = v_reset_e; theta += theta_plus_e; timer = 0*ms'
 
 	offset = 20.0 * b.mV
 	v_thresh_e = '(v>(theta - offset + ' + str(v_thresh_e) + ')) * (timer>refrac_e)'
@@ -1155,7 +1179,7 @@ if __name__ == '__main__':
 			dge/dt = -ge/(1.0*ms)                                   : 1
 			dgi/dt = -gi/(2.0*ms)                                  : 1
 			'''
-	if test_mode:
+	if test_mode or not homeostasis:
 		neuron_eqs_e += '\n  theta      :volt'
 	else:
 		neuron_eqs_e += '\n  dtheta/dt = -theta / (tc_theta)  : volt'
