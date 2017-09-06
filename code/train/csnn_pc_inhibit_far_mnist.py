@@ -377,6 +377,7 @@ def plot_performance(fig_num, performances, num_evaluations):
 	plt.ylim(ymax=100)
 	plt.xticks(xrange(0, num_evaluations + 10, 10), xrange(0, ((num_evaluations + 10) * update_interval), 10))
 	plt.legend()
+	plt.grid(True)
 	plt.title('Classification performance per update interval')
 	
 	fig.canvas.draw()
@@ -423,7 +424,8 @@ def predict_label(assignments, input_numbers, spike_rates):
 
 		if len(spike_rates[np.where(assignments[most_spiked_array] == i)]) > 0:
 			# sum the spike rates of all excitatory neurons with this label, which fired the most in its patch
-			most_spiked_summed_rates[i] = np.sum(spike_rates[np.where(np.logical_and(assignments == i, most_spiked_array))]) / float(np.sum(spike_rates[most_spiked_array]))
+			most_spiked_summed_rates[i] = np.sum(spike_rates[np.where(np.logical_and(assignments == i,
+											 most_spiked_array))]) / float(np.sum(spike_rates[most_spiked_array]))
 
 	all_summed_rates = [0] * 10
 	num_assignments = [0] * 10
@@ -999,17 +1001,17 @@ if __name__ == '__main__':
 	parser.add_argument('--classes', type=int, default=range(10), nargs='+', help='List of classes to use in reduced dataset.')
 	parser.add_argument('--examples_per_class', type=int, default=100, help='Number of examples per class to use in reduced dataset.')
 	parser.add_argument('--neighborhood', type=str, default='8', help='The structure of neighborhood not to inhibit on firing. One of "4", "8".')
-	parser.add_argument('--inhib_scheme', type=str, default='far', help='The scheme with which one excitatory neuron\'s firing activity \
+	parser.add_argument('--inhib_scheme', type=str, default='increasing', help='The scheme with which one excitatory neuron\'s firing activity \
 																			inhibits others. One of "far", "increasing".')
 	parser.add_argument('--inhib_const', type=float, default=5.0, help='A constant which controls how quickly inhibition strengthens \
 																			between two neurons as their relative distance increases.')
-	parser.add_argument('--strengthen_const', type=float, default=0.5, help='A constant which controls how much weights learned in one iteration \
+	parser.add_argument('--strengthen_const', type=float, default=0.25, help='A constant which controls how much weights learned in one iteration \
 																				are transferred over to neighboring excitatory neurons\' weights.')
 	parser.add_argument('--noise', type=str, default='False', help='Whether or not to add Gaussian noise to input images.')
 	parser.add_argument('--noise_const', type=float, default=0.1, help='A constant which gives the mean of the Gaussian noise \
 																			added to the input images (fraction of maximum firing rate.')
 	parser.add_argument('--save_weights', type=str, default='False', help='Whether or not to save the weights of the model every `weight_update_interval`.')
-	parser.add_argument('--homeostasis', type=str, default='False', help='Whether or not to use the homeostasis mechanism.')
+	parser.add_argument('--homeostasis', type=str, default='True', help='Whether or not to use the homeostasis mechanism.')
 	parser.add_argument('--weight_update_interval', type=int, default=10, help='How often to update the plot of network filter weights.')
 
 	# parse arguments and place them in local scope
@@ -1167,6 +1169,7 @@ if __name__ == '__main__':
 	else:
 		tc_theta = 1e7 * b.ms
 		theta_plus_e = 0.05 * b.mV
+		scr_e = 'v = v_reset_e; theta += theta_plus_e; timer = 0*ms'
 
 	offset = 20.0 * b.mV
 	v_thresh_e = '(v>(theta - offset + ' + str(v_thresh_e) + ')) * (timer>refrac_e)'
