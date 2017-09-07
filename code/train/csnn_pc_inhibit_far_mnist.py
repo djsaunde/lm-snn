@@ -42,8 +42,10 @@ performance_dir = os.path.join(top_level_path, 'performance', model_name)
 activity_dir = os.path.join(top_level_path, 'activity', model_name)
 weights_dir = os.path.join(top_level_path, 'weights', model_name)
 random_dir = os.path.join(top_level_path, 'random', model_name)
+best_weights_dir = os.path.join(weights_dir, 'best')
+end_weights_dir = os.path.join(weights_dir, 'end')
 
-for d in [ performance_dir, activity_dir, weights_dir, random_dir, MNIST_data_path, results_path, plots_path ]:
+for d in [ performance_dir, activity_dir, weights_dir, random_dir, MNIST_data_path, results_path, plots_path, best_weights_dir, end_weights_dir ]:
 	if not os.path.isdir(d):
 		os.makedirs(d)
 
@@ -123,9 +125,9 @@ def update_input(rates, im, fig):
 
 def plot_labels(labels):
 	fig = plt.figure(fig_num, figsize = (5, 5))
-	cmap = plt.get_cmap('RdBu', 10)
-	im = plt.matshow(labels.reshape((int(np.sqrt(n_e_total)), int(np.sqrt(n_e_total)))).T, cmap=cmap, vmin=-0.5, vmax=9.5)
-	plt.colorbar(im, ticks=np.arange(0, 10))
+	cmap = plt.get_cmap('RdBu', 11)
+	im = plt.matshow(labels.reshape((int(np.sqrt(n_e_total)), int(np.sqrt(n_e_total)))).T, cmap=cmap, vmin=-1.5, vmax=9.5)
+	plt.colorbar(im, ticks=np.arange(-1, 10))
 	plt.title('Neuron labels')
 	fig.canvas.draw()
 	return im, fig
@@ -458,7 +460,7 @@ def assign_labels(result_monitor, input_numbers):
 	Based on the results from the previous 'update_interval', assign labels to the
 	excitatory neurons.
 	'''
-	assignments = np.ones((conv_features, n_e))
+	assignments = -1 * np.ones((conv_features, n_e))
 	input_nums = np.asarray(input_numbers)
 	maximum_rate = np.zeros(conv_features * n_e)	
 	
@@ -533,7 +535,8 @@ def build_network():
 								for n in xrange(n_e):
 									# connections[conn_name][feature * n_e + n, other_feature * n_e + n] = min(17.4, 
 									# 											inhib_const * np.sqrt(euclidean([x, y], [x_, y_])))
-									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = inhib_const * np.sqrt(euclidean([x, y], [x_, y_]))
+									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = \
+													min(17.4, inhib_const * np.sqrt(euclidean([x, y], [x_, y_])))
 
 					elif inhib_scheme == 'increasing':
 						for other_feature in xrange(conv_features):
@@ -543,7 +546,8 @@ def build_network():
 								for n in xrange(n_e):
 									# connections[conn_name][feature * n_e + n, other_feature * n_e + n] = min(17.4, 
 									# 											inhib_const * np.sqrt(euclidean([x, y], [x_, y_])))
-									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = inhib_const * np.sqrt(euclidean([x, y], [x_, y_]))
+									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = \
+													min(17.4, inhib_const * np.sqrt(euclidean([x, y], [x_, y_])))
 
 					else:
 						raise Exception('Expecting one of "far", "increasing", or "strengthen" for argument "inhib_scheme".')
@@ -769,6 +773,9 @@ def run_simulation():
 	num_retries = 0
 	b.run(0)
 
+	if save_best_model:
+		best_performance = 0.0
+
 	# start recording time
 	start_time = timeit.default_timer()
 
@@ -847,6 +854,7 @@ def run_simulation():
 					input_connections[input_connection].reinit()
 				for group in neuron_groups:
 					neuron_groups[group].reinit()
+		
 		# otherwise, record results and continue simulation
 		else:
 			num_retries = 0
@@ -877,10 +885,23 @@ def run_simulation():
 				# pickling performance recording and iteration number
 				p.dump((j, performances), open(os.path.join(performance_dir, ending + '.p'), 'wb'))
 
+				# Save the best model's weights and theta parameters (if so specified)
+				if save_best_model:
+					for performance in performances:
+						if performances[performance][int(j / float(update_interval))] > best_performance:
+							print '\n', 'Best model thus far! Voting scheme:', performance, '\n'
+
+							best_performance = performances[performance][int(j / float(update_interval))]
+							save_connections(best_weights_dir, connections, input_connections, ending, 'best')
+							save_theta(best_weights_dir, population_names, neuron_groups, ending, 'best')
+
+				# Print out performance progress intermittently
 				for performance in performances:
 					print '\nClassification performance (' + performance + ')', performances[performance][1:int(j / float(update_interval)) + 1], \
 								'\nAverage performance:', sum(performances[performance][1:int(j / float(update_interval)) + 1]) / \
-									float(len(performances[performance][1:int(j / float(update_interval)) + 1])), '\n'
+									float(len(performances[performance][1:int(j / float(update_interval)) + 1])), \
+									'\nBest performance:', max(performances[performance][1:int(j / float(update_interval)) + 1]), \
+									'\n'
 					
 			# set input firing rates back to zero
 			for name in input_population_names:
@@ -914,8 +935,8 @@ def save_results():
 	print '...Saving results'
 
 	if not test_mode:
-		save_connections(weights_dir, connections, input_connections, ending, 'end')
-		save_theta(weights_dir, population_names, neuron_groups, ending)
+		save_connections(end_weights_dir, connections, input_connections, ending, 'end')
+		save_theta(end_weights_dir, population_names, neuron_groups, ending, 'end')
 	else:
 		np.save(os.path.join(activity_dir, '_'.join(['results', str(num_examples), ending])), result_monitor)
 		np.save(os.path.join(activity_dir, '_'.join(['input_numbers', str(num_examples), ending])), input_numbers)
@@ -1013,6 +1034,7 @@ if __name__ == '__main__':
 	parser.add_argument('--save_weights', type=str, default='False', help='Whether or not to save the weights of the model every `weight_update_interval`.')
 	parser.add_argument('--homeostasis', type=str, default='True', help='Whether or not to use the homeostasis mechanism.')
 	parser.add_argument('--weight_update_interval', type=int, default=10, help='How often to update the plot of network filter weights.')
+	parser.add_argument('--save_best_model', type=str, default='True', help='Whether to save the current best version of the model.')
 
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
@@ -1066,6 +1088,13 @@ if __name__ == '__main__':
 		homeostasis = False
 	else:
 		raise Exception('Expecting True or False-valued command line argument "homeostasis".')
+
+	if save_best_model == 'True':
+		save_best_model = True
+	elif save_best_model == 'False':
+		save_best_model = False
+	else:
+		raise Exception('Expecting True or False-valued command line argument "save_best_model".')
 
 	# test or training mode
 	test_mode = mode == 'test'
@@ -1270,7 +1299,7 @@ if __name__ == '__main__':
 
 	# bookkeeping variables
 	previous_spike_count = np.zeros((conv_features, n_e))
-	assignments = np.zeros((conv_features, n_e))
+	assignments = -1 * np.ones((conv_features, n_e))
 	input_numbers = [0] * num_examples
 	rates = np.zeros((n_input_sqrt, n_input_sqrt))
 
