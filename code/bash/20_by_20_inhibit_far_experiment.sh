@@ -1,6 +1,6 @@
 # Grid search over hyperparameters for experiments with new inhibition schemes.
 
-num_examples=60000
+num_examples=15000
 reduced_dataset="True"
 examples_per_class=500
 inhib_scheme="increasing"
