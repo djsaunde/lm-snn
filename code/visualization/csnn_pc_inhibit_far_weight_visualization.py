@@ -225,11 +225,11 @@ for n in xrange(n_e):
 
 weight_matrix = np.load(os.path.join(weight_dir, file_name))
 
-patch_weight_matrix = np.load(os.path.join(weight_dir, file_name.replace('XeAe', 'AeAe')))
-patch_weight_matrix[patch_weight_matrix < np.percentile(patch_weight_matrix, 99.9)] = 0
-patch_weight_matrix[np.nonzero(patch_weight_matrix)] = 1
+# patch_weight_matrix = np.load(os.path.join(weight_dir, file_name.replace('XeAe', 'AeAe')))
+# patch_weight_matrix[patch_weight_matrix < np.percentile(patch_weight_matrix, 99.9)] = 0
+# patch_weight_matrix[np.nonzero(patch_weight_matrix)] = 1
 
-plot_patch_weights()
+# plot_patch_weights()
 
 input_weight_monitor, fig_weights = plot_2d_input_weights()
 fig_num += 1

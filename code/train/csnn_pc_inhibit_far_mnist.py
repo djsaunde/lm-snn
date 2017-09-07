@@ -185,10 +185,17 @@ def get_2d_input_weights():
 		ceil_sqrt = int(math.ceil(math.sqrt(conv_features)))
 		square_weights = np.zeros((28 * ceil_sqrt, 28 * ceil_sqrt))
 		for n in xrange(conv_features):
-			square_weights[(n // ceil_sqrt) * 28 : ((n // ceil_sqrt) + 1) * 28, (n % ceil_sqrt) * 28 : ((n % ceil_sqrt) + 1) * 28] = rearranged_weights[n * 28 : (n + 1) * 28, :]
+			square_weights[(n // ceil_sqrt) * 28 : ((n // ceil_sqrt) + 1) * 28, 
+							(n % ceil_sqrt) * 28 : ((n % ceil_sqrt) + 1) * 28] = rearranged_weights[n * 28 : (n + 1) * 28, :]
 
 		return square_weights.T
 	else:
+		features_sqrt = int(math.sqrt(conv_features))
+		square_weights = np.zeros((28 * features_sqrt * n_e_sqrt, 28 * features_sqrt * n_e_sqrt))
+		for n in xrange(n_e):
+			for feature in xrange(conv_features):
+				square_weights[((n // n_e_sqrt) * conv_size * features_sqrt) + (feature // features_sqrt) * conv_size : ((n // features_sqrt) + 1) * 28, 
+							(n % features_sqrt) * 28 : ((n % features_sqrt) + 1) * 28] = rearranged_weights[n * 28 : (n + 1) * 28, :]
 		return rearranged_weights.T
 
 
@@ -500,7 +507,10 @@ def build_network():
 		# if we're in test mode / using some stored weights
 		if test_mode:
 			# load up adaptive threshold parameters
-			neuron_groups['e'].theta = np.load(os.path.join(weights_dir, '_'.join(['theta_A', ending +'.npy'])))
+			if save_best_model:
+				neuron_groups['e'].theta = np.load(os.path.join(best_weights_dir, '_'.join(['theta_A', ending +'_best.npy'])))
+			else:
+				neuron_groups['e'].theta = np.load(os.path.join(end_weights_dir, '_'.join(['theta_A', ending +'_end.npy'])))
 		else:
 			# otherwise, set the adaptive additive threshold parameter at 20mV
 			neuron_groups['e'].theta = np.ones((n_e_total)) * 20.0 * b.mV
@@ -557,7 +567,10 @@ def build_network():
 				conn_name = name + conn_type[0] + name + conn_type[1]
 				# get weights from file if we are in test mode
 				if test_mode:
-					weight_matrix = np.load(os.path.join(weights_dir, '_'.join([conn_name, ending + '.npy'])))
+					if save_best_model:
+						weight_matrix = np.load(os.path.join(best_weights_dir, '_'.join([conn_name, ending + '_best.npy'])))
+					else:
+						weight_matrix = np.load(os.path.join(end_weights_dir, '_'.join([conn_name, ending + '_end.npy'])))
 				# create a connection from the first group in conn_name with the second group
 				connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
 				# instantiate the created connection
@@ -692,7 +705,11 @@ def build_network():
 
 			# get weight matrix depending on training or test phase
 			if test_mode:
-				weight_matrix = np.load(os.path.join(weights_dir, '_'.join([conn_name, ending + '.npy'])))
+				if save_best_model:
+					weight_matrix = np.load(os.path.join(best_weights_dir, '_'.join([conn_name, ending + '_best.npy'])))
+				else:
+					weight_matrix = np.load(os.path.join(end_weights_dir, '_'.join([conn_name, ending + '_end.npy'])))
+
 				# weight_matrix[weight_matrix < 0.20] = 0
 
 			# create connections from the windows of the input group to the neuron population
