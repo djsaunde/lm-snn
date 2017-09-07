@@ -328,12 +328,15 @@ def get_current_performance(performances, current_example_num):
 	global input_numbers
 
 	current_evaluation = int(current_example_num / update_interval)
+	if current_example_num == num_examples -1:
+		current_evaluation+=1
 	start_num = current_example_num - update_interval
 	end_num = current_example_num
 
 	for performance in performances.keys():
 		difference = output_numbers[performance][start_num : end_num, 0] - input_numbers[start_num : end_num]
 		correct = len(np.where(difference == 0)[0])
+		print "correct: "+str(correct)
 		performances[performance][current_evaluation] = correct / float(update_interval) * 100
 
 	return performances
@@ -715,7 +718,7 @@ def run_simulation():
 		fig_num += 1
 
 	# set up performance recording and plotting
-	num_evaluations = int(num_examples / update_interval)
+	num_evaluations = int(num_examples / update_interval) + 1
 	performances = { voting_scheme : np.zeros(num_evaluations) for voting_scheme in ['all', 'most_spiked', 'top_percent'] }
 	if not test_mode and do_plot:
 		performance_monitor, fig_num, fig_performance = plot_performance(fig_num, performances, num_evaluations)
@@ -740,7 +743,8 @@ def run_simulation():
 		if not test_mode:
 			# ensure weights don't grow without bound
 			normalize_weights()
-
+		if j % weight_update_interval == 0 and not test_mode:
+			save_connections(weights_dir, connections, input_connections, ending, j)
 		# get the firing rates of the next input example
 		rates = (data['x'][j % data_size, :, :] / 8.0) * input_intensity
 
@@ -769,7 +773,7 @@ def run_simulation():
 		# update weights every 'weight_update_interval'
 		if j % weight_update_interval == 0 and not test_mode and do_plot:
 			update_2d_input_weights(input_weight_monitor, fig_weights)
-			save_connections(weights_dir, connections, input_connections, ending, j)
+			# save_connections(weights_dir, connections, input_connections, ending, j)
 			if connectivity != 'none':
 				update_patch_weights(patch_weight_monitor, fig2_weights)
 			
@@ -808,7 +812,8 @@ def run_simulation():
 				start_time = timeit.default_timer()
 			
 			# plot performance if appropriate
-			if j % update_interval == 0 and j > 0:
+			if (j % update_interval == 0 or j== num_examples-1 ) and j > 0:
+				print str(j)
 				if not test_mode and do_plot:
 					# updating the performance plot
 					perf_plot, performances = update_performance_plot(performance_monitor, performances, j, fig_performance)
@@ -816,6 +821,7 @@ def run_simulation():
 					performances = get_current_performance(performances, j)
 
 				# pickling performance recording and iteration number
+				print str(j)+' : '+ending
 				p.dump((j, performances), open(os.path.join(performance_dir, ending + '.p'), 'wb'))
 
 				for performance in performances:
@@ -839,8 +845,8 @@ def run_simulation():
 
 	# ensure weights don't grow without bound
 	normalize_weights()
-	if j % weight_update_interval == 0 and not test_mode:
-		save_connections(weights_dir, connections, input_connections, ending, j)
+
+
 
 	print '\n'
 
@@ -852,8 +858,9 @@ def save_results():
 	print '...Saving results'
 
 	if not test_mode:
-		save_connections(weights_dir, connections, input_connections, ending, 'end')
+		save_connections(weights_dir, connections, input_connections, ending, num_examples)
 		save_theta(weights_dir, population_names, neuron_groups, ending)
+
 	else:
 		np.save(os.path.join(activity_dir, '_'.join(['results', str(num_examples), ending])), result_monitor)
 		np.save(os.path.join(activity_dir, '_'.join(['input_numbers', str(num_examples), ending])), input_numbers)
@@ -949,7 +956,7 @@ if __name__ == '__main__':
 	parser.add_argument('--inhib_const', type=str, default=5.0, help='A constant which controls how quickly inhibition strengthens \
 																			between two neurons as their relative distance increases.')
 
-	parser.add_argument('--save_weights', type=str, default='False', help='')
+	parser.add_argument('--save_weights', type=str, default='False', help='This string indicates whether or not to save weights plots during the training')
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
 	args = vars(args)

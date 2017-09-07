@@ -283,7 +283,8 @@ def plot_performance(perf_file_name):
     for voting_mechanism in sorted(performances.keys()):
         if voting_mechanism in ['all', 'most_spiked', 'top_percent', 'spatial_clusters']:
             performance_plots.append(plt.plot(performances[voting_mechanism], label=voting_mechanism)[0])
-
+    print str(performances)
+    print str(performances[performances.keys()[0]])
     plt.xlabel('Iteration number (1 through ' + str(len(performances[performances.keys()[0]]) * 100) + ')')
     print str(len(performances[performances.keys()[0]]))
 
@@ -333,9 +334,9 @@ print '\n'
 
 to_plot = raw_input('Enter the index of the file from above which you\'d like to plot: ')
 if to_plot == '':
-    file_name = [file_name for file_name in sorted(os.listdir(weight_dir)) if 'XeAe' in file_name][0]
+    file_name = [file_name for file_name in sorted(os.listdir(weight_dir)) if ('XeAe' in file_name and 'end' in file_name)][0]
 else:
-    file_name = [file_name for file_name in sorted(os.listdir(weight_dir)) if 'XeAe' in file_name][int(to_plot)]
+    file_name = [file_name for file_name in sorted(os.listdir(weight_dir)) if ('XeAe' in file_name and 'end' in file_name)][int(to_plot)]
 
 sort_euclidean = raw_input('Sort plot by Euclidean distance? (y / n, default no): ')
 if sort_euclidean in ['', 'n']:
@@ -355,7 +356,7 @@ conv_features = int(file_name.split('_')[4])
 reduced_data = file_name.split('_')[13]
 
 lattice_structure = file_name[-9:-8]
-iteration = file_name[-1]
+iteration = file_name[-1]#end
 
 performance_file = '_'.join(file_name.split('_')[1:-1]) + '.p'
 # number of excitatory neurons (number output from convolutional layer)
