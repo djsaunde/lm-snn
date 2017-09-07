@@ -399,21 +399,8 @@ patch_weight_matrix[np.nonzero(patch_weight_matrix)] = 1
 fig_num += 1
 plot_performance(performance_file)
 fig_num += 1
-# plot_patch_weights()
 
 input_weight_monitor, fig_weights = plot_2d_input_weights(weight_matrix)
-# fig_num += 1
-
-# ordering = np.array([ ordering[i, :] + conv_features * i for i in xrange(n_e) ])
-
-# print '\n...Plotting patch connectivity graph.\n'
-# for i in xrange(ordering.size):
-# 	for j in xrange(ordering.size):
-# 		if patch_weight_matrix[i, j] == 1:
-# 			ax.plot([(ordering[i % n_e, i // conv_features] % conv_features) * conv_size + (conv_size // 2), \
-# 					 (ordering[j % n_e, j // conv_features] % conv_features) * conv_size + (conv_size // 2)], \
-# 					[(ordering[i % n_e, i // conv_features] // conv_features) * conv_size + (conv_size // 2), \
-# 					 (ordering[j % n_e, j // conv_features] // conv_features) * conv_size + (conv_size // 2)], color='gray', linestyle='--', linewidth=1)
 
 plt.savefig(os.path.join(plots_dir, file_name[:-4] + '_patch_connectivity.png'))
 plt.show()

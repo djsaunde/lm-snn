@@ -5,7 +5,6 @@ Supporting functions for use in training scripts.
 import cPickle as p
 import numpy as np
 import os
-
 from struct import unpack
 
 top_level_path = os.path.join('..', '..')
@@ -119,13 +118,13 @@ def save_connections(weights_dir, connections, input_connections, ending, j):
 	connections.update(input_connections)
 
 	# save out each connection's parameters to disk
-	for connection_name in connections.keys():
-		print '...Saving connection: ' + os.path.join(weights_dir, connection_name + '_' + ending+"_"+str(j))
-		
+
+	for connection_name in connections.keys():		
 		# get parameters of this connection
 		connection_matrix = connections[connection_name][:].todense()
 		# save it out to disk
-		np.save(os.path.join(weights_dir, connection_name + '_' + ending+"_"+str(j)), connection_matrix)
+		np.save(os.path.join(weights_dir, connection_name + '_' + ending + '_' + str(j)), connection_matrix)
+
 
 
 def save_theta(weights_dir, populations, neuron_groups, ending):
@@ -135,8 +134,5 @@ def save_theta(weights_dir, populations, neuron_groups, ending):
 
 	# iterate over population for which to save theta parameters
 	for population in populations:
-		# print out saved theta populations
-		print '...Saving theta: ' + os.path.join(weights_dir, 'theta_' + population + '_' + ending)
-
 		# save out the theta parameters to file
 		np.save(os.path.join(weights_dir, 'theta_' + population + '_' + ending), neuron_groups[population + 'e'].theta)

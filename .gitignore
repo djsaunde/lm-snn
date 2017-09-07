@@ -20,3 +20,5 @@ time_series/*
 slurm*
 inhibition_job*
 !requirements.txt
+results/*
+*.pyc
