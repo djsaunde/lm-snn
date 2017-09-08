@@ -41,11 +41,12 @@ plots_path = os.path.join(top_level_path, 'plots', model_name)
 performance_dir = os.path.join(top_level_path, 'performance', model_name)
 activity_dir = os.path.join(top_level_path, 'activity', model_name)
 weights_dir = os.path.join(top_level_path, 'weights', model_name)
+deltas_dir = os.path.join(top_level_path, 'deltas', model_name)
 random_dir = os.path.join(top_level_path, 'random', model_name)
 best_weights_dir = os.path.join(weights_dir, 'best')
 end_weights_dir = os.path.join(weights_dir, 'end')
 
-for d in [ performance_dir, activity_dir, weights_dir, random_dir, MNIST_data_path, results_path, plots_path, best_weights_dir, end_weights_dir ]:
+for d in [ performance_dir, activity_dir, weights_dir, deltas_dir, random_dir, MNIST_data_path, results_path, plots_path, best_weights_dir, end_weights_dir ]:
 	if not os.path.isdir(d):
 		os.makedirs(d)
 
@@ -417,6 +418,48 @@ def update_performance_plot(lines, performances, current_example_num, fig):
 	return lines, performances
 
 
+def plot_deltas(fig_num, deltas, num_weight_updates):
+	'''
+	Set up the performance plot for the beginning of the simulation.
+	'''
+	time_steps = range(0, num_weight_updates)
+
+	fig = plt.figure(fig_num, figsize = (12, 4))
+	fig_num += 1
+
+	plt.plot([], [], label='Absolute difference in weights')
+
+	lines = plt.gca().lines
+
+	plt.ylim(ymin=0)
+	plt.xticks(xrange(0, num_weight_updates + weight_update_interval, 100), xrange(0, ((num_weight_updates + weight_update_interval) * weight_update_interval), 100))
+	plt.legend()
+	plt.grid(True)
+	plt.title('Absolute difference in weights per weight update interval')
+	
+	fig.canvas.draw()
+
+	return lines[0], fig_num, fig
+
+
+def update_deltas_plot(line, deltas, current_example_num, fig):
+	'''
+	Update the plot of the performance based on results thus far.
+	'''
+	delta = np.sum(np.abs(deltas[int(current_example_num / weight_update_interval), :, :]))
+	
+	line.set_xdata(range(int(current_example_num / weight_update_interval) + 1))
+	ydata = list(line.get_ydata())
+	ydata.append(delta)
+	line.set_ydata(ydata)
+
+	plt.ylim(ymax=np.max(ydata))
+
+	fig.canvas.draw()
+
+	return line, deltas
+
+
 def predict_label(assignments, input_numbers, spike_rates):
 	'''
 	Given the label assignments of the excitatory layer and their spike rates over
@@ -783,9 +826,12 @@ def run_simulation():
 	# set up performance recording and plotting
 	num_evaluations = int(num_examples / update_interval)
 	performances = { voting_scheme : np.zeros(num_evaluations) for voting_scheme in ['all', 'most_spiked', 'top_percent'] }
+	num_weight_updates = int(num_examples / weight_update_interval)
+	deltas = np.zeros((num_weight_updates, input_connections['XeAe'][:].shape[0], input_connections['XeAe'][:].shape[1]))
 
 	if not test_mode and do_plot:
 		performance_monitor, fig_num, fig_performance = plot_performance(fig_num, performances, num_evaluations)
+		line, fig_num, deltas_figure = plot_deltas(fig_num, deltas, num_weight_updates)
 	else:
 		performances = get_current_performance(performances, 0)
 
@@ -803,6 +849,8 @@ def run_simulation():
 
 	# start recording time
 	start_time = timeit.default_timer()
+
+	last_weights = input_connections['XeAe'][:].todense()
 
 	while j < num_examples:
 
@@ -849,11 +897,20 @@ def run_simulation():
 		if not test_mode and j % weight_update_interval == 0 and save_weights:
 			save_connections(weights_dir, connections, input_connections, ending, j)
 
+		if j % weight_update_interval == 0 and not test_mode:
+			deltas[j / weight_update_interval, :, :] = (input_connections['XeAe'][:].todense() - last_weights)
+			last_weights = input_connections['XeAe'][:].todense()
+
+			# pickling delta recording and iteration number
+			p.dump((j, deltas), open(os.path.join(deltas_dir, ending + '.p'), 'wb'))
+
 		# update weights every 'weight_update_interval'
 		if j % weight_update_interval == 0 and not test_mode and do_plot:
 			update_2d_input_weights(input_weight_monitor, fig_weights)
 			if connectivity != 'none':
 				update_patch_weights(patch_weight_monitor, fig2_weights)
+
+			update_deltas_plot(line, deltas, j, deltas_figure)
 			
 		if not test_mode and do_plot:
 			update_neuron_votes(neuron_rects, fig_neuron_votes, result_monitor[:])
@@ -1060,6 +1117,7 @@ if __name__ == '__main__':
 	parser.add_argument('--homeostasis', type=str, default='True', help='Whether or not to use the homeostasis mechanism.')
 	parser.add_argument('--weight_update_interval', type=int, default=10, help='How often to update the plot of network filter weights.')
 	parser.add_argument('--save_best_model', type=str, default='True', help='Whether to save the current best version of the model.')
+	parser.add_argument('--update_interval', type=int, default=100, help='How often to update neuron labels and classify new inputs.')
 
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
@@ -1176,8 +1234,6 @@ if __name__ == '__main__':
 	# set the update interval
 	if test_mode:
 		update_interval = num_examples
-	else:
-		update_interval = 100
 
 	# weight updates and progress printing intervals
 	print_progress_interval = 10
