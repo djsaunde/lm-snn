@@ -180,10 +180,10 @@ def get_2d_input_weights():
 				rearranged_weights[ feature * conv_size : (feature + 1) * conv_size, n * conv_size : (n + 1) * conv_size ] = \
 																temp[convolution_locations[n]].reshape((conv_size, conv_size))
 
-	# return the rearranged weights to display to the user
 	if n_e == 1:
 		ceil_sqrt = int(math.ceil(math.sqrt(conv_features)))
 		square_weights = np.zeros((28 * ceil_sqrt, 28 * ceil_sqrt))
+
 		for n in xrange(conv_features):
 			square_weights[(n // ceil_sqrt) * 28 : ((n // ceil_sqrt) + 1) * 28, 
 							(n % ceil_sqrt) * 28 : ((n % ceil_sqrt) + 1) * 28] = rearranged_weights[n * 28 : (n + 1) * 28, :]
@@ -191,12 +191,17 @@ def get_2d_input_weights():
 		return square_weights.T
 	else:
 		features_sqrt = int(math.sqrt(conv_features))
-		square_weights = np.zeros((28 * features_sqrt * n_e_sqrt, 28 * features_sqrt * n_e_sqrt))
+		square_weights = np.zeros((conv_size * features_sqrt * n_e_sqrt, conv_size * features_sqrt * n_e_sqrt))
+
 		for n in xrange(n_e):
 			for feature in xrange(conv_features):
-				square_weights[((n // n_e_sqrt) * conv_size * features_sqrt) + (feature // features_sqrt) * conv_size : ((n // features_sqrt) + 1) * 28, 
-							(n % features_sqrt) * 28 : ((n % features_sqrt) + 1) * 28] = rearranged_weights[n * 28 : (n + 1) * 28, :]
-		return rearranged_weights.T
+				square_weights[((n // n_e_sqrt) * conv_size) + (feature // features_sqrt) * (conv_size * n_e_sqrt) : \
+									(((n // n_e_sqrt) + 1) * conv_size) + (feature // features_sqrt) * (conv_size * n_e_sqrt), \
+									((n % n_e_sqrt) * conv_size) + (feature % features_sqrt) * (conv_size * n_e_sqrt) : \
+									(((n % n_e_sqrt) + 1) * conv_size) + (feature % features_sqrt) * (conv_size * n_e_sqrt)] = \
+									rearranged_weights[feature * conv_size : (feature + 1) * conv_size, n * conv_size : (n + 1) * conv_size]
+
+		return square_weights.T
 
 
 def get_input_weights(weight_matrix):
@@ -224,24 +229,27 @@ def plot_2d_input_weights():
 	weights = get_2d_input_weights()
 
 	if n_e != 1:
-		fig = plt.figure(fig_num, figsize=(18, 9))
+		fig = plt.figure(fig_num, figsize=(9, 9))
 	else:
 		fig = plt.figure(fig_num, figsize=(9, 9))
 
 	im = plt.imshow(weights, interpolation='nearest', vmin=0, vmax=wmax_ee, cmap=cmap.get_cmap('hot_r'))
 	
 	if n_e != 1:
-		plt.colorbar(im, fraction=0.016)
+		plt.colorbar(im, fraction=0.06)
 	else:
 		plt.colorbar(im, fraction=0.06)
 
 	plt.title(ending.replace('_', ' '))
 
+	features_sqrt = int(math.sqrt(conv_features))
+
 	if n_e != 1:
-		plt.xticks(xrange(conv_size, conv_size * (conv_features + 1), conv_size), xrange(1, conv_features + 1))
-		plt.yticks(xrange(conv_size, conv_size * (n_e + 1), conv_size), xrange(1, n_e + 1))
-		plt.xlabel('Convolution patch')
-		plt.ylabel('Location in input (from top left to bottom right')
+		plt.xticks(xrange(conv_size, conv_size * n_e_sqrt * features_sqrt + 1, conv_size), xrange(1, conv_size * n_e_sqrt * features_sqrt + 1))
+		plt.yticks(xrange(conv_size, conv_size * n_e_sqrt * features_sqrt + 1, conv_size), xrange(1, conv_size * n_e_sqrt * features_sqrt + 1))
+		for pos in xrange(conv_size * features_sqrt, conv_size * features_sqrt * n_e_sqrt, conv_size * features_sqrt):
+			plt.axhline(pos)
+			plt.axvline(pos)
 	else:
 		plt.xticks(xrange(conv_size, conv_size * (int(np.sqrt(conv_features)) + 1), conv_size), xrange(1, int(np.sqrt(conv_features)) + 1))
 		plt.yticks(xrange(conv_size, conv_size * (int(np.sqrt(conv_features)) + 1), conv_size), xrange(1, int(np.sqrt(conv_features)) + 1))
@@ -1035,7 +1043,7 @@ if __name__ == '__main__':
 																in the input) sorted by Euclidean distance from the 0 matrix.')
 	parser.add_argument('--num_examples', type=int, default=10000, help='The number of examples for which to train or test the network on.')
 	parser.add_argument('--random_seed', type=int, default=42, help='The random seed (any integer) from which to generate random numbers.')
-	parser.add_argument('--reduced_dataset', type=str, default='False', help='Whether or not to use 9-digit reduced-size dataset (900 images).')
+	parser.add_argument('--reduced_dataset', type=str, default='False', help='Whether or not to a reduced dataset.')
 	parser.add_argument('--classes', type=int, default=range(10), nargs='+', help='List of classes to use in reduced dataset.')
 	parser.add_argument('--examples_per_class', type=int, default=100, help='Number of examples per class to use in reduced dataset.')
 	parser.add_argument('--neighborhood', type=str, default='8', help='The structure of neighborhood not to inhibit on firing. One of "4", "8".')
