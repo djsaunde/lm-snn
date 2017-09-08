@@ -42,8 +42,10 @@ performance_dir = os.path.join(top_level_path, 'performance', model_name)
 activity_dir = os.path.join(top_level_path, 'activity', model_name)
 weights_dir = os.path.join(top_level_path, 'weights', model_name)
 random_dir = os.path.join(top_level_path, 'random', model_name)
+best_weights_dir = os.path.join(weights_dir, 'best')
+end_weights_dir = os.path.join(weights_dir, 'end')
 
-for d in [ performance_dir, activity_dir, weights_dir, random_dir, MNIST_data_path, results_path, plots_path ]:
+for d in [ performance_dir, activity_dir, weights_dir, random_dir, MNIST_data_path, results_path, plots_path, best_weights_dir, end_weights_dir ]:
 	if not os.path.isdir(d):
 		os.makedirs(d)
 
@@ -123,9 +125,9 @@ def update_input(rates, im, fig):
 
 def plot_labels(labels):
 	fig = plt.figure(fig_num, figsize = (5, 5))
-	cmap = plt.get_cmap('RdBu', 10)
-	im = plt.matshow(labels.reshape((int(np.sqrt(n_e_total)), int(np.sqrt(n_e_total)))).T, cmap=cmap, vmin=-0.5, vmax=9.5)
-	plt.colorbar(im, ticks=np.arange(0, 10))
+	cmap = plt.get_cmap('RdBu', 11)
+	im = plt.matshow(labels.reshape((int(np.sqrt(n_e_total)), int(np.sqrt(n_e_total)))).T, cmap=cmap, vmin=-1.5, vmax=9.5)
+	plt.colorbar(im, ticks=np.arange(-1, 10))
 	plt.title('Neuron labels')
 	fig.canvas.draw()
 	return im, fig
@@ -178,16 +180,28 @@ def get_2d_input_weights():
 				rearranged_weights[ feature * conv_size : (feature + 1) * conv_size, n * conv_size : (n + 1) * conv_size ] = \
 																temp[convolution_locations[n]].reshape((conv_size, conv_size))
 
-	# return the rearranged weights to display to the user
 	if n_e == 1:
 		ceil_sqrt = int(math.ceil(math.sqrt(conv_features)))
 		square_weights = np.zeros((28 * ceil_sqrt, 28 * ceil_sqrt))
+
 		for n in xrange(conv_features):
-			square_weights[(n // ceil_sqrt) * 28 : ((n // ceil_sqrt) + 1) * 28, (n % ceil_sqrt) * 28 : ((n % ceil_sqrt) + 1) * 28] = rearranged_weights[n * 28 : (n + 1) * 28, :]
+			square_weights[(n // ceil_sqrt) * 28 : ((n // ceil_sqrt) + 1) * 28, 
+							(n % ceil_sqrt) * 28 : ((n % ceil_sqrt) + 1) * 28] = rearranged_weights[n * 28 : (n + 1) * 28, :]
 
 		return square_weights.T
 	else:
-		return rearranged_weights.T
+		features_sqrt = int(math.sqrt(conv_features))
+		square_weights = np.zeros((conv_size * features_sqrt * n_e_sqrt, conv_size * features_sqrt * n_e_sqrt))
+
+		for n in xrange(n_e):
+			for feature in xrange(conv_features):
+				square_weights[((n // n_e_sqrt) * conv_size) + (feature // features_sqrt) * (conv_size * n_e_sqrt) : \
+									(((n // n_e_sqrt) + 1) * conv_size) + (feature // features_sqrt) * (conv_size * n_e_sqrt), \
+									((n % n_e_sqrt) * conv_size) + (feature % features_sqrt) * (conv_size * n_e_sqrt) : \
+									(((n % n_e_sqrt) + 1) * conv_size) + (feature % features_sqrt) * (conv_size * n_e_sqrt)] = \
+									rearranged_weights[feature * conv_size : (feature + 1) * conv_size, n * conv_size : (n + 1) * conv_size]
+
+		return square_weights.T
 
 
 def get_input_weights(weight_matrix):
@@ -215,24 +229,27 @@ def plot_2d_input_weights():
 	weights = get_2d_input_weights()
 
 	if n_e != 1:
-		fig = plt.figure(fig_num, figsize=(18, 9))
+		fig = plt.figure(fig_num, figsize=(9, 9))
 	else:
 		fig = plt.figure(fig_num, figsize=(9, 9))
 
 	im = plt.imshow(weights, interpolation='nearest', vmin=0, vmax=wmax_ee, cmap=cmap.get_cmap('hot_r'))
 	
 	if n_e != 1:
-		plt.colorbar(im, fraction=0.016)
+		plt.colorbar(im, fraction=0.06)
 	else:
 		plt.colorbar(im, fraction=0.06)
 
 	plt.title(ending.replace('_', ' '))
 
+	features_sqrt = int(math.sqrt(conv_features))
+
 	if n_e != 1:
-		plt.xticks(xrange(conv_size, conv_size * (conv_features + 1), conv_size), xrange(1, conv_features + 1))
-		plt.yticks(xrange(conv_size, conv_size * (n_e + 1), conv_size), xrange(1, n_e + 1))
-		plt.xlabel('Convolution patch')
-		plt.ylabel('Location in input (from top left to bottom right')
+		plt.xticks(xrange(conv_size, conv_size * n_e_sqrt * features_sqrt + 1, conv_size), xrange(1, conv_size * n_e_sqrt * features_sqrt + 1))
+		plt.yticks(xrange(conv_size, conv_size * n_e_sqrt * features_sqrt + 1, conv_size), xrange(1, conv_size * n_e_sqrt * features_sqrt + 1))
+		for pos in xrange(conv_size * features_sqrt, conv_size * features_sqrt * n_e_sqrt, conv_size * features_sqrt):
+			plt.axhline(pos)
+			plt.axvline(pos)
 	else:
 		plt.xticks(xrange(conv_size, conv_size * (int(np.sqrt(conv_features)) + 1), conv_size), xrange(1, int(np.sqrt(conv_features)) + 1))
 		plt.yticks(xrange(conv_size, conv_size * (int(np.sqrt(conv_features)) + 1), conv_size), xrange(1, int(np.sqrt(conv_features)) + 1))
@@ -458,7 +475,7 @@ def assign_labels(result_monitor, input_numbers):
 	Based on the results from the previous 'update_interval', assign labels to the
 	excitatory neurons.
 	'''
-	assignments = np.ones((conv_features, n_e))
+	assignments = -1 * np.ones((conv_features, n_e))
 	input_nums = np.asarray(input_numbers)
 	maximum_rate = np.zeros(conv_features * n_e)	
 	
@@ -498,7 +515,10 @@ def build_network():
 		# if we're in test mode / using some stored weights
 		if test_mode:
 			# load up adaptive threshold parameters
-			neuron_groups['e'].theta = np.load(os.path.join(weights_dir, '_'.join(['theta_A', ending +'.npy'])))
+			if save_best_model:
+				neuron_groups['e'].theta = np.load(os.path.join(best_weights_dir, '_'.join(['theta_A', ending +'_best.npy'])))
+			else:
+				neuron_groups['e'].theta = np.load(os.path.join(end_weights_dir, '_'.join(['theta_A', ending +'_end.npy'])))
 		else:
 			# otherwise, set the adaptive additive threshold parameter at 20mV
 			neuron_groups['e'].theta = np.ones((n_e_total)) * 20.0 * b.mV
@@ -533,7 +553,8 @@ def build_network():
 								for n in xrange(n_e):
 									# connections[conn_name][feature * n_e + n, other_feature * n_e + n] = min(17.4, 
 									# 											inhib_const * np.sqrt(euclidean([x, y], [x_, y_])))
-									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = inhib_const * np.sqrt(euclidean([x, y], [x_, y_]))
+									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = \
+													min(17.4, inhib_const * np.sqrt(euclidean([x, y], [x_, y_])))
 
 					elif inhib_scheme == 'increasing':
 						for other_feature in xrange(conv_features):
@@ -543,7 +564,8 @@ def build_network():
 								for n in xrange(n_e):
 									# connections[conn_name][feature * n_e + n, other_feature * n_e + n] = min(17.4, 
 									# 											inhib_const * np.sqrt(euclidean([x, y], [x_, y_])))
-									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = inhib_const * np.sqrt(euclidean([x, y], [x_, y_]))
+									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = \
+													min(17.4, inhib_const * np.sqrt(euclidean([x, y], [x_, y_])))
 
 					else:
 						raise Exception('Expecting one of "far", "increasing", or "strengthen" for argument "inhib_scheme".')
@@ -553,7 +575,10 @@ def build_network():
 				conn_name = name + conn_type[0] + name + conn_type[1]
 				# get weights from file if we are in test mode
 				if test_mode:
-					weight_matrix = np.load(os.path.join(weights_dir, '_'.join([conn_name, ending + '.npy'])))
+					if save_best_model:
+						weight_matrix = np.load(os.path.join(best_weights_dir, '_'.join([conn_name, ending + '_best.npy'])))
+					else:
+						weight_matrix = np.load(os.path.join(end_weights_dir, '_'.join([conn_name, ending + '_end.npy'])))
 				# create a connection from the first group in conn_name with the second group
 				connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
 				# instantiate the created connection
@@ -688,7 +713,11 @@ def build_network():
 
 			# get weight matrix depending on training or test phase
 			if test_mode:
-				weight_matrix = np.load(os.path.join(weights_dir, '_'.join([conn_name, ending + '.npy'])))
+				if save_best_model:
+					weight_matrix = np.load(os.path.join(best_weights_dir, '_'.join([conn_name, ending + '_best.npy'])))
+				else:
+					weight_matrix = np.load(os.path.join(end_weights_dir, '_'.join([conn_name, ending + '_end.npy'])))
+
 				# weight_matrix[weight_matrix < 0.20] = 0
 
 			# create connections from the windows of the input group to the neuron population
@@ -769,6 +798,9 @@ def run_simulation():
 	num_retries = 0
 	b.run(0)
 
+	if save_best_model:
+		best_performance = 0.0
+
 	# start recording time
 	start_time = timeit.default_timer()
 
@@ -847,6 +879,7 @@ def run_simulation():
 					input_connections[input_connection].reinit()
 				for group in neuron_groups:
 					neuron_groups[group].reinit()
+		
 		# otherwise, record results and continue simulation
 		else:
 			num_retries = 0
@@ -877,10 +910,23 @@ def run_simulation():
 				# pickling performance recording and iteration number
 				p.dump((j, performances), open(os.path.join(performance_dir, ending + '.p'), 'wb'))
 
+				# Save the best model's weights and theta parameters (if so specified)
+				if save_best_model:
+					for performance in performances:
+						if performances[performance][int(j / float(update_interval))] > best_performance:
+							print '\n', 'Best model thus far! Voting scheme:', performance, '\n'
+
+							best_performance = performances[performance][int(j / float(update_interval))]
+							save_connections(best_weights_dir, connections, input_connections, ending, 'best')
+							save_theta(best_weights_dir, population_names, neuron_groups, ending, 'best')
+
+				# Print out performance progress intermittently
 				for performance in performances:
 					print '\nClassification performance (' + performance + ')', performances[performance][1:int(j / float(update_interval)) + 1], \
 								'\nAverage performance:', sum(performances[performance][1:int(j / float(update_interval)) + 1]) / \
-									float(len(performances[performance][1:int(j / float(update_interval)) + 1])), '\n'
+									float(len(performances[performance][1:int(j / float(update_interval)) + 1])), \
+									'\nBest performance:', max(performances[performance][1:int(j / float(update_interval)) + 1]), \
+									'\n'
 					
 			# set input firing rates back to zero
 			for name in input_population_names:
@@ -914,8 +960,8 @@ def save_results():
 	print '...Saving results'
 
 	if not test_mode:
-		save_connections(weights_dir, connections, input_connections, ending, 'end')
-		save_theta(weights_dir, population_names, neuron_groups, ending)
+		save_connections(end_weights_dir, connections, input_connections, ending, 'end')
+		save_theta(end_weights_dir, population_names, neuron_groups, ending, 'end')
 	else:
 		np.save(os.path.join(activity_dir, '_'.join(['results', str(num_examples), ending])), result_monitor)
 		np.save(os.path.join(activity_dir, '_'.join(['input_numbers', str(num_examples), ending])), input_numbers)
@@ -997,7 +1043,7 @@ if __name__ == '__main__':
 																in the input) sorted by Euclidean distance from the 0 matrix.')
 	parser.add_argument('--num_examples', type=int, default=10000, help='The number of examples for which to train or test the network on.')
 	parser.add_argument('--random_seed', type=int, default=42, help='The random seed (any integer) from which to generate random numbers.')
-	parser.add_argument('--reduced_dataset', type=str, default='False', help='Whether or not to use 9-digit reduced-size dataset (900 images).')
+	parser.add_argument('--reduced_dataset', type=str, default='False', help='Whether or not to a reduced dataset.')
 	parser.add_argument('--classes', type=int, default=range(10), nargs='+', help='List of classes to use in reduced dataset.')
 	parser.add_argument('--examples_per_class', type=int, default=100, help='Number of examples per class to use in reduced dataset.')
 	parser.add_argument('--neighborhood', type=str, default='8', help='The structure of neighborhood not to inhibit on firing. One of "4", "8".')
@@ -1013,6 +1059,7 @@ if __name__ == '__main__':
 	parser.add_argument('--save_weights', type=str, default='False', help='Whether or not to save the weights of the model every `weight_update_interval`.')
 	parser.add_argument('--homeostasis', type=str, default='True', help='Whether or not to use the homeostasis mechanism.')
 	parser.add_argument('--weight_update_interval', type=int, default=10, help='How often to update the plot of network filter weights.')
+	parser.add_argument('--save_best_model', type=str, default='True', help='Whether to save the current best version of the model.')
 
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
@@ -1066,6 +1113,13 @@ if __name__ == '__main__':
 		homeostasis = False
 	else:
 		raise Exception('Expecting True or False-valued command line argument "homeostasis".')
+
+	if save_best_model == 'True':
+		save_best_model = True
+	elif save_best_model == 'False':
+		save_best_model = False
+	else:
+		raise Exception('Expecting True or False-valued command line argument "save_best_model".')
 
 	# test or training mode
 	test_mode = mode == 'test'
@@ -1270,7 +1324,7 @@ if __name__ == '__main__':
 
 	# bookkeeping variables
 	previous_spike_count = np.zeros((conv_features, n_e))
-	assignments = np.zeros((conv_features, n_e))
+	assignments = -1 * np.ones((conv_features, n_e))
 	input_numbers = [0] * num_examples
 	rates = np.zeros((n_input_sqrt, n_input_sqrt))
 
