@@ -446,14 +446,18 @@ def update_deltas_plot(line, deltas, current_example_num, fig):
 	'''
 	Update the plot of the performance based on results thus far.
 	'''
-	delta = np.sum(np.abs(deltas[int(current_example_num / weight_update_interval), :, :]))
+	delta = deltas[int(current_example_num / weight_update_interval)]
 	
 	line.set_xdata(range(int(current_example_num / weight_update_interval) + 1))
 	ydata = list(line.get_ydata())
 	ydata.append(delta)
+
+	print len(ydata)
+	print len(list(line.get_xdata()))
+
 	line.set_ydata(ydata)
 
-	plt.ylim(ymax=np.max(ydata))
+	plt.ylim(ymax=np.max(ydata) + 100)
 
 	fig.canvas.draw()
 
@@ -800,6 +804,7 @@ def run_simulation():
 	'''
 	Logic for running the simulation itself.
 	'''
+
 	global fig_num, input_intensity, previous_spike_count, rates, assignments, clusters, cluster_assignments, \
 				kmeans, kmeans_assignments, simple_clusters, simple_cluster_assignments, index_matrix
 
@@ -827,7 +832,7 @@ def run_simulation():
 	num_evaluations = int(num_examples / update_interval)
 	performances = { voting_scheme : np.zeros(num_evaluations) for voting_scheme in ['all', 'most_spiked', 'top_percent'] }
 	num_weight_updates = int(num_examples / weight_update_interval)
-	deltas = np.zeros((num_weight_updates, input_connections['XeAe'][:].shape[0], input_connections['XeAe'][:].shape[1]))
+	deltas = np.zeros(num_weight_updates)
 
 	if not test_mode and do_plot:
 		performance_monitor, fig_num, fig_performance = plot_performance(fig_num, performances, num_evaluations)
@@ -898,10 +903,10 @@ def run_simulation():
 			save_connections(weights_dir, connections, input_connections, ending, j)
 
 		if j % weight_update_interval == 0 and not test_mode:
-			deltas[j / weight_update_interval, :, :] = (input_connections['XeAe'][:].todense() - last_weights)
+			deltas[j / weight_update_interval] = np.sum(np.abs((input_connections['XeAe'][:].todense() - last_weights)))
 			last_weights = input_connections['XeAe'][:].todense()
 
-			# pickling delta recording and iteration number
+			# pickling performance recording and iteration number
 			p.dump((j, deltas), open(os.path.join(deltas_dir, ending + '.p'), 'wb'))
 
 		# update weights every 'weight_update_interval'
@@ -909,8 +914,6 @@ def run_simulation():
 			update_2d_input_weights(input_weight_monitor, fig_weights)
 			if connectivity != 'none':
 				update_patch_weights(patch_weight_monitor, fig2_weights)
-
-			update_deltas_plot(line, deltas, j, deltas_figure)
 			
 		if not test_mode and do_plot:
 			update_neuron_votes(neuron_rects, fig_neuron_votes, result_monitor[:])
@@ -955,6 +958,9 @@ def run_simulation():
 			if j % print_progress_interval == 0 and j > 0:
 				print 'runs done:', j, 'of', int(num_examples), '(time taken for past', print_progress_interval, 'runs:', str(timeit.default_timer() - start_time) + ')'
 				start_time = timeit.default_timer()
+
+			if j % weight_update_interval == 0 and not test_mode and do_plot:
+				update_deltas_plot(line, deltas, j, deltas_figure)
 			
 			# plot performance if appropriate
 			if j % update_interval == 0 and j > 0:
