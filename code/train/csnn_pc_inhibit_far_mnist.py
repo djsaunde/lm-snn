@@ -196,10 +196,13 @@ def get_2d_input_weights():
 
 		for n in xrange(n_e):
 			for feature in xrange(conv_features):
-				square_weights[((n // n_e_sqrt) * conv_size) + (feature // features_sqrt) * (conv_size * n_e_sqrt) : \
-									(((n // n_e_sqrt) + 1) * conv_size) + (feature // features_sqrt) * (conv_size * n_e_sqrt), \
-									((n % n_e_sqrt) * conv_size) + (feature % features_sqrt) * (conv_size * n_e_sqrt) : \
-									(((n % n_e_sqrt) + 1) * conv_size) + (feature % features_sqrt) * (conv_size * n_e_sqrt)] = \
+				print '-', n, feature
+
+				print conv_size * (n // n_e_sqrt + feature // features_sqrt), conv_size * (n // n_e_sqrt + 1 + feature // features_sqrt), \
+						conv_size * (n + feature % features_sqrt), conv_size * (n + 1 + feature % features_sqrt)
+
+				square_weights[conv_size * (n + feature // features_sqrt) : conv_size * (n + 1 + feature // features_sqrt), \
+						conv_size * (n + feature % features_sqrt) : conv_size * (n + 1 + feature % features_sqrt)] = \
 									rearranged_weights[feature * conv_size : (feature + 1) * conv_size, n * conv_size : (n + 1) * conv_size]
 
 		return square_weights.T
@@ -452,7 +455,6 @@ def update_deltas_plot(line, deltas, current_example_num, fig):
 	ydata = list(line.get_ydata())
 	ydata.append(delta)
 	line.set_ydata(ydata)
-	plt.ylim(ymax=np.max(ydata) + 100)
 
 	fig.canvas.draw()
 
