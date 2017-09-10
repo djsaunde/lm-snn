@@ -451,12 +451,7 @@ def update_deltas_plot(line, deltas, current_example_num, fig):
 	line.set_xdata(range(int(current_example_num / weight_update_interval) + 1))
 	ydata = list(line.get_ydata())
 	ydata.append(delta)
-
-	print len(ydata)
-	print len(list(line.get_xdata()))
-
 	line.set_ydata(ydata)
-
 	plt.ylim(ymax=np.max(ydata) + 100)
 
 	fig.canvas.draw()
@@ -1077,7 +1072,6 @@ def evaluate_results():
 	else:
 		all_results = pd.read_csv(os.path.join(results_path, 'results.csv'))
 		all_results = pd.concat([all_results, results], ignore_index=True)
-		print all_results
 		all_results.to_csv(os.path.join(results_path, 'results.csv'), index=False)
 
 	print '\n'
@@ -1104,7 +1098,8 @@ if __name__ == '__main__':
 	parser.add_argument('--sort_euclidean', type=str, default='False', help='When plotting reshaped \
 														input -> excitatory weights, whether to plot each row (corresponding to locations \
 																in the input) sorted by Euclidean distance from the 0 matrix.')
-	parser.add_argument('--num_examples', type=int, default=10000, help='The number of examples for which to train or test the network on.')
+	parser.add_argument('--num_train', type=int, default=10000, help='The number of examples for which to train the network on.')
+	parser.add_argument('--num_test', type=int, default=10000, help='The number of examples for which to test the network on.')
 	parser.add_argument('--random_seed', type=int, default=42, help='The random seed (any integer) from which to generate random numbers.')
 	parser.add_argument('--reduced_dataset', type=str, default='False', help='Whether or not to a reduced dataset.')
 	parser.add_argument('--classes', type=int, default=range(10), nargs='+', help='List of classes to use in reduced dataset.')
@@ -1187,6 +1182,11 @@ if __name__ == '__main__':
 
 	# test or training mode
 	test_mode = mode == 'test'
+
+	if test_mode:
+		num_examples = num_test
+	else:
+		num_examples = num_train
 
 	if reduced_dataset:
 		data_size = len(classes) * examples_per_class
@@ -1328,7 +1328,7 @@ if __name__ == '__main__':
 	# set ending of filename saves
 	ending = '_'.join([ connectivity, str(conv_size), str(conv_stride), str(conv_features), str(n_e), \
 						str(reduced_dataset), '_'.join([ str(class_) for class_ in classes ]), str(examples_per_class), \
-						neighborhood, inhib_scheme, str(inhib_const), str(strengthen_const), str(num_examples), str(random_seed) ])
+						neighborhood, inhib_scheme, str(inhib_const), str(strengthen_const), str(num_train), str(random_seed) ])
 
 	b.ion()
 	fig_num = 1
