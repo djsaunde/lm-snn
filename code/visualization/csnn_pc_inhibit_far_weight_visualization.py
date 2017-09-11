@@ -176,7 +176,7 @@ for n in xrange(n_e):
 
 weight_matrix = np.load(os.path.join(weight_dir, file_name))
 
-input_weight_monitor, fig_weights = plot_2d_input_weights(file_name[:-4].split('_'))
+input_weight_monitor, fig_weights = plot_2d_input_weights(' '.join(file_name[:-4].split('_')))
 
 plt.savefig(os.path.join(plots_dir, file_name[:-4] + '.png'))
 plt.show()

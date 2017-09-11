@@ -39,7 +39,7 @@ plt.xlabel('Iteration number (1 through ' + str(len(performances[performances.ke
 plt.xticks([ x for x in xrange(0, len(performances[performances.keys()[0]]) + 25, 25) ], [ x * 100 for x in xrange(0, len(performances[performances.keys()[0]]) + 25, 25) ])
 plt.ylabel('Classification accuracy (out of 100%)')
 
-plt.title(file_name.split('_'))
+plt.title(' '.join(file_name.split('_')))
 plt.tight_layout()
 
 plt.savefig(os.path.join(performance_dir, 'performance_plots', file_name[:-2].replace('.', '_')))

@@ -432,7 +432,7 @@ def plot_deltas(fig_num, deltas, num_weight_updates):
 
 	lines = plt.gca().lines
 
-	plt.ylim(ymin=0, ymax=10*n_e_total)
+	plt.ylim(ymin=0, ymax=5*n_e_total)
 	plt.xticks(xrange(0, num_weight_updates + weight_update_interval, 100), xrange(0, ((num_weight_updates + weight_update_interval) * weight_update_interval), 100))
 	plt.legend()
 	plt.grid(True)
@@ -1113,7 +1113,7 @@ if __name__ == '__main__':
 																			inhibits others. One of "far", "increasing".')
 	parser.add_argument('--inhib_const', type=float, default=5.0, help='A constant which controls how quickly inhibition strengthens \
 																			between two neurons as their relative distance increases.')
-	parser.add_argument('--strengthen_const', type=float, default=0.25, help='A constant which controls how much weights learned in one iteration \
+	parser.add_argument('--strengthen_const', type=float, default=0.15, help='A constant which controls how much weights learned in one iteration \
 																				are transferred over to neighboring excitatory neurons\' weights.')
 	parser.add_argument('--noise', type=str, default='False', help='Whether or not to add Gaussian noise to input images.')
 	parser.add_argument('--noise_const', type=float, default=0.1, help='A constant which gives the mean of the Gaussian noise \
