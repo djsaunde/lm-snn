@@ -194,16 +194,14 @@ def get_2d_input_weights():
 		features_sqrt = int(math.sqrt(conv_features))
 		square_weights = np.zeros((conv_size * features_sqrt * n_e_sqrt, conv_size * features_sqrt * n_e_sqrt))
 
-		for n in xrange(n_e):
-			for feature in xrange(conv_features):
-				print '-', n, feature
-
-				print conv_size * (n // n_e_sqrt + feature // features_sqrt), conv_size * (n // n_e_sqrt + 1 + feature // features_sqrt), \
-						conv_size * (n + feature % features_sqrt), conv_size * (n + 1 + feature % features_sqrt)
-
-				square_weights[conv_size * (n + feature // features_sqrt) : conv_size * (n + 1 + feature // features_sqrt), \
-						conv_size * (n + feature % features_sqrt) : conv_size * (n + 1 + feature % features_sqrt)] = \
-									rearranged_weights[feature * conv_size : (feature + 1) * conv_size, n * conv_size : (n + 1) * conv_size]
+		for n_1 in xrange(n_e_sqrt):
+			for n_2 in xrange(n_e_sqrt):
+				for f_1 in xrange(features_sqrt):
+					for f_2 in xrange(features_sqrt):
+						square_weights[conv_size * (n_2 * features_sqrt + f_2) : conv_size * (n_2 * features_sqrt + f_2 + 1), \
+								conv_size * (n_1 * features_sqrt + f_1) : conv_size * (n_1 * features_sqrt + f_1 + 1)] = \
+						 		rearranged_weights[(f_1 * features_sqrt + f_2) * conv_size : (f_1 * features_sqrt + f_2 + 1) * conv_size, \
+						 				(n_1 * n_e_sqrt + n_2) * conv_size : (n_1 * n_e_sqrt + n_2 + 1) * conv_size]
 
 		return square_weights.T
 
@@ -434,7 +432,7 @@ def plot_deltas(fig_num, deltas, num_weight_updates):
 
 	lines = plt.gca().lines
 
-	plt.ylim(ymin=0)
+	plt.ylim(ymin=0, ymax=10*n_e_total)
 	plt.xticks(xrange(0, num_weight_updates + weight_update_interval, 100), xrange(0, ((num_weight_updates + weight_update_interval) * weight_update_interval), 100))
 	plt.legend()
 	plt.grid(True)
@@ -592,22 +590,28 @@ def build_network():
 									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = 17.4
 
 							elif inhib_scheme == 'strengthen':
-								x, y = feature // np.sqrt(n_e_total), feature % np.sqrt(n_e_total)
-								x_, y_ = other_feature // np.sqrt(n_e_total), other_feature % np.sqrt(n_e_total)
+								if n_e == 1:
+									x, y = feature // np.sqrt(n_e_total), feature % np.sqrt(n_e_total)
+									x_, y_ = other_feature // np.sqrt(n_e_total), other_feature % np.sqrt(n_e_total)
+								else:
+									x, y = feature // np.sqrt(conv_features), feature % np.sqrt(conv_features)
+									x_, y_ = other_feature // np.sqrt(conv_features), other_feature % np.sqrt(conv_features)
+
 								for n in xrange(n_e):
-									# connections[conn_name][feature * n_e + n, other_feature * n_e + n] = min(17.4, 
-									# 											inhib_const * np.sqrt(euclidean([x, y], [x_, y_])))
 									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = \
 													min(17.4, inhib_const * np.sqrt(euclidean([x, y], [x_, y_])))
 
 					elif inhib_scheme == 'increasing':
 						for other_feature in xrange(conv_features):
-							x, y = feature // np.sqrt(n_e_total), feature % np.sqrt(n_e_total)
-							x_, y_ = other_feature // np.sqrt(n_e_total), other_feature % np.sqrt(n_e_total)
+							if n_e == 1:
+								x, y = feature // np.sqrt(n_e_total), feature % np.sqrt(n_e_total)
+								x_, y_ = other_feature // np.sqrt(n_e_total), other_feature % np.sqrt(n_e_total)
+							else:
+								x, y = feature // np.sqrt(conv_features), feature % np.sqrt(conv_features)
+								x_, y_ = other_feature // np.sqrt(conv_features), other_feature % np.sqrt(conv_features)
+
 							if feature != other_feature:
 								for n in xrange(n_e):
-									# connections[conn_name][feature * n_e + n, other_feature * n_e + n] = min(17.4, 
-									# 											inhib_const * np.sqrt(euclidean([x, y], [x_, y_])))
 									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = \
 													min(17.4, inhib_const * np.sqrt(euclidean([x, y], [x_, y_])))
 
@@ -793,8 +797,6 @@ def build_network():
 			stdp_methods[conn_name] = b.STDP(input_connections[conn_name], eqs=eqs_stdp_ee, pre=eqs_stdp_pre_ee, post=eqs_stdp_post_ee, wmin=0., wmax=wmax_ee)
 
 	print '\n'
-
-	return neighbor_mapping
 
 
 def run_simulation():
@@ -1352,8 +1354,13 @@ if __name__ == '__main__':
 	for feature in xrange(conv_features):
 		neighbor_mapping[feature] = range(conv_features)
 		for other_feature in xrange(conv_features):
-			x, y = feature // np.sqrt(n_e_total), feature % np.sqrt(n_e_total)
-			x_, y_ = other_feature // np.sqrt(n_e_total), other_feature % np.sqrt(n_e_total)
+			if n_e == 1:
+				x, y = feature // np.sqrt(n_e_total), feature % np.sqrt(n_e_total)
+				x_, y_ = other_feature // np.sqrt(n_e_total), other_feature % np.sqrt(n_e_total)
+			else:
+				x, y = feature // np.sqrt(conv_features), feature % np.sqrt(conv_features)
+				x_, y_ = other_feature // np.sqrt(conv_features), other_feature % np.sqrt(conv_features)
+				
 
 			if inhib_scheme == 'far':
 				if neighborhood == '8':
@@ -1371,12 +1378,10 @@ if __name__ == '__main__':
 			elif inhib_scheme == 'strengthen':
 				if neighborhood == '8':
 					if feature != other_feature and euclidean([x, y], [x_, y_]) >= 2.0:
-						for n in xrange(n_e):
-							neighbor_mapping[feature].remove(other_feature)
+						neighbor_mapping[feature].remove(other_feature)
 				elif neighborhood == '4':
 					if feature != other_feature and euclidean([x, y], [x_, y_]) > 1.0:
-						for n in xrange(n_e):
-							neighbor_mapping[feature].remove(other_feature)
+						neighbor_mapping[feature].remove(other_feature)
 				else:
 					raise Exception('Expecting one of "8" or "4" for argument "neighborhood".')
 
