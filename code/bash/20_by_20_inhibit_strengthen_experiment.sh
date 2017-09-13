@@ -4,7 +4,7 @@ num_train=15000
 reduced_dataset="True"
 examples_per_class=500
 inhib_scheme="strengthen"
-conv_features=400
+conv_features=225
 
 for random_seed in 1 2 3
 do
