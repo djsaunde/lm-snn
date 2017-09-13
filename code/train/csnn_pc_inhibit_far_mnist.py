@@ -365,6 +365,8 @@ def get_current_performance(performances, current_example_num):
 	global input_numbers
 
 	current_evaluation = int(current_example_num / update_interval)
+	if current_example_num == num_examples -1:
+		current_evaluation+=1
 	start_num = current_example_num - update_interval
 	end_num = current_example_num
 
@@ -374,9 +376,14 @@ def get_current_performance(performances, current_example_num):
 	for scheme in performances.keys():
 		difference = output_numbers[scheme][start_num : end_num, 0] - input_numbers[start_num : end_num]
 		correct = len(np.where(difference == 0)[0])
+
+# 		print "correct: "+str(correct)
+# 		performances[performance][current_evaluation] = correct / float(update_interval) * 100
+# =======
 		wrong_idxs[scheme] = np.where(difference != 0)[0]
 		wrong_labels[scheme] = output_numbers[scheme][start_num : end_num, 0][np.where(difference != 0)[0]]
 		performances[scheme][current_evaluation] = correct / float(update_interval) * 100
+
 
 	return performances, wrong_idxs, wrong_labels
 
@@ -852,6 +859,7 @@ def run_simulation():
 	num_weight_updates = int(num_examples / weight_update_interval)
 	deltas = np.zeros(num_weight_updates)
 
+
 	if not test_mode and do_plot:
 		performance_monitor, fig_num, fig_performance = plot_performance(fig_num, performances, num_evaluations)
 		line, fig_num, deltas_figure = plot_deltas(fig_num, deltas, num_weight_updates)
@@ -879,7 +887,13 @@ def run_simulation():
 	accumulated_inputs = np.zeros(10)
 
 	while j < num_examples:
-
+		# fetched rates depend on training / test phase, and whether we use the 
+		# testing dataset for the test phase
+		if not test_mode:
+			# ensure weights don't grow without bound
+			normalize_weights()
+		# if j % weight_update_interval == 0 and not test_mode:
+		# 	save_connections(weights_dir, connections, input_connections, ending, j)
 		# get the firing rates of the next input example
 		if noise:
 			rates = (data['x'][j % data_size, :, :] / 8.0) * input_intensity + np.random.normal(loc=63.75 * noise_const, scale=1.0, size=(28, 28))
@@ -935,6 +949,7 @@ def run_simulation():
 		# update weights every 'weight_update_interval'
 		if j % weight_update_interval == 0 and not test_mode and do_plot:
 			update_2d_input_weights(input_weight_monitor, fig_weights)
+			# save_connections(weights_dir, connections, input_connections, ending, j)
 			if connectivity != 'none':
 				update_patch_weights(patch_weight_monitor, fig2_weights)
 			
@@ -987,7 +1002,8 @@ def run_simulation():
 				update_deltas_plot(line, deltas, j, deltas_figure)
 			
 			# plot performance if appropriate
-			if j % update_interval == 0 and j > 0:
+			if (j % update_interval == 0 or j== num_examples-1 ) and j > 0:
+				print str(j)
 				if not test_mode and do_plot:
 					# updating the performance plot
 					perf_plot, performances, wrong_idxs, wrong_labels = update_performance_plot(performance_monitor, performances, j, fig_performance)
@@ -995,6 +1011,7 @@ def run_simulation():
 					performances, wrong_idxs, wrong_labels = get_current_performance(performances, j)
 
 				# pickling performance recording and iteration number
+				print str(j)+' : '+ending
 				p.dump((j, performances), open(os.path.join(performance_dir, ending + '.p'), 'wb'))
 
 				# Save the best model's weights and theta parameters (if so specified)
@@ -1037,6 +1054,8 @@ def run_simulation():
 	# ensure weights don't grow without bound
 	normalize_weights()
 
+
+
 	print '\n'
 
 
@@ -1047,9 +1066,16 @@ def save_results():
 	print '...Saving results'
 
 	if not test_mode:
+
+
+		# save_connections(weights_dir, connections, input_connections, ending, num_examples)
+		# save_theta(weights_dir, population_names, neuron_groups, ending)
+
+
 		save_connections(end_weights_dir, connections, input_connections, ending, 'end')
 		save_theta(end_weights_dir, population_names, neuron_groups, ending, 'end')
 		save_assignments(end_weights_dir, assignments, ending, 'end')
+
 	else:
 		np.save(os.path.join(activity_dir, '_'.join(['results', str(num_examples), ending])), result_monitor)
 		np.save(os.path.join(activity_dir, '_'.join(['input_numbers', str(num_examples), ending])), input_numbers)
@@ -1120,8 +1146,10 @@ if __name__ == '__main__':
 	parser.add_argument('--num_train', type=int, default=10000, help='The number of examples for which to train the network on.')
 	parser.add_argument('--num_test', type=int, default=10000, help='The number of examples for which to test the network on.')
 	parser.add_argument('--random_seed', type=int, default=42, help='The random seed (any integer) from which to generate random numbers.')
+
 	parser.add_argument('--reduced_dataset', type=str, default='False', help='Whether or not to a reduced dataset.')
 	parser.add_argument('--classes', type=int, default=range(10), nargs='+', help='List of classes to use in reduced dataset.')
+
 	parser.add_argument('--examples_per_class', type=int, default=100, help='Number of examples per class to use in reduced dataset.')
 	parser.add_argument('--neighborhood', type=str, default='8', help='The structure of neighborhood not to inhibit on firing. One of "4", "8".')
 	parser.add_argument('--inhib_scheme', type=str, default='increasing', help='The scheme with which one excitatory neuron\'s firing activity \
@@ -1141,6 +1169,7 @@ if __name__ == '__main__':
 	parser.add_argument('--accumulate_votes', type=str, default='True', help='Whether to base neuron votes on all past spikes \
 																					or only on the spikes from the last "update_interval"')
 
+	parser.add_argument('--save_weights', type=str, default='False', help='This string indicates whether or not to save weights plots during the training')
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
 	args = vars(args)
