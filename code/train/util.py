@@ -127,11 +127,9 @@ def save_connections(weights_dir, connections, input_connections, ending, suffix
 
 
 
-#
-# def save_theta(weights_dir, populations, neuron_groups, ending):
-# =======
+
 def save_theta(weights_dir, populations, neuron_groups, ending, suffix):
-# >>>>>>> b1857f7199806b116b4b132bd7fc33c866fedcb6
+
 	'''
 	Save the adaptive threshold parameters out to disk.
 	'''

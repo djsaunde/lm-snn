@@ -248,20 +248,12 @@ def on_move(event):
         print('data coords %f %f' % (event.xdata, event.ydata))
         txt = ax.get_children()[5]
         x, y = event.xdata, event.ydata
-        # update the line positions
-        print [x]
-        # indx = np.searchsorted(ax.get_lines()[1].get_data()[0], [x])[0]
-        # # print ax.get_lines()[0].get_data()
-        # x =  ax.get_lines()[1].get_data()[0][indx]
-        # y =  ax.get_lines()[1].get_data()[1][indx]
 
         lx = ax.get_lines()[3]
         ly = ax.get_lines()[4]
         lx.set_ydata(y)
         ly.set_xdata(x)
         txt.set_text('iteration=%1.2f, accuracy=%1.2f' % (x*100, y))
-        # for l in ax.get_children():
-        #     print ax.get_xlim()
         plt.draw()
 
 def plot_performance(perf_file_name):
@@ -278,15 +270,13 @@ def plot_performance(perf_file_name):
     for voting_mechanism in sorted(performances.keys()):
         if voting_mechanism in ['all', 'most_spiked', 'top_percent', 'spatial_clusters']:
             performance_plots.append(plt.plot(performances[voting_mechanism], label=voting_mechanism)[0])
-    print str(performances)
-    print str(performances[performances.keys()[0]])
+
     plt.xlabel('Iteration number (1 through ' + str(len(performances[performances.keys()[0]]) * 100) + ')')
-    print str(len(performances[performances.keys()[0]]))
+
 
     locs, labs = plt.xticks([x for x in xrange(0, len(performances[performances.keys()[0]]))],
                             [x * 100 for x in xrange(0, len(performances[performances.keys()[0]]))])
-    print locs
-    print labs
+
     # xtickslocs = (np.arange(0, len(performances[performances.keys()[0]])),
     #            np.arange(0, len(performances[performances.keys()[0]])*100, 100))
     #
@@ -300,10 +290,9 @@ def plot_performance(perf_file_name):
     lx = ax.axhline(color='k')  # the horiz line
     ly = ax.axvline(color='k')
     txt = ax.text(0.7, 0.9, '', transform=ax.transAxes)
-    for l in ax.get_lines():
-        print l
 
-    print ax==plt.subplot(212)
+
+
     plt.ylabel('Classification accuracy (out of 100%)')
 
     title_strs = file_name[:file_name.index('weight') - 1].split('_')

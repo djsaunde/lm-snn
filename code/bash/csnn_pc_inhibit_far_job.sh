@@ -7,7 +7,7 @@
 connectivity=${1:-none}
 conv_size=${2:-28}
 conv_stride=${3:-0}
-conv_features=${4:-10}
+conv_features=${4:-100}
 lattice_structure=${5:-4}
 
 top_percent=${6:-10}

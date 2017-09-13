@@ -377,9 +377,6 @@ def get_current_performance(performances, current_example_num):
 		difference = output_numbers[scheme][start_num : end_num, 0] - input_numbers[start_num : end_num]
 		correct = len(np.where(difference == 0)[0])
 
-# 		print "correct: "+str(correct)
-# 		performances[performance][current_evaluation] = correct / float(update_interval) * 100
-# =======
 		wrong_idxs[scheme] = np.where(difference != 0)[0]
 		wrong_labels[scheme] = output_numbers[scheme][start_num : end_num, 0][np.where(difference != 0)[0]]
 		performances[scheme][current_evaluation] = correct / float(update_interval) * 100
@@ -854,7 +851,7 @@ def run_simulation():
 			fig_num += 2
 
 	# set up performance recording and plotting
-	num_evaluations = int(num_examples / update_interval)
+	num_evaluations = int(num_examples / update_interval) + 1
 	performances = { voting_scheme : np.zeros(num_evaluations) for voting_scheme in voting_schemes }
 	num_weight_updates = int(num_examples / weight_update_interval)
 	deltas = np.zeros(num_weight_updates)
@@ -887,10 +884,7 @@ def run_simulation():
 	accumulated_inputs = np.zeros(10)
 
 	while j < num_examples:
-		# fetched rates depend on training / test phase, and whether we use the 
-		# testing dataset for the test phase
 		if not test_mode:
-			# ensure weights don't grow without bound
 			normalize_weights()
 		# if j % weight_update_interval == 0 and not test_mode:
 		# 	save_connections(weights_dir, connections, input_connections, ending, j)
@@ -1003,7 +997,7 @@ def run_simulation():
 			
 			# plot performance if appropriate
 			if (j % update_interval == 0 or j== num_examples-1 ) and j > 0:
-				print str(j)
+
 				if not test_mode and do_plot:
 					# updating the performance plot
 					perf_plot, performances, wrong_idxs, wrong_labels = update_performance_plot(performance_monitor, performances, j, fig_performance)
@@ -1011,7 +1005,6 @@ def run_simulation():
 					performances, wrong_idxs, wrong_labels = get_current_performance(performances, j)
 
 				# pickling performance recording and iteration number
-				print str(j)+' : '+ending
 				p.dump((j, performances), open(os.path.join(performance_dir, ending + '.p'), 'wb'))
 
 				# Save the best model's weights and theta parameters (if so specified)
@@ -1168,8 +1161,6 @@ if __name__ == '__main__':
 	parser.add_argument('--update_interval', type=int, default=100, help='How often to update neuron labels and classify new inputs.')
 	parser.add_argument('--accumulate_votes', type=str, default='True', help='Whether to base neuron votes on all past spikes \
 																					or only on the spikes from the last "update_interval"')
-
-	parser.add_argument('--save_weights', type=str, default='False', help='This string indicates whether or not to save weights plots during the training')
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
 	args = vars(args)
