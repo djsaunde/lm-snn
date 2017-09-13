@@ -12,6 +12,7 @@ import os
 from scipy.sparse import coo_matrix
 from struct import unpack
 from brian import *
+from matplotlib import gridspec
 
 fig_num = 0
 wmax_ee = 1
@@ -30,7 +31,7 @@ if not os.path.isdir(plots_dir):
 
 def onclick(event):
     # clear subplots
-    print "***********************************"
+    # print "***********************************"
     if event.inaxes:
         ax = event.inaxes  # the axes instance
         print('button=%d, x=%d, y=%d, xdata=%f, ydata=%f' %
@@ -46,10 +47,9 @@ def onclick(event):
         new_file_name = 'XeAe_' + '_'.join(file_name.split('_')[1:-1]) + '_' + str(iteration) + '.npy'
         weight_matrix = np.load(os.path.join(weight_dir, new_file_name))
         plt.subplot(211).clear()
-        # plt.subplot(211).set_frame_on(True)
-        # plt.figure(1).clf()
+
         '''
-            Plot the weights from input to excitatory layer to view during training.
+            Plot the weights from input to excitatory layer to view what happened during training.
             '''
         weights = get_2d_input_weights(weight_matrix)
 
@@ -64,11 +64,6 @@ def onclick(event):
             ax1 = plt.subplot(211)
 
         im = ax1.imshow(weights, interpolation='nearest', vmin=0, vmax=wmax_ee, cmap=cmap.get_cmap('hot_r'))
-
-        # if n_e != 1:
-        #     plt.colorbar(im, fraction=0.016)
-        # else:
-        #     plt.colorbar(im, fraction=0.06)
 
         plt.title('Reshaped input -> convolution weights')
 
@@ -329,15 +324,15 @@ def plot_performance(perf_file_name):
 # --------------------------
 print '\n'
 print '\n'.join([str(idx) + ' | ' + file_name for idx, file_name in
-                 enumerate([file_name for file_name in sorted(os.listdir(weight_dir)) if ('XeAe' in file_name and 'end' in file_name)])])
+                 enumerate([file_name for file_name in sorted(os.listdir(weight_dir)) if ('XeAe' in file_name) and file_name.split('npy')[0].split('_')[-1][0:-1] ==  file_name.split('npy')[0].split('_')[-2]])])
 print '\n'
 
 to_plot = raw_input('Enter the index of the file from above which you\'d like to plot: ')
 if to_plot == '':
-    file_name = [file_name for file_name in sorted(os.listdir(weight_dir)) if ('XeAe' in file_name and 'end' in file_name)][0]
+    file_name = [file_name for file_name in sorted(os.listdir(weight_dir)) if ('XeAe' in file_name) and file_name.split('npy')[0].split('_')[-1][0:-1] ==  file_name.split('npy')[0].split('_')[-2]][0]
 else:
-    file_name = [file_name for file_name in sorted(os.listdir(weight_dir)) if ('XeAe' in file_name and 'end' in file_name)][int(to_plot)]
-
+    file_name = [file_name for file_name in sorted(os.listdir(weight_dir)) if ('XeAe' in file_name) and file_name.split('npy')[0].split('_')[-1][0:-1] ==  file_name.split('npy')[0].split('_')[-2]][int(to_plot)]
+print file_name
 sort_euclidean = raw_input('Sort plot by Euclidean distance? (y / n, default no): ')
 if sort_euclidean in ['', 'n']:
     sort_euclidean = False
