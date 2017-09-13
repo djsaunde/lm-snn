@@ -135,3 +135,12 @@ def save_theta(weights_dir, populations, neuron_groups, ending, suffix):
 	for population in populations:
 		# save out the theta parameters to file
 		np.save(os.path.join(weights_dir, 'theta_' + population + '_' + ending + '_' + str(suffix)), neuron_groups[population + 'e'].theta)
+
+
+def save_assignments(weights_dir, assignments, ending, suffix):
+	'''
+	Save neuron class labels out to disk.
+	'''
+
+	# save the labels assigned to excitatory neurons out to disk
+	np.save(os.path.join(weights_dir, '_'.join(['assignments', ending, str(suffix)])), assignments)
