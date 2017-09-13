@@ -11,7 +11,7 @@ conv_features=${4:-10}
 lattice_structure=${5:-4}
 
 top_percent=${6:-10}
-num_examples=${7:-10000}
+num_train=${7:-10000}
 reduced_dataset=${8:-True}
 examples_per_class=${9:-500}
 neighborhood=${10:-8}
@@ -24,16 +24,17 @@ random_seed=${16:-42}
 
 cd ../train/
 
-echo 1 $connectivity 2 $conv_size 3 $conv_stride 4 $conv_features 5 $lattice_structure 6 $top_percent 7 $num_examples 8 $reduced_dataset 9 $examples_per_class 10 \
+echo 1 $connectivity 2 $conv_size 3 $conv_stride 4 $conv_features 5 $lattice_structure 6 $top_percent 7 $num_train 8 $reduced_dataset 9 $examples_per_class 10 \
 	$neighborhood 11 $inhib_scheme 12 $inhib_const 13 $strengthen_const 14 $noise 15 $noise_const 16 $random_seed
 
 python csnn_pc_inhibit_far_mnist.py --mode=train --connectivity=$connectivity --conv_size=$conv_size \
 	--conv_stride=$conv_stride --conv_features=$conv_features --lattice_structure=$lattice_structure --top_percent=$top_percent \
-	--num_examples=$num_examples --reduced_dataset=$reduced_dataset --examples_per_class=$examples_per_class --neighborhood=$neighborhood \
+	--num_train=$num_train --reduced_dataset=$reduced_dataset --examples_per_class=$examples_per_class --neighborhood=$neighborhood \
 	--inhib_scheme=$inhib_scheme --inhib_const=$inhib_const --strengthen_const=$strengthen_const --noise=$noise --noise_const=$noise_const --random_seed=$random_seed
+
 python csnn_pc_inhibit_far_mnist.py --mode=test --connectivity=$connectivity --conv_size=$conv_size \
 	--conv_stride=$conv_stride --conv_features=$conv_features --lattice_structure=$lattice_structure --top_percent=$top_percent \
-	--num_examples=$num_examples --reduced_dataset=$reduced_dataset --examples_per_class=$examples_per_class --neighborhood=$neighborhood \
+	--num_train=$num_train --num_test=10000 --reduced_dataset=$reduced_dataset --examples_per_class=$examples_per_class --neighborhood=$neighborhood \
         --inhib_scheme=$inhib_scheme --inhib_const=$inhib_const --strengthen_const=$strengthen_const --noise=$noise --noise_const=$noise_const --random_seed=$random_seed
 
 exit

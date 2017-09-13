@@ -109,7 +109,7 @@ def is_lattice_connection(sqrt, i, j, lattice_structure):
 		return True
 
 
-def save_connections(weights_dir, connections, input_connections, ending, j):
+def save_connections(weights_dir, connections, input_connections, ending, suffix):
 	'''
 	Save all synaptic connection parameters out to disk.
 	'''
@@ -123,11 +123,15 @@ def save_connections(weights_dir, connections, input_connections, ending, j):
 		# get parameters of this connection
 		connection_matrix = connections[connection_name][:].todense()
 		# save it out to disk
-		np.save(os.path.join(weights_dir, connection_name + '_' + ending + '_' + str(j)), connection_matrix)
+		np.save(os.path.join(weights_dir, connection_name + '_' + ending + '_' + str(suffix)), connection_matrix)
 
 
 
-def save_theta(weights_dir, populations, neuron_groups, ending):
+#
+# def save_theta(weights_dir, populations, neuron_groups, ending):
+# =======
+def save_theta(weights_dir, populations, neuron_groups, ending, suffix):
+# >>>>>>> b1857f7199806b116b4b132bd7fc33c866fedcb6
 	'''
 	Save the adaptive threshold parameters out to disk.
 	'''
@@ -135,4 +139,13 @@ def save_theta(weights_dir, populations, neuron_groups, ending):
 	# iterate over population for which to save theta parameters
 	for population in populations:
 		# save out the theta parameters to file
-		np.save(os.path.join(weights_dir, 'theta_' + population + '_' + ending), neuron_groups[population + 'e'].theta)
+		np.save(os.path.join(weights_dir, 'theta_' + population + '_' + ending + '_' + str(suffix)), neuron_groups[population + 'e'].theta)
+
+
+def save_assignments(weights_dir, assignments, ending, suffix):
+	'''
+	Save neuron class labels out to disk.
+	'''
+
+	# save the labels assigned to excitatory neurons out to disk
+	np.save(os.path.join(weights_dir, '_'.join(['assignments', ending, str(suffix)])), assignments)
