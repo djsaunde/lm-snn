@@ -374,12 +374,14 @@ def get_current_performance(performances, current_example_num):
 	wrong_idxs = {}
 	wrong_labels = {}
 
-	for scheme in schemse.keys():
+	for scheme in performances.keys():
 		difference = output_numbers[scheme][start_num : end_num, 0] - input_numbers[start_num : end_num]
 		correct = len(np.where(difference == 0)[0])
 		wrong_idxs[scheme] = np.where(difference != 0)[0]
 		wrong_labels[scheme] = output_numbers[scheme][start_num : end_num, 0][np.where(difference != 0)[0]]
 		performances[scheme][current_evaluation] = correct / float(update_interval) * 100
+
+	print wrong_idxs
 
 	return performances, wrong_idxs, wrong_labels
 
@@ -1194,7 +1196,7 @@ if __name__ == '__main__':
 	parser.add_argument('--classes', type=int, default=range(10), nargs='+', help='List of classes to use in reduced dataset.')
 	parser.add_argument('--examples_per_class', type=int, default=1000, help='Number of examples per class to use in reduced dataset.')
 	parser.add_argument('--neighborhood', type=str, default='8', help='The structure of neighborhood not to inhibit on firing. One of "4", "8".')
-	parser.add_argument('--inhib_scheme', type=str, default='increasing', help='The scheme with which one excitatory neuron\'s firing activity \
+	parser.add_argument('--inhib_scheme', type=str, default='strengthen', help='The scheme with which one excitatory neuron\'s firing activity \
 																			inhibits others. One of "far", "increasing".')
 	parser.add_argument('--inhib_const', type=float, default=5.0, help='A constant which controls how quickly inhibition strengthens \
 																			between two neurons as their relative distance increases.')

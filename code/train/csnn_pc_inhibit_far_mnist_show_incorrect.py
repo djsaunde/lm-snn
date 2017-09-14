@@ -368,8 +368,8 @@ def get_current_performance(performances, current_example_num):
 	global input_numbers
 
 	current_evaluation = int(current_example_num / update_interval)
-	start_num = current_example_num - update_interval
-	end_num = current_example_num
+	start_num = current_example_num - update_interval + 1
+	end_num = current_example_num + 1
 
 	wrong_idxs = {}
 	wrong_labels = {}
@@ -378,7 +378,7 @@ def get_current_performance(performances, current_example_num):
 		difference = output_numbers[scheme][start_num : end_num, 0] - input_numbers[start_num : end_num]
 		correct = len(np.where(difference == 0)[0])
 		wrong_idxs[scheme] = np.where(difference != 0)[0]
-		wrong_labels[scheme] = output_numbers[scheme][start_num : end_num, 0][np.where(difference != 0)[0]]
+		wrong_labels[scheme] = output_numbers[scheme][start_num : end_num	, 0][np.where(difference != 0)[0]]
 		performances[scheme][current_evaluation] = correct / float(update_interval) * 100
 
 	return performances, wrong_idxs, wrong_labels
@@ -787,7 +787,8 @@ def build_network():
 	if connectivity == 'all':
 		lattice_locations = {}
 		for this_n in xrange(conv_features * n_e):
-			lattice_locations[this_n] = [ other_n for other_n in xrange(conv_features * n_e) if is_lattice_connection(n_e_sqrt, this_n % n_e, other_n % n_e, lattice_structure) ]
+			lattice_locations[this_n] = [ other_n for other_n in xrange(conv_features * n_e) if \
+					is_lattice_connection(n_e_sqrt, this_n % n_e, other_n % n_e, lattice_structure) ]
 	elif connectivity == 'pairs':
 		lattice_locations = {}
 		for this_n in xrange(conv_features * n_e):
@@ -934,7 +935,7 @@ def run_simulation():
 
 	last_weights = input_connections['XeAe'][:].todense()
 
-	max_fired = np.zeros(update_interval)
+	max_fired = None
 
 	while j < num_examples:
 
@@ -1041,7 +1042,7 @@ def run_simulation():
 			for scheme, outputs in predict_label(assignments, result_monitor[j % update_interval, :], accumulated_rates, spike_proportions).items():
 				output_numbers[scheme][j, :] = outputs
 
-			max_fired[j % update_interval] = np.argmax(result_monitor[j % update_interval, :])
+			max_fired = np.argmax(result_monitor[j % update_interval, :])
 			
 			# print progress
 			if j % print_progress_interval == 0 and j > 0:
@@ -1061,20 +1062,24 @@ def run_simulation():
 				else:
 					performances, wrong_idxs, wrong_labels = get_current_performance(performances, j)
 
-				features_sqrt = int(np.sqrt(conv_features))
-
 				if test_mode:
 					for performance in performances:
-						for wrong_idx, wrong_label in zip(wrong_idxs[performance], wrong_labels[performance]):
-							print wrong_idx
-							
-							rates = (data['x'][wrong_idx % data_size, :, :] / 8.0) * input_intensity
-							fig_num += 1
-							fig = plt.figure(fig_num, figsize = (8, 8))
-							plt.imshow(rates.reshape((28, 28)), interpolation = 'nearest', vmin=0, vmax=64, cmap='binary')
-							plt.title('Misclassified: ' + performance + ', ' + str(int(wrong_label)) + \
-								', ' + str(int(max_fired[wrong_idx % update_interval] % features_sqrt)) + ', ' + \
-										str(int(max_fired[wrong_idx % update_interval] // features_sqrt)))
+						for wrong_idx, wrong_label in zip(wrong_idxs[performance], wrong_labels[performance]):							
+							rates = (data['x'][(j - wrong_idx) % data_size, :, :] / 8.0) * input_intensity
+							fig = plt.figure(9, figsize = (8, 8))
+							plt.imshow(rates.reshape((28, 28)), interpolation='nearest', vmin=0, vmax=64, cmap='binary')
+							plt.title('Misclassified with ' + performance + ' as ' + str(int(wrong_label)) + \
+								' in location (' + str(int(max_fired // features_sqrt)) + ', ' + \
+										str(int(max_fired % features_sqrt)) + ')')
+
+							print max_fired
+
+							max_fired_location = np.zeros((conv_features))
+							max_fired_location[max_fired] = 1
+							fig = plt.figure(10, figsize = (7, 7))
+							plt.xticks(xrange(features_sqrt))
+							plt.yticks(xrange(features_sqrt))
+							plt.imshow(max_fired_location.reshape((features_sqrt, features_sqrt)).T, interpolation='nearest', cmap='binary')
 							
 							fig.canvas.draw()
 
@@ -1217,7 +1222,7 @@ if __name__ == '__main__':
 	parser.add_argument('--classes', type=int, default=range(10), nargs='+', help='List of classes to use in reduced dataset.')
 	parser.add_argument('--examples_per_class', type=int, default=1000, help='Number of examples per class to use in reduced dataset.')
 	parser.add_argument('--neighborhood', type=str, default='8', help='The structure of neighborhood not to inhibit on firing. One of "4", "8".')
-	parser.add_argument('--inhib_scheme', type=str, default='increasing', help='The scheme with which one excitatory neuron\'s firing activity \
+	parser.add_argument('--inhib_scheme', type=str, default='strengthen', help='The scheme with which one excitatory neuron\'s firing activity \
 																			inhibits others. One of "far", "increasing".')
 	parser.add_argument('--inhib_const', type=float, default=5.0, help='A constant which controls how quickly inhibition strengthens \
 																			between two neurons as their relative distance increases.')
