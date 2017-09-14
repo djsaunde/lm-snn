@@ -374,7 +374,7 @@ def get_current_performance(performances, current_example_num):
 	wrong_idxs = {}
 	wrong_labels = {}
 
-	for scheme in performances.keys():
+	for scheme in schemse.keys():
 		difference = output_numbers[scheme][start_num : end_num, 0] - input_numbers[start_num : end_num]
 		correct = len(np.where(difference == 0)[0])
 		wrong_idxs[scheme] = np.where(difference != 0)[0]
@@ -1210,7 +1210,7 @@ if __name__ == '__main__':
 	parser.add_argument('--update_interval', type=int, default=100, help='How often to update neuron labels and classify new inputs.')
 	parser.add_argument('--accumulate_votes', type=str, default='True', help='Whether to base neuron votes on all past spikes \
 																					or only on the spikes from the last "update_interval"')
-	parser.add_argument('--accumulation_decay', type=float, default=0.9, help='How much to decay the influence of past spikes \
+	parser.add_argument('--accumulation_decay', type=float, default=0.95, help='How much to decay the influence of past spikes \
 																						on the labeling of the excitatory neurons.')
 	parser.add_argument('--plot_all_deltas', type=str, default='False', help='Whether or not to plot weight changes for all \
 																						synpases from input to excitatory layer.')
