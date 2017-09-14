@@ -1066,13 +1066,16 @@ def run_simulation():
 				if test_mode:
 					for performance in performances:
 						for wrong_idx, wrong_label in zip(wrong_idxs[performance], wrong_labels[performance]):
+							print wrong_idx
+							
 							rates = (data['x'][wrong_idx % data_size, :, :] / 8.0) * input_intensity
 							fig_num += 1
 							fig = plt.figure(fig_num, figsize = (8, 8))
 							plt.imshow(rates.reshape((28, 28)), interpolation = 'nearest', vmin=0, vmax=64, cmap='binary')
-							plt.title('Misclassified: ' + performance + ', ' + str(wrong_label) + \
+							plt.title('Misclassified: ' + performance + ', ' + str(int(wrong_label)) + \
 								', ' + str(int(max_fired[wrong_idx % update_interval] % features_sqrt)) + ', ' + \
-								str(int(max_fired[wrong_idx % update_interval] // features_sqrt)))
+										str(int(max_fired[wrong_idx % update_interval] // features_sqrt)))
+							
 							fig.canvas.draw()
 
 							inpt = raw_input('continue? ')
