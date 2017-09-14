@@ -1314,7 +1314,7 @@ if __name__ == '__main__':
 
 	# set the update interval
 	if test_mode:
-		update_interval = num_examples
+		update_interval = 1
 
 	# weight updates and progress printing intervals
 	print_progress_interval = 10
