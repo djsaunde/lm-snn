@@ -1072,14 +1072,13 @@ def run_simulation():
 								' in location (' + str(int(max_fired // features_sqrt)) + ', ' + \
 										str(int(max_fired % features_sqrt)) + ')')
 
-							print max_fired
-
 							max_fired_location = np.zeros((conv_features))
 							max_fired_location[max_fired] = 1
 							fig = plt.figure(10, figsize = (7, 7))
 							plt.xticks(xrange(features_sqrt))
 							plt.yticks(xrange(features_sqrt))
 							plt.imshow(max_fired_location.reshape((features_sqrt, features_sqrt)).T, interpolation='nearest', cmap='binary')
+							plt.grid(True)
 							
 							fig.canvas.draw()
 
