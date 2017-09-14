@@ -904,7 +904,7 @@ def run_simulation():
 
 	# set up performance recording and plotting
 	num_evaluations = int(num_examples / update_interval)
-	performances = { voting_scheme : np.zeros(num_evaluations) for voting_scheme in ['all', 'most_spiked', 'top_percent'] }
+	performances = { voting_scheme : np.zeros(num_evaluations) for voting_scheme in voting_schemes }
 	num_weight_updates = int(num_examples / weight_update_interval)
 	all_deltas = np.zeros((num_weight_updates, (conv_size ** 2) * n_e_total))
 	deltas = np.zeros(num_weight_updates)
@@ -1183,6 +1183,7 @@ def evaluate_results():
 		all_results = pd.concat([all_results, results], ignore_index=True)
 		all_results.to_csv(os.path.join(results_path, 'results.csv'), index=False)
 
+	print '\n'
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
