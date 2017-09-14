@@ -1077,30 +1077,31 @@ def run_simulation():
 
 							inpt = raw_input('continue? ')
 
-				# pickling performance recording and iteration number
-				p.dump((j, performances), open(os.path.join(performance_dir, ending + '.p'), 'wb'))
+				if not test_mode:
+					# pickling performance recording and iteration number
+					p.dump((j, performances), open(os.path.join(performance_dir, ending + '.p'), 'wb'))
 
-				# Save the best model's weights and theta parameters (if so specified)
-				if save_best_model:
+					# Save the best model's weights and theta parameters (if so specified)
+					if save_best_model:
+						for performance in performances:
+							if performances[performance][int(j / float(update_interval))] > best_performance:
+								print '\n', 'Best model thus far! Voting scheme:', performance, '\n'
+
+								best_performance = performances[performance][int(j / float(update_interval))]
+								save_connections(best_weights_dir, connections, input_connections, ending, 'best')
+								save_theta(best_weights_dir, population_names, neuron_groups, ending, 'best')
+
+								np.save(os.path.join(best_misc_dir, '_'.join(['assignments', ending, 'best'])), assignments)
+								np.save(os.path.join(best_misc_dir, '_'.join(['accumulated_rates', ending, 'best'])), accumulated_rates)
+								np.save(os.path.join(best_misc_dir, '_'.join(['spike_proportions', ending, 'best'])), spike_proportions)
+
+					# Print out performance progress intermittently
 					for performance in performances:
-						if performances[performance][int(j / float(update_interval))] > best_performance:
-							print '\n', 'Best model thus far! Voting scheme:', performance, '\n'
-
-							best_performance = performances[performance][int(j / float(update_interval))]
-							save_connections(best_weights_dir, connections, input_connections, ending, 'best')
-							save_theta(best_weights_dir, population_names, neuron_groups, ending, 'best')
-
-							np.save(os.path.join(best_misc_dir, '_'.join(['assignments', ending, 'best'])), assignments)
-							np.save(os.path.join(best_misc_dir, '_'.join(['accumulated_rates', ending, 'best'])), accumulated_rates)
-							np.save(os.path.join(best_misc_dir, '_'.join(['spike_proportions', ending, 'best'])), spike_proportions)
-
-				# Print out performance progress intermittently
-				for performance in performances:
-					print '\nClassification performance (' + performance + ')', performances[performance][1:int(j / float(update_interval)) + 1], \
-								'\nAverage performance:', sum(performances[performance][1:int(j / float(update_interval)) + 1]) / \
-									float(len(performances[performance][1:int(j / float(update_interval)) + 1])), \
-									'\nBest performance:', max(performances[performance][1:int(j / float(update_interval)) + 1]), \
-									'\n'
+						print '\nClassification performance (' + performance + ')', performances[performance][1:int(j / float(update_interval)) + 1], \
+									'\nAverage performance:', sum(performances[performance][1:int(j / float(update_interval)) + 1]) / \
+										float(len(performances[performance][1:int(j / float(update_interval)) + 1])), \
+										'\nBest performance:', max(performances[performance][1:int(j / float(update_interval)) + 1]), \
+										'\n'
 					
 			# set input firing rates back to zero
 			for name in input_population_names:
