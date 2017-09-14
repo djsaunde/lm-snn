@@ -967,7 +967,7 @@ def run_simulation():
 					input_connections['XeAe'][:, feature] += strengthen_const * new_weights[:, other_feature]
 
 		# get new neuron label assignments every 'update_interval'
-		if j % update_interval == 0 and j > 0:
+		if j % update_interval == 0 and j > 0 and not test_mode:
 			assignments, accumulated_rates, spike_proportions = assign_labels(result_monitor, input_numbers[j - update_interval : j], accumulated_rates, accumulated_inputs)
 
 		# get count of spikes over the past iteration
