@@ -1211,7 +1211,7 @@ if __name__ == '__main__':
 	parser.add_argument('--classes', type=int, default=range(10), nargs='+', help='List of classes to use in reduced dataset.')
 	parser.add_argument('--examples_per_class', type=int, default=1000, help='Number of examples per class to use in reduced dataset.')
 	parser.add_argument('--neighborhood', type=str, default='8', help='The structure of neighborhood not to inhibit on firing. One of "4", "8".')
-	parser.add_argument('--inhib_scheme', type=str, default='increasing', help='The scheme with which one excitatory neuron\'s firing activity \
+	parser.add_argument('--inhib_scheme', type=str, default='strengthen', help='The scheme with which one excitatory neuron\'s firing activity \
 																			inhibits others. One of "far", "increasing".')
 	parser.add_argument('--inhib_const', type=float, default=2.5, help='A constant which controls how quickly inhibition strengthens \
 																			between two neurons as their relative distance increases.')
@@ -1263,7 +1263,7 @@ if __name__ == '__main__':
 	if test_mode:
 		num_examples = num_test
 	else:
-		num_examples = num_traindfadsfasdf
+		num_examples = num_train
 
 	if reduced_dataset:
 		data_size = len(classes) * examples_per_class
