@@ -17,9 +17,6 @@ model_name = 'csnn_pc_inhibit_far'
 weight_dir = os.path.join(top_level_path, 'weights', model_name, 'best')
 plots_dir = os.path.join(top_level_path, 'plots', model_name)
 
-if not os.path.isdir(plots_dir):
-	os.makedirs(plots_dir)
-
 
 def normalize_weights():
 	'''

@@ -45,9 +45,12 @@ deltas_dir = os.path.join(top_level_path, 'deltas', model_name)
 random_dir = os.path.join(top_level_path, 'random', model_name)
 best_weights_dir = os.path.join(weights_dir, 'best')
 end_weights_dir = os.path.join(weights_dir, 'end')
+misc_dir = os.path.join(top_level_path, 'misc', model_name)
+best_misc_dir = os.path.join(misc_dir, 'best')
+end_misc_dir = os.path.join(misc_dir, 'end')
 
-for d in [ performance_dir, activity_dir, weights_dir, deltas_dir, random_dir, \
-			MNIST_data_path, results_path, plots_path, best_weights_dir, end_weights_dir ]:
+for d in [ performance_dir, activity_dir, weights_dir, deltas_dir, random_dir, misc_dir, best_misc_dir, \
+			MNIST_data_path, results_path, plots_path, best_weights_dir, end_weights_dir, end_misc_dir ]:
 	if not os.path.isdir(d):
 		os.makedirs(d)
 
@@ -92,16 +95,16 @@ def normalize_weights():
 				dense_weights[convolution_locations[n]] *= column_factors[n]
 				input_connections[conn_name][:, feature * n_e + n] = dense_weights
 
-	for conn_name in connections:
-		if 'AeAe' in conn_name and lattice_structure != 'none' and lattice_structure != 'none':
-			connection = connections[conn_name][:].todense()
-			for feature in xrange(conv_features):
-				feature_connection = connection[feature * n_e : (feature + 1) * n_e, :]
-				column_sums = np.sum(feature_connection)
-				column_factors = weight['ee_recurr'] / column_sums
+	# for conn_name in connections:
+	# 	if 'AeAe' in conn_name and lattice_structure != 'none' and lattice_structure != 'none':
+	# 		connection = connections[conn_name][:].todense()
+	# 		for feature in xrange(conv_features):
+	# 			feature_connection = connection[feature * n_e : (feature + 1) * n_e, :]
+	# 			column_sums = np.sum(feature_connection)
+	# 			column_factors = weight['ee_recurr'] / column_sums
 
-				for idx in xrange(feature * n_e, (feature + 1) * n_e):
-					connections[conn_name][idx, :] *= column_factors
+	# 			for idx in xrange(feature * n_e, (feature + 1) * n_e):
+	# 				connections[conn_name][idx, :] *= column_factors
 
 
 def plot_input(rates):
@@ -125,19 +128,16 @@ def update_input(rates, im, fig):
 	return im
 
 
-def plot_labels(labels):
-	fig = plt.figure(fig_num, figsize = (5, 5))
+def plot_assignments(assignments):
 	cmap = plt.get_cmap('RdBu', 11)
-	im = plt.matshow(labels.reshape((int(np.sqrt(n_e_total)), int(np.sqrt(n_e_total)))).T, cmap=cmap, vmin=-1.5, vmax=9.5)
+	im = plt.matshow(assignments.reshape((int(np.sqrt(n_e_total)), int(np.sqrt(n_e_total)))).T, cmap=cmap, vmin=-1.5, vmax=9.5)
 	plt.colorbar(im, ticks=np.arange(-1, 10))
 	plt.title('Neuron labels')
-	fig.canvas.draw()
-	return im, fig
+	return im
 
 
-def update_labels(labels, im, fig):
-	im.set_array(labels.reshape((int(np.sqrt(n_e_total)), int(np.sqrt(n_e_total)))).T)
-	fig.canvas.draw()
+def update_assignments_plot(assignments, im):
+	im.set_array(assignments.reshape((int(np.sqrt(n_e_total)), int(np.sqrt(n_e_total)))).T)
 	return im
 
 
@@ -439,8 +439,9 @@ def plot_deltas(fig_num, deltas, num_weight_updates):
 
 	lines = plt.gca().lines
 
-	plt.ylim(ymin=0, ymax=5*n_e_total)
-	plt.xticks(xrange(0, num_weight_updates + weight_update_interval, 100), xrange(0, ((num_weight_updates + weight_update_interval) * weight_update_interval), 100))
+	plt.ylim(ymin=0, ymax=conv_size*n_e_total)
+	plt.xticks(xrange(0, num_weight_updates + weight_update_interval, 100), \
+			xrange(0, ((num_weight_updates + weight_update_interval) * weight_update_interval), 100))
 	plt.legend()
 	plt.grid(True)
 	plt.title('Absolute difference in weights per weight update interval')
@@ -466,7 +467,50 @@ def update_deltas_plot(line, deltas, current_example_num, fig):
 	return line, deltas
 
 
-def predict_label(assignments, spike_rates):
+def plot_all_deltas(fig_num, all_deltas, num_weight_updates):
+	'''
+	Set up the performance plot for the beginning of the simulation.
+	'''
+	time_steps = range(0, num_weight_updates)
+
+	fig = plt.figure(fig_num, figsize = (12, 4))
+	fig_num += 1
+
+	for idx in xrange(all_deltas.shape[1]):
+		plt.plot([], [])
+
+	lines = plt.gca().lines
+
+	plt.ylim(ymin=-1, ymax=1)
+	plt.xticks(xrange(0, num_weight_updates + weight_update_interval, 100), \
+			xrange(0, ((num_weight_updates + weight_update_interval) * weight_update_interval), 100))
+	plt.legend()
+	plt.grid(True)
+	plt.title('Differences per synapse weight per weight update interval')
+	
+	fig.canvas.draw()
+
+	return lines, fig_num, fig
+
+
+def update_all_deltas_plot(lines, all_deltas, current_example_num, fig):
+	'''
+	Update the plot of the performance based on results thus far.
+	'''
+	deltas = all_deltas[int(current_example_num / weight_update_interval)]
+	
+	for idx, line in enumerate(lines):
+		line.set_xdata(range(int(current_example_num / weight_update_interval) + 1))
+		ydata = list(line.get_ydata())
+		ydata.append(deltas[idx])
+		line.set_ydata(ydata)
+
+	fig.canvas.draw()
+
+	return lines, deltas
+
+
+def predict_label(assignments, spike_rates, accumulated_rates, spike_proportions):
 	'''
 	Given the label assignments of the excitatory layer and their spike rates over
 	the past 'update_interval', get the ranking of each of the categories of input.
@@ -532,6 +576,12 @@ def predict_label(assignments, spike_rates):
 				if len(np.where(assignments[top_percents] == i)) > 0:
 					# sum the spike rates of all excitatory neurons with this label, which fired the most in its patch
 					summed_rates[i] = len(spike_rates[np.where(np.logical_and(assignments == i, top_percents))])
+
+		elif scheme == 'confidence_weighting':
+			for i in xrange(10):
+				num_assignments[i] = np.count_nonzero(assignments == i)
+				if num_assignments[i] > 0:
+					summed_rates[i] = np.sum(spike_rates[assignments == i] * spike_proportions[(assignments == i).ravel(), i]) / num_assignments[i]
 		
 		output_numbers[scheme] = np.argsort(summed_rates)[::-1]
 	
@@ -547,11 +597,13 @@ def assign_labels(result_monitor, input_numbers, accumulated_rates, accumulated_
 		num_assignments = len(np.where(input_numbers == j)[0])
 		if num_assignments > 0:
 			accumulated_inputs[j] += num_assignments
-			accumulated_rates[:, j] += np.ravel(np.sum(result_monitor[input_numbers == j], axis=0) / num_assignments)
+			accumulated_rates[:, j] = accumulated_rates[:, j] * accumulation_decay + np.ravel(np.sum(result_monitor[input_numbers == j], axis=0) / num_assignments)
 	
 	assignments = np.argmax(accumulated_rates, axis=1).reshape((conv_features, n_e))
 
-	return assignments, accumulated_rates
+	spike_proportions = np.divide(accumulated_rates, np.sum(accumulated_rates, axis=0))
+
+	return assignments, accumulated_rates, spike_proportions
 
 
 def build_network():
@@ -592,23 +644,25 @@ def build_network():
 				conn_name = name + conn_type[0] + name + conn_type[1]
 				# create a connection from the first group in conn_name with the second group
 				connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
+				
 				# instantiate the created connection
 				for feature in xrange(conv_features):
 					for n in xrange(n_e):
 						connections[conn_name][feature * n_e + n, feature * n_e + n] = 10.4
 
-			elif conn_type == 'ie':
+			elif conn_type == 'ie' and not test_remove_inhibition:
 				# create connection name (composed of population and connection types)
 				conn_name = name + conn_type[0] + name + conn_type[1]
 				# create a connection from the first group in conn_name with the second group
 				connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
+				
 				# define the actual synaptic connections and strengths
 				for feature in xrange(conv_features):
 					if inhib_scheme in ['far', 'strengthen']:
 						for other_feature in set(range(conv_features)) - set(neighbor_mapping[feature]):
 							if inhib_scheme == 'far':
 								for n in xrange(n_e):
-									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = 17.4
+									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = max_inhib
 
 							elif inhib_scheme == 'strengthen':
 								if n_e == 1:
@@ -620,7 +674,7 @@ def build_network():
 
 								for n in xrange(n_e):
 									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = \
-													min(17.4, inhib_const * np.sqrt(euclidean([x, y], [x_, y_])))
+													min(max_inhib, inhib_const * np.sqrt(euclidean([x, y], [x_, y_])))
 
 					elif inhib_scheme == 'increasing':
 						for other_feature in xrange(conv_features):
@@ -634,79 +688,67 @@ def build_network():
 							if feature != other_feature:
 								for n in xrange(n_e):
 									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = \
-													min(17.4, inhib_const * np.sqrt(euclidean([x, y], [x_, y_])))
+													min(max_inhib, inhib_const * np.sqrt(euclidean([x, y], [x_, y_])))
+
+					elif inhib_scheme == 'constant':
+						for other_feature in xrange(conv_features):
+							if feature != other_feature:
+								for n in xrange(n_e):
+									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = \
+													min(max_inhib, inhib_const * np.sqrt(euclidean([x, y], [x_, y_])))
 
 					else:
-						raise Exception('Expecting one of "far", "increasing", or "strengthen" for argument "inhib_scheme".')
+						raise Exception('Expecting one of "far", "increasing", "strengthen", or "constant" for argument "inhib_scheme".')
 
-			elif conn_type == 'ee':
+			elif conn_type == 'ee' and exc_stdp:
 				# create connection name (composed of population and connection types)
 				conn_name = name + conn_type[0] + name + conn_type[1]
+
 				# get weights from file if we are in test mode
 				if test_mode:
 					if save_best_model:
 						weight_matrix = np.load(os.path.join(best_weights_dir, '_'.join([conn_name, ending + '_best.npy'])))
 					else:
 						weight_matrix = np.load(os.path.join(end_weights_dir, '_'.join([conn_name, ending + '_end.npy'])))
+
 				# create a connection from the first group in conn_name with the second group
 				connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
-				# instantiate the created connection
-				if connectivity == 'all':
-					for feature in xrange(conv_features):
+				
+				# define the actual synaptic connections and strengths
+				for feature in xrange(conv_features):
+					if excite_scheme == 'near':
+						for other_feature in neighbor_mapping[feature]:
+							for n in xrange(n_e):
+								connections[conn_name][feature * n_e + n, other_feature * n_e + n] = b.random() + 0.01 * 0.1 * wmax_AeAe
+
+					elif excite_scheme == 'all':
 						for other_feature in xrange(conv_features):
 							if feature != other_feature:
-								for this_n in xrange(n_e):
-									for other_n in xrange(n_e):
-										if is_lattice_connection(n_e_sqrt, this_n, other_n, lattice_structure):
-											if test_mode:
-												connections[conn_name][feature * n_e + this_n, other_feature * n_e + other_n] = weight_matrix[feature * n_e + this_n, other_feature * n_e + other_n]
-											else:
-												connections[conn_name][feature * n_e + this_n, other_feature * n_e + other_n] = (b.random() + 0.01) * 0.3
+								for n in xrange(n_e):
+									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = b.random() + 0.01 * 0.1 * wmax_AeAe								
 
-				elif connectivity == 'pairs':
-					for feature in xrange(conv_features):
-						if feature % 2 == 0:
-							for this_n in xrange(n_e):
-								for other_n in xrange(n_e):
-									if is_lattice_connection(n_e_sqrt, this_n, other_n, lattice_structure):
-										if test_mode:
-											connections[conn_name][feature * n_e + this_n, (feature + 1) * n_e + other_n] = weight_matrix[feature * n_e + this_n, (feature + 1) * n_e + other_n]
-										else:
-											connections[conn_name][feature * n_e + this_n, (feature + 1) * n_e + other_n] = (b.random() + 0.01) * 0.3
-						elif feature % 2 == 1:
-							for this_n in xrange(n_e):
-								for other_n in xrange(n_e):
-									if is_lattice_connection(n_e_sqrt, this_n, other_n, lattice_structure):
-										if test_mode:
-											connections[conn_name][feature * n_e + this_n, (feature - 1) * n_e + other_n] = weight_matrix[feature * n_e + this_n, (feature - 1) * n_e + other_n]
-										else:
-											connections[conn_name][feature * n_e + this_n, (feature - 1) * n_e + other_n] = (b.random() + 0.01) * 0.3
+					elif excite_scheme == 'decreasing':
+						for other_feature in xrange(conv_features):
+							if n_e == 1:
+								x, y = feature // np.sqrt(n_e_total), feature % np.sqrt(n_e_total)
+								x_, y_ = other_feature // np.sqrt(n_e_total), other_feature % np.sqrt(n_e_total)
+							else:
+								x, y = feature // np.sqrt(conv_features), feature % np.sqrt(conv_features)
+								x_, y_ = other_feature // np.sqrt(conv_features), other_feature % np.sqrt(conv_features)
 
-				elif connectivity == 'linear':
-					for feature in xrange(conv_features):
-						if feature != conv_features - 1:
-							for this_n in xrange(n_e):
-								for other_n in xrange(n_e):
-									if is_lattice_connection(n_e_sqrt, this_n, other_n, lattice_structure):
-										if test_mode:
-											connections[conn_name][feature * n_e + this_n, (feature + 1) * n_e + other_n] = weight_matrix[feature * n_e + this_n, (feature + 1) * n_e + other_n]
-										else:
-											connections[conn_name][feature * n_e + this_n, (feature + 1) * n_e + other_n] = (b.random() + 0.01) * 0.3
-						if feature != 0:
-							for this_n in xrange(n_e):
-								for other_n in xrange(n_e):
-									if is_lattice_connection(n_e_sqrt, this_n, other_n, lattice_structure):
-										if test_mode:
-											connections[conn_name][feature * n_e + this_n, (feature - 1) * n_e + other_n] = weight_matrix[feature * n_e + this_n, (feature - 1) * n_e + other_n]
-										else:
-											connections[conn_name][feature * n_e + this_n, (feature - 1) * n_e + other_n] = (b.random() + 0.01) * 0.3
+							if feature != other_feature:
+								for n in xrange(n_e):
+									# needs rethinking!
+									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = \
+													min(wmax_AeAe, np.sqrt(euclidean([x, y], [x_, y_])))
 
-				elif connectivity == 'none':
-					pass
+					else:
+						raise Exception('Expecting one of "near" or "decreasing" for argument "excite_scheme".')
 
 		# if STDP from excitatory -> excitatory is on and this connection is excitatory -> excitatory
-		if ee_STDP_on and 'ee' in recurrent_conn_names:
-			stdp_methods[name + 'e' + name + 'e'] = b.STDP(connections[name + 'e' + name + 'e'], eqs=eqs_stdp_ee, pre=eqs_stdp_pre_ee, post=eqs_stdp_post_ee, wmin=0., wmax=wmax_ee)
+		if exc_stdp and 'ee' in recurrent_conn_names:
+			stdp_methods[name + 'e' + name + 'e'] = b.STDP(connections[name + 'e' + name + 'e'], \
+							eqs=eqs_stdp_ee, pre=eqs_stdp_pre_AeAe, post=eqs_stdp_post_AeAe, wmin=0., wmax=wmax_AeAe)
 
 		print '...Creating monitors for:', name
 
@@ -771,7 +813,7 @@ def build_network():
 		input_groups[name + 'e'] = b.PoissonGroup(n_input, 0)
 		rate_monitors[name + 'e'] = b.PopulationRateMonitor(input_groups[name + 'e'], bin=(single_example_time + resting_time) / b.second)
 
-	# creating connections from input Poisson spike train to convolution patch populations
+	# creating connections from input Poisson spike train to excitatory neuron population(s)
 	for name in input_connection_names:
 		print '\n...Creating connections between', name[0], 'and', name[1]
 		
@@ -790,13 +832,15 @@ def build_network():
 				# weight_matrix[weight_matrix < 0.20] = 0
 
 			# create connections from the windows of the input group to the neuron population
-			input_connections[conn_name] = b.Connection(input_groups['Xe'], neuron_groups[name[1] + conn_type[1]], structure='sparse', state='g' + conn_type[0], delay=True, max_delay=delay[conn_type][1])
+			input_connections[conn_name] = b.Connection(input_groups['Xe'], neuron_groups[name[1] + conn_type[1]], \
+									structure='sparse', state='g' + conn_type[0], delay=True, max_delay=delay[conn_type][1])
 			
 			if test_mode:
 				for feature in xrange(conv_features):
 					for n in xrange(n_e):
 						for idx in xrange(conv_size ** 2):
-							input_connections[conn_name][convolution_locations[n][idx], feature * n_e + n] = weight_matrix[convolution_locations[n][idx], feature * n_e + n]
+							input_connections[conn_name][convolution_locations[n][idx], feature * n_e + n] = \
+															weight_matrix[convolution_locations[n][idx], feature * n_e + n]
 			else:
 				for feature in xrange(conv_features):
 					for n in xrange(n_e):
@@ -826,10 +870,14 @@ def run_simulation():
 	'''
 
 	global fig_num, input_intensity, previous_spike_count, rates, assignments, clusters, cluster_assignments, \
-				kmeans, kmeans_assignments, simple_clusters, simple_cluster_assignments, index_matrix
+				kmeans, kmeans_assignments, simple_clusters, simple_cluster_assignments, index_matrix, accumulated_rates, \
+				accumulated_inputs, spike_proportions
 
 	if do_plot:
-		input_image_monitor, input_image = plot_input(rates)
+		# input_image_monitor, input_image = plot_input(rates)
+		# fig_num += 1
+
+		assignments_image = plot_assignments(assignments)
 		fig_num += 1
 
 		if not test_mode:
@@ -840,26 +888,22 @@ def run_simulation():
 				patch_weight_monitor, fig2_weights = plot_patch_weights()
 				fig_num += 1
 		
-			neuron_rects, fig_neuron_votes = plot_neuron_votes(assignments, result_monitor[:])
-			fig_num += 1
-
-			label_image, label_figure = plot_labels(assignments)
-			fig_num += 2
-
-		if test_mode:
-			label_image, label_figure = plot_labels(assignments)
-			fig_num += 2
-
+			# neuron_rects, fig_neuron_votes = plot_neuron_votes(assignments, result_monitor[:])
+			# fig_num += 1
+			
 	# set up performance recording and plotting
 	num_evaluations = int(num_examples / update_interval) + 1
 	performances = { voting_scheme : np.zeros(num_evaluations) for voting_scheme in voting_schemes }
 	num_weight_updates = int(num_examples / weight_update_interval)
+	all_deltas = np.zeros((num_weight_updates, (conv_size ** 2) * n_e_total))
 	deltas = np.zeros(num_weight_updates)
 
 
 	if not test_mode and do_plot:
 		performance_monitor, fig_num, fig_performance = plot_performance(fig_num, performances, num_evaluations)
 		line, fig_num, deltas_figure = plot_deltas(fig_num, deltas, num_weight_updates)
+		if plot_all_deltas:
+			lines, fig_num, all_deltas_figure = plot_all_deltas(fig_num, all_deltas, num_weight_updates)
 	else:
 		performances, wrong_idxs, wrong_labels = get_current_performance(performances, 0)
 
@@ -879,15 +923,9 @@ def run_simulation():
 	start_time = timeit.default_timer()
 
 	last_weights = input_connections['XeAe'][:].todense()
-
-	accumulated_rates = np.zeros((conv_features * n_e, 10))
-	accumulated_inputs = np.zeros(10)
+	last_ee_weights = connections['AeAe'][:].todense()
 
 	while j < num_examples:
-		if not test_mode:
-			normalize_weights()
-		# if j % weight_update_interval == 0 and not test_mode:
-		# 	save_connections(weights_dir, connections, input_connections, ending, j)
 		# get the firing rates of the next input example
 		if noise:
 			rates = (data['x'][j % data_size, :, :] / 8.0) * input_intensity + np.random.normal(loc=63.75 * noise_const, scale=1.0, size=(28, 28))
@@ -895,8 +933,8 @@ def run_simulation():
 			rates = (data['x'][j % data_size, :, :] / 8.0) * input_intensity
 
 		# plot the input at this step
-		if do_plot:
-			input_image_monitor = update_input(rates, input_image_monitor, input_image)
+		# if do_plot:
+		# 	input_image_monitor = update_input(rates, input_image_monitor, input_image)
 		
 		# sets the input firing rates
 		input_groups['Xe'].rate = rates.reshape(n_input)
@@ -910,6 +948,15 @@ def run_simulation():
 		# get difference between weights from before and after running a single iteration
 		new_weights = input_connections['XeAe'][:].todense() - previous_weights
 
+		if j == 0:
+			exc_weights_image = plt.matshow(connections['AeAe'][:].todense().T, cmap='binary', vmin=0, vmax=wmax_AeAe)
+			plt.colorbar()
+			plt.title('Excitatory to excitatory weights')
+		else:
+			exc_weights_image.set_array(connections['AeAe'][:].todense().T)
+
+		last_ee_weights = connections['AeAe'][:].todense()
+
 		# add weight gain / loss to neighboring excitatory neuron weights by a constant factor of the weight gain / loss
 		if inhib_scheme == 'strengthen':
 			for feature in xrange(conv_features):
@@ -917,8 +964,8 @@ def run_simulation():
 					input_connections['XeAe'][:, feature] += strengthen_const * new_weights[:, other_feature]
 
 		# get new neuron label assignments every 'update_interval'
-		if j % update_interval == 0 and j > 0:
-			assignments, accumulated_rates = assign_labels(result_monitor, input_numbers[j - update_interval : j], accumulated_rates, accumulated_inputs)
+		if j % update_interval == 0 and j > 0 and not test_mode:
+			assignments, accumulated_rates, spike_proportions = assign_labels(result_monitor, input_numbers[j - update_interval : j], accumulated_rates, accumulated_inputs)
 
 		# get count of spikes over the past iteration
 		current_spike_count = np.copy(spike_counters['Ae'].count[:]).reshape((conv_features, n_e)) - previous_spike_count
@@ -931,10 +978,15 @@ def run_simulation():
 		if not test_mode and j % weight_update_interval == 0 and save_weights:
 			save_connections(weights_dir, connections, input_connections, ending, j)
 			save_theta(weights_dir, population_names, neuron_groups, ending, j)
-			save_assignments(weights_dir, assignments, ending, j)
 
+			np.save(os.path.join(misc_dir, '_'.join(['assignments', ending, str(j)])), assignments)
+			np.save(os.path.join(misc_dir, '_'.join(['accumulated_rates', ending, str(j)])), accumulated_rates)
+			np.save(os.path.join(misc_dir, '_'.join(['spike_proportions', ending, str(j)])), spike_proportions)
+			
 		if j % weight_update_interval == 0 and not test_mode:
 			deltas[j / weight_update_interval] = np.sum(np.abs((input_connections['XeAe'][:].todense() - last_weights)))
+			if plot_all_deltas:
+				all_deltas[j / weight_update_interval, :] = np.ravel(input_connections['XeAe'][:].todense() - last_weights)
 			last_weights = input_connections['XeAe'][:].todense()
 
 			# pickling performance recording and iteration number
@@ -947,11 +999,11 @@ def run_simulation():
 			if connectivity != 'none':
 				update_patch_weights(patch_weight_monitor, fig2_weights)
 			
-		if not test_mode and do_plot:
-			update_neuron_votes(neuron_rects, fig_neuron_votes, result_monitor[:])
+		# if not test_mode and do_plot:
+		# 	update_neuron_votes(neuron_rects, fig_neuron_votes, result_monitor[:])
 		
 		if do_plot:
-			label_image = update_labels(assignments, label_image, label_figure)
+			assignments_image = update_assignments_plot(assignments, assignments_image)
 
 		# if the neurons in the network didn't spike more than four times
 		if np.sum(current_spike_count) < 5 and num_retries < 3:
@@ -984,7 +1036,7 @@ def run_simulation():
 			input_numbers[j] = data['y'][j % data_size][0]
 			
 			# get the output classifications of the network
-			for scheme, outputs in predict_label(assignments, result_monitor[j % update_interval, :]).items():
+			for scheme, outputs in predict_label(assignments, result_monitor[j % update_interval, :], accumulated_rates, spike_proportions).items():
 				output_numbers[scheme][j, :] = outputs
 
 			# print progress
@@ -994,6 +1046,8 @@ def run_simulation():
 
 			if j % weight_update_interval == 0 and not test_mode and do_plot:
 				update_deltas_plot(line, deltas, j, deltas_figure)
+				if plot_all_deltas:
+					update_all_deltas_plot(lines, all_deltas, j, all_deltas_figure)
 			
 			# plot performance if appropriate
 			if (j % update_interval == 0 or j== num_examples-1 ) and j > 0:
@@ -1016,7 +1070,11 @@ def run_simulation():
 							best_performance = performances[performance][int(j / float(update_interval))]
 							save_connections(best_weights_dir, connections, input_connections, ending, 'best')
 							save_theta(best_weights_dir, population_names, neuron_groups, ending, 'best')
-							save_assignments(best_weights_dir, assignments, ending, 'best')
+
+							np.save(os.path.join(best_misc_dir, '_'.join(['assignments', ending, 'best'])), assignments)
+							np.save(os.path.join(best_misc_dir, '_'.join(['accumulated_rates', ending, 'best'])), accumulated_rates)
+							np.save(os.path.join(best_misc_dir, '_'.join(['spike_proportions', ending, 'best'])), spike_proportions)
+							
 
 				# Print out performance progress intermittently
 				for performance in performances:
@@ -1067,8 +1125,10 @@ def save_results():
 
 		save_connections(end_weights_dir, connections, input_connections, ending, 'end')
 		save_theta(end_weights_dir, population_names, neuron_groups, ending, 'end')
-		save_assignments(end_weights_dir, assignments, ending, 'end')
 
+		np.save(os.path.join(end_misc_dir, '_'.join(['assignments', ending, 'end'])), assignments)
+		np.save(os.path.join(end_misc_dir, '_'.join(['accumulated_rates', ending, 'end'])), accumulated_rates)
+		np.save(os.path.join(end_misc_dir, '_'.join(['spike_proportions', ending, 'end'])), spike_proportions)
 	else:
 		np.save(os.path.join(activity_dir, '_'.join(['results', str(num_examples), ending])), result_monitor)
 		np.save(os.path.join(activity_dir, '_'.join(['input_numbers', str(num_examples), ending])), input_numbers)
@@ -1092,7 +1152,7 @@ def evaluate_results():
 
 	# for idx in xrange(end_time_testing - end_time_training):
 	for idx in xrange(num_examples):
-		label_rankings = predict_label(assignments, result_monitor[idx, :])
+		label_rankings = predict_label(assignments, result_monitor[idx, :], accumulated_rates, spike_proportions)
 		for scheme in voting_schemes:
 			test_results[scheme][:, idx] = label_rankings[scheme]
 
@@ -1142,25 +1202,34 @@ if __name__ == '__main__':
 
 	parser.add_argument('--reduced_dataset', type=str, default='False', help='Whether or not to a reduced dataset.')
 	parser.add_argument('--classes', type=int, default=range(10), nargs='+', help='List of classes to use in reduced dataset.')
-
-	parser.add_argument('--examples_per_class', type=int, default=100, help='Number of examples per class to use in reduced dataset.')
+	parser.add_argument('--examples_per_class', type=int, default=1000, help='Number of examples per class to use in reduced dataset.')
 	parser.add_argument('--neighborhood', type=str, default='8', help='The structure of neighborhood not to inhibit on firing. One of "4", "8".')
 	parser.add_argument('--inhib_scheme', type=str, default='increasing', help='The scheme with which one excitatory neuron\'s firing activity \
 																			inhibits others. One of "far", "increasing".')
-	parser.add_argument('--inhib_const', type=float, default=5.0, help='A constant which controls how quickly inhibition strengthens \
+	parser.add_argument('--inhib_const', type=float, default=2.5, help='A constant which controls how quickly inhibition strengthens \
 																			between two neurons as their relative distance increases.')
-	parser.add_argument('--strengthen_const', type=float, default=0.5, help='A constant which controls how much weights learned in one iteration \
-																				are transferred over to neighboring excitatory neurons\' weights.')
+	parser.add_argument('--strengthen_const', type=float, default=0.1, help='A constant which controls how much weights learned in \
+																		one iteration are added to neighboring excitatory neurons\' weights.')
 	parser.add_argument('--noise', type=str, default='False', help='Whether or not to add Gaussian noise to input images.')
 	parser.add_argument('--noise_const', type=float, default=0.1, help='A constant which gives the mean of the Gaussian noise \
 																			added to the input images (fraction of maximum firing rate.')
-	parser.add_argument('--save_weights', type=str, default='False', help='Whether or not to save the weights of the model every `weight_update_interval`.')
+	parser.add_argument('--save_weights', type=str, default='False', help='Whether osdfaasdffasd not to save the weights of the model every `weight_update_interval`.')
 	parser.add_argument('--homeostasis', type=str, default='True', help='Whether or not to use the homeostasis mechanism.')
 	parser.add_argument('--weight_update_interval', type=int, default=10, help='How often to update the plot of network filter weights.')
 	parser.add_argument('--save_best_model', type=str, default='True', help='Whether to save the current best version of the model.')
 	parser.add_argument('--update_interval', type=int, default=100, help='How often to update neuron labels and classify new inputs.')
 	parser.add_argument('--accumulate_votes', type=str, default='True', help='Whether to base neuron votes on all past spikes \
 																					or only on the spikes from the last "update_interval"')
+	parser.add_argument('--accumulation_decay', type=float, default=0.75, help='How much to decay the influence of past spikes \
+																						on the labeling of the excitatory neurons.')
+	parser.add_argument('--plot_all_deltas', type=str, default='False', help='Whether or not to plot weight changes for all \
+																						synpases from input to excitatory layer.')
+	parser.add_argument('--test_remove_inhibition', type=str, default='False', help='Whether or not to remove lateral inhibition during the test phase.')
+	parser.add_argument('--exc_stdp', type=str, default='False', help='Whether to use STDP synapses between neurons in the excitatory layer.')
+	parser.add_argument('--excite_scheme', type=str, default='near', help='The scheme with which one excitatory neuron excites other excitatory neurons.')
+	parser.add_argument('--wmax_AeAe', type=float, default=1.0, help='The max weight on synapses between any two connected excitatory neurons.')
+	parser.add_argument('--max_inhib', type=float, default=17.4, help='The maximum synapse weight for inhibitory to excitatory connections.')
+
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
 	args = vars(args)
@@ -1172,61 +1241,14 @@ if __name__ == '__main__':
 
 	print '\n'
 
-	if do_plot == 'True':
-		do_plot = True
-	elif do_plot == 'False':
-		do_plot = False
-	else:
-		raise Exception('Expecting True or False-valued command line argument "do_plot".')
-
-	if sort_euclidean == 'True':
-		sort_euclidean = True
-	elif sort_euclidean == 'False':
-		sort_euclidean = False
-	else:
-		raise Exception('Expecting True or False-valued command line argument "sort_euclidean".')
-
-	if reduced_dataset == 'True':
-		reduced_dataset = True
-	elif reduced_dataset == 'False':
-		reduced_dataset = False
-	else:
-		raise Exception('Expecting True or False-valued command line argument "reduced_dataset".')
-
-	if noise == 'True':
-		noise = True
-	elif noise == 'False':
-		noise = False
-	else:
-		raise Exception('Expecting True or False-valued command line argument "noise".')
-
-	if save_weights == 'True':
-		save_weights = True
-	elif save_weights == 'False':
-		save_weights = False
-	else:
-		raise Exception('Expecting True or False-valued command line argument "save_weights".')
-
-	if homeostasis == 'True':
-		homeostasis = True
-	elif homeostasis == 'False':
-		homeostasis = False
-	else:
-		raise Exception('Expecting True or False-valued command line argument "homeostasis".')
-
-	if save_best_model == 'True':
-		save_best_model = True
-	elif save_best_model == 'False':
-		save_best_model = False
-	else:
-		raise Exception('Expecting True or False-valued command line argument "save_best_model".')
-
-	if accumulate_votes == 'True':
-		accumulate_votes = True
-	elif accumulate_votes == 'False':
-		accumulate_votes = False
-	else:
-		raise Exception('Expecting True or False-valued command line argument "accumulate_votes".')
+	for var in [ 'do_plot', 'sort_euclidean', 'reduced_dataset', 'noise', 'plot_all_deltas', 'exc_stdp', \
+					'save_weights', 'homeostasis', 'save_best_model', 'accumulate_votes', 'test_remove_inhibition' ]:
+		if locals()[var] == 'True':
+			locals()[var] = True
+		elif locals()[var] == 'False':
+			locals()[var] = False
+		else:
+			raise Exception('Expecting True or False-valued command line argument "' + var + '".')
 
 	# test or training mode
 	test_mode = mode == 'test'
@@ -1234,7 +1256,7 @@ if __name__ == '__main__':
 	if test_mode:
 		num_examples = num_test
 	else:
-		num_examples = num_train
+		num_examples = num_traindfadsfasdf
 
 	if reduced_dataset:
 		data_size = len(classes) * examples_per_class
@@ -1323,6 +1345,7 @@ if __name__ == '__main__':
 	# time constants, learning rates, max weights, weight dependence, etc.
 	tc_pre_ee, tc_post_ee = 20 * b.ms, 20 * b.ms
 	nu_ee_pre, nu_ee_post = 0.0001, 0.01
+	nu_AeAe_pre, nu_Ae_Ae_post = 0.1, 0.5
 	wmax_ee = 1.0
 	exp_ee_post = exp_ee_pre = 0.2
 	w_mu_pre, w_mu_post = 0.2, 0.2
@@ -1371,12 +1394,15 @@ if __name__ == '__main__':
 	eqs_stdp_pre_ee = 'pre = 1.; w -= nu_ee_pre * post'
 	eqs_stdp_post_ee = 'w += nu_ee_post * pre; post = 1.'
 
+	eqs_stdp_pre_AeAe = 'pre += 1.; w -= nu_AeAe_pre * post'
+	eqs_stdp_post_AeAe = 'w += nu_AeAe_post * pre; post += 1.'
+
 	print '\n'
 
 	# set ending of filename saves
 	ending = '_'.join([ connectivity, str(conv_size), str(conv_stride), str(conv_features), str(n_e), str(reduced_dataset), \
 						'_'.join([ str(class_) for class_ in classes ]), str(examples_per_class), neighborhood, inhib_scheme, \
-						str(inhib_const), str(strengthen_const), str(num_train), str(random_seed), str(accumulate_votes) ])
+			str(inhib_const), str(strengthen_const), str(num_train), str(random_seed), str(accumulate_votes), str(accumulation_decay) ])
 
 	b.ion()
 	fig_num = 1
@@ -1416,7 +1442,7 @@ if __name__ == '__main__':
 				else:
 					raise Exception('Expecting one of "8" or "4" for argument "neighborhood".')
 
-			elif inhib_scheme == 'increasing':
+			elif inhib_scheme in [ 'increasing', 'constant' ]:
 				pass
 
 			elif inhib_scheme == 'strengthen':
@@ -1442,16 +1468,25 @@ if __name__ == '__main__':
 
 	if test_mode:
 		if save_best_model:
-			assignments = np.load(os.path.join(best_weights_dir, '_'.join(['assignments', ending, 'best.npy'])))
+			assignments = np.load(os.path.join(best_misc_dir, '_'.join(['assignments', ending, 'best.npy'])))
+			accumulated_rates = np.load(os.path.join(best_misc_dir, '_'.join(['accumulated_rates', ending, 'best.npy'])))
+			spike_proportions = np.load(os.path.join(best_misc_dir, '_'.join(['spike_proportions', ending, 'best.npy'])))
 		else:
-			assignments = np.load(os.path.join(best_weights_dir, '_'.join(['assignments', ending, 'end.npy'])))
+			assignments = np.load(os.path.join(end_misc_dir, '_'.join(['assignments', ending, 'end.npy'])))
+			accumulated_rates = np.load(os.path.join(end_misc_dir, '_'.join(['accumulated_rates', ending, 'end.npy'])))
+			spike_proportions = np.load(os.path.join(end_misc_dir, '_'.join(['spike_proportions', ending, 'end.npy'])))
 	else:
 		assignments = -1 * np.ones((conv_features, n_e))
 
-	voting_schemes = ['all', 'most_spiked_patch', 'top_percent', 'most_spiked_location']
+	voting_schemes = ['all', 'most_spiked_patch', 'top_percent', 'most_spiked_location', 'confidence_weighting']
 
 	for scheme in voting_schemes:
 		output_numbers[scheme] = np.zeros((num_examples, 10))
+
+	if not test_mode:
+		accumulated_rates = np.zeros((conv_features * n_e, 10))
+		accumulated_inputs = np.zeros(10)
+		spike_proportions = np.zeros((conv_features * n_e, 10))
 	
 	# run the simulation of the network
 	run_simulation()

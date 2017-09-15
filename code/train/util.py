@@ -147,3 +147,12 @@ def save_assignments(weights_dir, assignments, ending, suffix):
 
 	# save the labels assigned to excitatory neurons out to disk
 	np.save(os.path.join(weights_dir, '_'.join(['assignments', ending, str(suffix)])), assignments)
+
+
+def save_accumulated_rates(weights_dir, accumulated_rates, ending, suffix):
+	'''
+	Save neuron class labels out to disk.
+	'''
+
+	# save the labels assigned to excitatory neurons out to disk
+	np.save(os.path.join(weights_dir, '_'.join(['accumulated_rates', ending, str(suffix)])), assignments)
