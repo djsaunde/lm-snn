@@ -1151,8 +1151,6 @@ def evaluate_results():
 	'''
 	global update_interval
 
-	print '...Getting assignments'
-
 	test_results = {}
 	for scheme in voting_schemes:
 		test_results[scheme] = np.zeros((10, num_examples))
