@@ -5,7 +5,6 @@ Supporting functions for use in training scripts.
 import cPickle as p
 import numpy as np
 import os
-
 from struct import unpack
 
 top_level_path = os.path.join('..', '..')
@@ -119,6 +118,7 @@ def save_connections(weights_dir, connections, input_connections, ending, suffix
 	connections.update(input_connections)
 
 	# save out each connection's parameters to disk
+
 	for connection_name in connections.keys():		
 		# get parameters of this connection
 		connection_matrix = connections[connection_name][:].todense()
@@ -126,7 +126,10 @@ def save_connections(weights_dir, connections, input_connections, ending, suffix
 		np.save(os.path.join(weights_dir, connection_name + '_' + ending + '_' + str(suffix)), connection_matrix)
 
 
+
+
 def save_theta(weights_dir, populations, neuron_groups, ending, suffix):
+
 	'''
 	Save the adaptive threshold parameters out to disk.
 	'''
