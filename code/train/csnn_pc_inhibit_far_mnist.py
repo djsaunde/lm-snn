@@ -365,6 +365,8 @@ def get_current_performance(performances, current_example_num):
 	global input_numbers
 
 	current_evaluation = int(current_example_num / update_interval)
+	if current_example_num == num_examples -1:
+		current_evaluation+=1
 	start_num = current_example_num - update_interval
 	end_num = current_example_num
 
@@ -374,9 +376,11 @@ def get_current_performance(performances, current_example_num):
 	for scheme in performances.keys():
 		difference = output_numbers[scheme][start_num : end_num, 0] - input_numbers[start_num : end_num]
 		correct = len(np.where(difference == 0)[0])
+
 		wrong_idxs[scheme] = np.where(difference != 0)[0]
 		wrong_labels[scheme] = output_numbers[scheme][start_num : end_num, 0][np.where(difference != 0)[0]]
 		performances[scheme][current_evaluation] = correct / float(update_interval) * 100
+
 
 	return performances, wrong_idxs, wrong_labels
 
@@ -888,11 +892,12 @@ def run_simulation():
 			# fig_num += 1
 			
 	# set up performance recording and plotting
-	num_evaluations = int(num_examples / update_interval)
+	num_evaluations = int(num_examples / update_interval) + 1
 	performances = { voting_scheme : np.zeros(num_evaluations) for voting_scheme in voting_schemes }
 	num_weight_updates = int(num_examples / weight_update_interval)
 	all_deltas = np.zeros((num_weight_updates, (conv_size ** 2) * n_e_total))
 	deltas = np.zeros(num_weight_updates)
+
 
 	if not test_mode and do_plot:
 		performance_monitor, fig_num, fig_performance = plot_performance(fig_num, performances, num_evaluations)
@@ -990,6 +995,7 @@ def run_simulation():
 		# update weights every 'weight_update_interval'
 		if j % weight_update_interval == 0 and not test_mode and do_plot:
 			update_2d_input_weights(input_weight_monitor, fig_weights)
+			# save_connections(weights_dir, connections, input_connections, ending, j)
 			if connectivity != 'none':
 				update_patch_weights(patch_weight_monitor, fig2_weights)
 			
@@ -1044,7 +1050,8 @@ def run_simulation():
 					update_all_deltas_plot(lines, all_deltas, j, all_deltas_figure)
 			
 			# plot performance if appropriate
-			if j % update_interval == 0 and j > 0:
+			if (j % update_interval == 0 or j== num_examples-1 ) and j > 0:
+
 				if not test_mode and do_plot:
 					# updating the performance plot
 					perf_plot, performances, wrong_idxs, wrong_labels = update_performance_plot(performance_monitor, performances, j, fig_performance)
@@ -1098,6 +1105,8 @@ def run_simulation():
 	# ensure weights don't grow without bound
 	normalize_weights()
 
+
+
 	print '\n'
 
 
@@ -1108,6 +1117,12 @@ def save_results():
 	print '...Saving results'
 
 	if not test_mode:
+
+
+		# save_connections(weights_dir, connections, input_connections, ending, num_examples)
+		# save_theta(weights_dir, population_names, neuron_groups, ending)
+
+
 		save_connections(end_weights_dir, connections, input_connections, ending, 'end')
 		save_theta(end_weights_dir, population_names, neuron_groups, ending, 'end')
 
@@ -1184,6 +1199,7 @@ if __name__ == '__main__':
 	parser.add_argument('--num_train', type=int, default=10000, help='The number of examples for which to train the network on.')
 	parser.add_argument('--num_test', type=int, default=10000, help='The number of examples for which to test the network on.')
 	parser.add_argument('--random_seed', type=int, default=42, help='The random seed (any integer) from which to generate random numbers.')
+
 	parser.add_argument('--reduced_dataset', type=str, default='False', help='Whether or not to a reduced dataset.')
 	parser.add_argument('--classes', type=int, default=range(10), nargs='+', help='List of classes to use in reduced dataset.')
 	parser.add_argument('--examples_per_class', type=int, default=1000, help='Number of examples per class to use in reduced dataset.')
@@ -1197,7 +1213,7 @@ if __name__ == '__main__':
 	parser.add_argument('--noise', type=str, default='False', help='Whether or not to add Gaussian noise to input images.')
 	parser.add_argument('--noise_const', type=float, default=0.1, help='A constant which gives the mean of the Gaussian noise \
 																			added to the input images (fraction of maximum firing rate.')
-	parser.add_argument('--save_weights', type=str, default='False', help='Whether or not to save the weights of the model every `weight_update_interval`.')
+	parser.add_argument('--save_weights', type=str, default='False', help='Whether osdfaasdffasd not to save the weights of the model every `weight_update_interval`.')
 	parser.add_argument('--homeostasis', type=str, default='True', help='Whether or not to use the homeostasis mechanism.')
 	parser.add_argument('--weight_update_interval', type=int, default=10, help='How often to update the plot of network filter weights.')
 	parser.add_argument('--save_best_model', type=str, default='True', help='Whether to save the current best version of the model.')
@@ -1240,7 +1256,7 @@ if __name__ == '__main__':
 	if test_mode:
 		num_examples = num_test
 	else:
-		num_examples = num_train
+		num_examples = num_traindfadsfasdf
 
 	if reduced_dataset:
 		data_size = len(classes) * examples_per_class
