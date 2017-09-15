@@ -715,13 +715,21 @@ def build_network():
 					if excite_scheme == 'near':
 						for other_feature in neighbor_mapping[feature]:
 							for n in xrange(n_e):
-								connections[conn_name][feature * n_e + n, other_feature * n_e + n] = b.random() + 0.01 * 0.1 * wmax_AeAe
+								if test_mode:
+									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = \
+																weight_matrix[feature * n_e + n, other_feature * n_e + n]
+								else:
+									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = b.random() + 0.01 * 0.1 * wmax_AeAe
 
 					elif excite_scheme == 'all':
 						for other_feature in xrange(conv_features):
 							if feature != other_feature:
 								for n in xrange(n_e):
-									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = b.random() + 0.01 * 0.1 * wmax_AeAe								
+									if test_mode:
+										connections[conn_name][feature * n_e + n, other_feature * n_e + n] = \
+																	weight_matrix[feature * n_e + n, other_feature * n_e + n]
+									else:
+										connections[conn_name][feature * n_e + n, other_feature * n_e + n] = b.random() + 0.01 * 0.1 * wmax_AeAe								
 
 					elif excite_scheme == 'decreasing':
 						for other_feature in xrange(conv_features):
@@ -742,9 +750,9 @@ def build_network():
 						raise Exception('Expecting one of "near" or "decreasing" for argument "excite_scheme".')
 
 		# if STDP from excitatory -> excitatory is on and this connection is excitatory -> excitatory
-		if exc_stdp and 'ee' in recurrent_conn_names:
+		if exc_stdp and 'ee' in recurrent_conn_names and not test_mode:
 			stdp_methods[name + 'e' + name + 'e'] = b.STDP(connections[name + 'e' + name + 'e'], \
-							eqs=eqs_stdp_ee, pre=eqs_stdp_pre_AeAe, post=eqs_stdp_post_AeAe, wmin=0., wmax=wmax_AeAe)
+							eqs=eqs_stdp_ee, pre=eqs_stdp_pre_ee, post=eqs_stdp_post_ee, wmin=0., wmax=wmax_AeAe)
 
 		print '...Creating monitors for:', name
 
@@ -849,7 +857,7 @@ def build_network():
 					fig_num += 1	
 
 		# if excitatory -> excitatory STDP is specified, add it here (input to excitatory populations)
-		if ee_STDP_on:
+		if not test_mode:
 			print '...Creating STDP for connection', name
 			
 			# STDP connection name
@@ -943,12 +951,13 @@ def run_simulation():
 		# get difference between weights from before and after running a single iteration
 		new_weights = input_connections['XeAe'][:].todense() - previous_weights
 
-		if j == 0:
-			exc_weights_image = plt.matshow(connections['AeAe'][:].todense().T, cmap='binary', vmin=0, vmax=wmax_AeAe)
-			plt.colorbar()
-			plt.title('Excitatory to excitatory weights')
-		else:
-			exc_weights_image.set_array(connections['AeAe'][:].todense().T)
+		if do_plot:
+			if j == 0:
+				exc_weights_image = plt.matshow(connections['AeAe'][:].todense().T, cmap='binary', vmin=0, vmax=wmax_AeAe)
+				plt.colorbar()
+				plt.title('Excitatory to excitatory weights')
+			else:
+				exc_weights_image.set_array(connections['AeAe'][:].todense().T)
 
 		last_ee_weights = connections['AeAe'][:].todense()
 
@@ -1266,10 +1275,8 @@ if __name__ == '__main__':
 	# set parameters for simulation based on train / test mode
 	if test_mode:
 		record_spikes = True
-		ee_STDP_on = False
 	else:
 		record_spikes = True
-		ee_STDP_on = True
 
 	# number of inputs to the network
 	n_input = 784
