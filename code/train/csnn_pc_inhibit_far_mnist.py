@@ -931,7 +931,9 @@ def run_simulation():
 	start_time = timeit.default_timer()
 
 	last_weights = input_connections['XeAe'][:].todense()
-	last_ee_weights = connections['AeAe'][:].todense()
+
+	if exc_stdp:
+		last_ee_weights = connections['AeAe'][:].todense()
 
 	while j < num_examples:
 		# get the firing rates of the next input example
@@ -956,7 +958,7 @@ def run_simulation():
 		# get difference between weights from before and after running a single iteration
 		new_weights = input_connections['XeAe'][:].todense() - previous_weights
 
-		if do_plot:
+		if do_plot and exc_stdp:
 			if j == 0:
 				exc_weights_image = plt.matshow(connections['AeAe'][:].todense().T, cmap='binary', vmin=0, vmax=wmax_AeAe)
 				plt.colorbar()
@@ -964,7 +966,8 @@ def run_simulation():
 			else:
 				exc_weights_image.set_array(connections['AeAe'][:].todense().T)
 
-		last_ee_weights = connections['AeAe'][:].todense()
+		if exc_stdp:
+			last_ee_weights = connections['AeAe'][:].todense()
 
 		# add weight gain / loss to neighboring excitatory neuron weights by a constant factor of the weight gain / loss
 		if inhib_scheme == 'strengthen':
@@ -1233,8 +1236,8 @@ if __name__ == '__main__':
 																						synpases from input to excitatory layer.')
 	parser.add_argument('--test_remove_inhibition', type=str, default='False', help='Whether or not to remove lateral inhibition during the test phase.')
 	parser.add_argument('--exc_stdp', type=str, default='False', help='Whether to use STDP synapses between neurons in the excitatory layer.')
-	parser.add_argument('--excite_scheme', type=str, default='near', help='The scheme with which one excitatory neuron excites other excitatory neurons.')
-	parser.add_argument('--wmax_AeAe', type=float, default=1.0, help='The max weight on synapses between any two connected excitatory neurons.')
+	parser.add_argument('--excite_scheme', type=str, default='all', help='The scheme with which one excitatory neuron excites other excitatory neurons.')
+	parser.add_argument('--wmax_AeAe', type=float, default=10.0, help='The max weight on synapses between any two connected excitatory neurons.')
 	parser.add_argument('--max_inhib', type=float, default=17.4, help='The maximum synapse weight for inhibitory to excitatory connections.')
 
 	# parse arguments and place them in local scope
