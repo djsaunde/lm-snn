@@ -10,7 +10,6 @@ from struct import unpack
 from brian import *
 
 fig_num = 0
-wmax_ee = 1
 
 top_level_path = os.path.join('..', '..')
 model_name = 'csnn_pc_inhibit_far'
@@ -172,6 +171,8 @@ for n in xrange(n_e):
 	convolution_locations[n] = [ ((n % n_e_sqrt) * conv_stride + (n // n_e_sqrt) * n_input_sqrt * conv_stride) + (x * n_input_sqrt) + y for y in xrange(conv_size) for x in xrange(conv_size) ]
 
 weight_matrix = np.load(os.path.join(weight_dir, file_name))
+
+wmax_ee = np.max(weight_matrix)
 
 input_weight_monitor, fig_weights = plot_2d_input_weights(' '.join(file_name[:-4].split('_')))
 
