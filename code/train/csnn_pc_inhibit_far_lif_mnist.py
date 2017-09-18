@@ -643,7 +643,7 @@ def build_network():
 				# create connection name (composed of population and connection types)
 				conn_name = name + conn_type[0] + name + conn_type[1]
 				# create a connection from the first group in conn_name with the second group
-				connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
+				connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='v') # state='g' + conn_type[0])
 				
 				# instantiate the created connection
 				for feature in xrange(conv_features):
@@ -654,7 +654,7 @@ def build_network():
 				# create connection name (composed of population and connection types)
 				conn_name = name + conn_type[0] + name + conn_type[1]
 				# create a connection from the first group in conn_name with the second group
-				connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
+				connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='v') # state='g' + conn_type[0])
 				
 				# define the actual synaptic connections and strengths
 				for feature in xrange(conv_features):
@@ -662,7 +662,7 @@ def build_network():
 						for other_feature in set(range(conv_features)) - set(neighbor_mapping[feature]):
 							if inhib_scheme == 'far':
 								for n in xrange(n_e):
-									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = max_inhib
+									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = max_inhib * wmax_ee
 
 							elif inhib_scheme == 'strengthen':
 								if n_e == 1:
@@ -674,7 +674,7 @@ def build_network():
 
 								for n in xrange(n_e):
 									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = \
-													min(max_inhib, inhib_const * np.sqrt(euclidean([x, y], [x_, y_])))
+													- min(max_inhib * wmax_ee, wmax_ee * inhib_const * np.sqrt(euclidean([x, y], [x_, y_])))
 
 					elif inhib_scheme == 'increasing':
 						for other_feature in xrange(conv_features):
@@ -688,14 +688,13 @@ def build_network():
 							if feature != other_feature:
 								for n in xrange(n_e):
 									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = \
-													min(max_inhib, inhib_const * np.sqrt(euclidean([x, y], [x_, y_])))
+													- min(max_inhib * wmax_ee, wmax_ee * inhib_const * np.sqrt(euclidean([x, y], [x_, y_])))
 
 					elif inhib_scheme == 'constant':
 						for other_feature in xrange(conv_features):
 							if feature != other_feature:
 								for n in xrange(n_e):
-									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = \
-													min(max_inhib, inhib_const * np.sqrt(euclidean([x, y], [x_, y_])))
+									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = - inhib_const * wmax_ee
 
 					else:
 						raise Exception('Expecting one of "far", "increasing", "strengthen", or "constant" for argument "inhib_scheme".')
@@ -712,7 +711,7 @@ def build_network():
 						weight_matrix = np.load(os.path.join(end_weights_dir, '_'.join([conn_name, ending + '_end.npy'])))
 
 				# create a connection from the first group in conn_name with the second group
-				connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
+				connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='v') # state='g' + conn_type[0])
 				
 				# define the actual synaptic connections and strengths
 				for feature in xrange(conv_features):
@@ -841,7 +840,7 @@ def build_network():
 
 			# create connections from the windows of the input group to the neuron population
 			input_connections[conn_name] = b.Connection(input_groups['Xe'], neuron_groups[name[1] + conn_type[1]], \
-									structure='sparse', state='g' + conn_type[0], delay=True, max_delay=delay[conn_type][1])
+									structure='sparse', state='v', delay=True, max_delay=delay[conn_type][1]) # 'g' + conn_type[0], delay=True, max_delay=delay[conn_type][1])
 			
 			if test_mode:
 				for feature in xrange(conv_features):
@@ -853,7 +852,7 @@ def build_network():
 				for feature in xrange(conv_features):
 					for n in xrange(n_e):
 						for idx in xrange(conv_size ** 2):
-							input_connections[conn_name][convolution_locations[n][idx], feature * n_e + n] = (b.random() + 0.01) * 0.3
+							input_connections[conn_name][convolution_locations[n][idx], feature * n_e + n] = (b.random() + 0.01) * 0.3 * wmax_ee
 
 			if test_mode:
 				if do_plot:
@@ -1340,23 +1339,24 @@ if __name__ == '__main__':
 	# weird and bad names for variables, I think
 	input_conn_names = [ 'ee_input' ]
 	recurrent_conn_names = [ 'ei', 'ie', 'ee' ]
-	
-	# setting weight, delay, and intensity parameters
-	if conv_size == 28 and conv_stride == 0:
-		weight['ee_input'] = (conv_size ** 2) * 0.15
-	else:
-		weight['ee_input'] = (conv_size ** 2) * 0.1625
+
 	delay['ee_input'] = (0 * b.ms, 10 * b.ms)
 	delay['ei_input'] = (0 * b.ms, 5 * b.ms)
 	input_intensity = start_input_intensity = 2.0
 
 	# time constants, learning rates, max weights, weight dependence, etc.
 	tc_pre_ee, tc_post_ee = 20 * b.ms, 20 * b.ms
-	nu_ee_pre, nu_ee_post = 0.0001, 0.01
+	wmax_ee = 0.0001
+	nu_ee_pre, nu_ee_post = 0.0001 * wmax_ee * 5.0, 0.01 * wmax_ee * 5.0
 	nu_AeAe_pre, nu_Ae_Ae_post = 0.1, 0.5
-	wmax_ee = 1.0
 	exp_ee_post = exp_ee_pre = 0.2
 	w_mu_pre, w_mu_post = 0.2, 0.2
+
+	# setting weight, delay, and intensity parameters
+	if conv_size == 28 and conv_stride == 0:
+		weight['ee_input'] = (conv_size ** 2) * 0.15 * wmax_ee
+	else:
+		weight['ee_input'] = (conv_size ** 2) * 0.1625 * wmax_ee
 
 	# setting up differential equations (depending on train / test mode)
 	if test_mode or not homeostasis:
@@ -1369,15 +1369,19 @@ if __name__ == '__main__':
 	offset = 20.0 * b.mV
 	v_thresh_e = '(v>(theta - offset + ' + str(v_thresh_e) + ')) * (timer>refrac_e)'
 
-	# equations for neurons
+	# # equations for neurons
+	# neuron_eqs_e = '''
+	# 		dv/dt = ((v_rest_e - v) + (I_synE + I_synI) / nS) / (100 * ms)  : volt
+	# 		I_synE = ge * nS *         -v                           : amp
+	# 		I_synI = gi * nS * (-100.*mV-v)                          : amp
+	# 		dge/dt = -ge/(1.0*ms)                                   : 1
+	# 		dgi/dt = -gi/(2.0*ms)                                  : 1
+	# 		'''
+
 	neuron_eqs_e = '''
-			dv/dt = ((v_rest_e - v) + (I_synE + I_synI) / nS) / (100 * ms)  : volt
-			I_synE = ge * nS *         -v                           : amp
-			I_synI = gi * nS * (-100.*mV-v)                          : amp
-			dge/dt = -ge/(1.0*ms)                                   : 1
-			dgi/dt = -gi/(2.0*ms)                                  : 1
+			dv/dt = (v_rest_e - v) / (100 * ms) : volt
 			'''
-			
+
 	if test_mode or not homeostasis:
 		neuron_eqs_e += '\n  theta      :volt'
 	else:
@@ -1385,12 +1389,16 @@ if __name__ == '__main__':
 
 	neuron_eqs_e += '\n  dtimer/dt = 100.0 : ms'
 
+	# neuron_eqs_i = '''
+	# 		dv/dt = ((v_rest_i - v) + (I_synE + I_synI) / nS) / (10*ms)  : volt
+	# 		I_synE = ge * nS *         -v                           : amp
+	# 		I_synI = gi * nS * (-85.*mV-v)                          : amp
+	# 		dge/dt = -ge/(1.0*ms)                                   : 1
+	# 		dgi/dt = -gi/(2.0*ms)                                  : 1
+	# 		'''
+
 	neuron_eqs_i = '''
-			dv/dt = ((v_rest_i - v) + (I_synE + I_synI) / nS) / (10*ms)  : volt
-			I_synE = ge * nS *         -v                           : amp
-			I_synI = gi * nS * (-85.*mV-v)                          : amp
-			dge/dt = -ge/(1.0*ms)                                   : 1
-			dgi/dt = -gi/(2.0*ms)                                  : 1
+			dv/dt = (v_rest_i - v) / (10 * ms) : volt
 			'''
 
 	# STDP synaptic traces
