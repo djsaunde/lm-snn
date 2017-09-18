@@ -95,17 +95,6 @@ def normalize_weights():
 				dense_weights[convolution_locations[n]] *= column_factors[n]
 				input_connections[conn_name][:, feature * n_e + n] = dense_weights
 
-	# for conn_name in connections:
-	# 	if 'AeAe' in conn_name and lattice_structure != 'none' and lattice_structure != 'none':
-	# 		connection = connections[conn_name][:].todense()
-	# 		for feature in xrange(conv_features):
-	# 			feature_connection = connection[feature * n_e : (feature + 1) * n_e, :]
-	# 			column_sums = np.sum(feature_connection)
-	# 			column_factors = weight['ee_recurr'] / column_sums
-
-	# 			for idx in xrange(feature * n_e, (feature + 1) * n_e):
-	# 				connections[conn_name][idx, :] *= column_factors
-
 
 def plot_input(rates):
 	'''
@@ -1215,7 +1204,7 @@ if __name__ == '__main__':
 	parser.add_argument('--neighborhood', type=str, default='8', help='The structure of neighborhood not to inhibit on firing. One of "4", "8".')
 	parser.add_argument('--inhib_scheme', type=str, default='strengthen', help='The scheme with which one excitatory neuron\'s firing activity \
 																			inhibits others. One of "far", "increasing".')
-	parser.add_argument('--inhib_const', type=float, default=2.5, help='A constant which controls how quickly inhibition strengthens \
+	parser.add_argument('--inhib_const', type=float, default=5.0, help='A constant which controls how quickly inhibition strengthens \
 																			between two neurons as their relative distance increases.')
 	parser.add_argument('--strengthen_const', type=float, default=0.1, help='A constant which controls how much weights learned in \
 																		one iteration are added to neighboring excitatory neurons\' weights.')
@@ -1311,7 +1300,7 @@ if __name__ == '__main__':
 
 	# time (in seconds) per data example presentation and rest period in between, used to calculate total runtime
 	single_example_time = 0.35 * b.second
-	resting_time = 0.15 * b.second
+	resting_time = 0.35 * b.second
 	runtime = num_examples * (single_example_time + resting_time)
 
 	# set the update interval
@@ -1369,15 +1358,6 @@ if __name__ == '__main__':
 	offset = 20.0 * b.mV
 	v_thresh_e = '(v>(theta - offset + ' + str(v_thresh_e) + ')) * (timer>refrac_e)'
 
-	# # equations for neurons
-	# neuron_eqs_e = '''
-	# 		dv/dt = ((v_rest_e - v) + (I_synE + I_synI) / nS) / (100 * ms)  : volt
-	# 		I_synE = ge * nS *         -v                           : amp
-	# 		I_synI = gi * nS * (-100.*mV-v)                          : amp
-	# 		dge/dt = -ge/(1.0*ms)                                   : 1
-	# 		dgi/dt = -gi/(2.0*ms)                                  : 1
-	# 		'''
-
 	neuron_eqs_e = '''
 			dv/dt = (v_rest_e - v) / (100 * ms) : volt
 			'''
@@ -1388,14 +1368,6 @@ if __name__ == '__main__':
 		neuron_eqs_e += '\n  dtheta/dt = -theta / (tc_theta)  : volt'
 
 	neuron_eqs_e += '\n  dtimer/dt = 100.0 : ms'
-
-	# neuron_eqs_i = '''
-	# 		dv/dt = ((v_rest_i - v) + (I_synE + I_synI) / nS) / (10*ms)  : volt
-	# 		I_synE = ge * nS *         -v                           : amp
-	# 		I_synI = gi * nS * (-85.*mV-v)                          : amp
-	# 		dge/dt = -ge/(1.0*ms)                                   : 1
-	# 		dgi/dt = -gi/(2.0*ms)                                  : 1
-	# 		'''
 
 	neuron_eqs_i = '''
 			dv/dt = (v_rest_i - v) / (10 * ms) : volt

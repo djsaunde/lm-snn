@@ -95,16 +95,16 @@ def normalize_weights():
 				dense_weights[convolution_locations[n]] *= column_factors[n]
 				input_connections[conn_name][:, feature * n_e + n] = dense_weights
 
-	# for conn_name in connections:
-	# 	if 'AeAe' in conn_name and lattice_structure != 'none' and lattice_structure != 'none':
-	# 		connection = connections[conn_name][:].todense()
-	# 		for feature in xrange(conv_features):
-	# 			feature_connection = connection[feature * n_e : (feature + 1) * n_e, :]
-	# 			column_sums = np.sum(feature_connection)
-	# 			column_factors = weight['ee_recurr'] / column_sums
+	for conn_name in connections:
+		if 'AeAe' in conn_name and exc_stdp:
+			connection = connections[conn_name][:].todense()
+			for feature in xrange(conv_features):
+				feature_connection = connection[feature * n_e : (feature + 1) * n_e, :]
+				column_sums = np.sum(feature_connection)
+				column_factors = weight['ee_recurr'] / column_sums
 
-	# 			for idx in xrange(feature * n_e, (feature + 1) * n_e):
-	# 				connections[conn_name][idx, :] *= column_factors
+				for idx in xrange(feature * n_e, (feature + 1) * n_e):
+					connections[conn_name][idx, :] *= column_factors
 
 
 def plot_input(rates):
@@ -694,9 +694,7 @@ def build_network():
 						for other_feature in xrange(conv_features):
 							if feature != other_feature:
 								for n in xrange(n_e):
-									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = \
-													min(max_inhib, inhib_const * np.sqrt(euclidean([x, y], [x_, y_])))
-
+									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = max_inhib
 					else:
 						raise Exception('Expecting one of "far", "increasing", "strengthen", or "constant" for argument "inhib_scheme".')
 
@@ -756,7 +754,7 @@ def build_network():
 		# if STDP from excitatory -> excitatory is on and this connection is excitatory -> excitatory
 		if exc_stdp and 'ee' in recurrent_conn_names and not test_mode:
 			stdp_methods[name + 'e' + name + 'e'] = b.STDP(connections[name + 'e' + name + 'e'], \
-							eqs=eqs_stdp_ee, pre=eqs_stdp_pre_ee, post=eqs_stdp_post_ee, wmin=0., wmax=wmax_AeAe)
+							eqs=eqs_stdp_ee, pre='pre = 1.; w -= 0.001 * post', post='w += 0.1 * pre; post = 1.', wmin=0., wmax=wmax_AeAe)
 
 		print '...Creating monitors for:', name
 
@@ -815,6 +813,9 @@ def build_network():
 	# setting up parameters for weight normalization between patches
 	num_lattice_connections = sum([ len(value) for value in lattice_locations.values() ])
 	weight['ee_recurr'] = (num_lattice_connections / conv_features) * 0.15
+
+	if exc_stdp:
+		weight['ee_recurr'] = (conv_features - 1) * 0.15 * wmax_AeAe
 
 	# creating Poission spike train from input image (784 vector, 28x28 image)
 	for name in input_population_names:
@@ -1117,8 +1118,6 @@ def run_simulation():
 	# ensure weights don't grow without bound
 	normalize_weights()
 
-
-
 	print '\n'
 
 
@@ -1223,7 +1222,7 @@ if __name__ == '__main__':
 	parser.add_argument('--noise', type=str, default='False', help='Whether or not to add Gaussian noise to input images.')
 	parser.add_argument('--noise_const', type=float, default=0.1, help='A constant which gives the mean of the Gaussian noise \
 																			added to the input images (fraction of maximum firing rate.')
-	parser.add_argument('--save_weights', type=str, default='False', help='Whether osdfaasdffasd not to save the weights of the model every `weight_update_interval`.')
+	parser.add_argument('--save_weights', type=str, default='False', help='Whether or not to save the weights of the model every `weight_update_interval`.')
 	parser.add_argument('--homeostasis', type=str, default='True', help='Whether or not to use the homeostasis mechanism.')
 	parser.add_argument('--weight_update_interval', type=int, default=10, help='How often to update the plot of network filter weights.')
 	parser.add_argument('--save_best_model', type=str, default='True', help='Whether to save the current best version of the model.')
@@ -1395,6 +1394,11 @@ if __name__ == '__main__':
 
 	# STDP synaptic traces
 	eqs_stdp_ee = '''
+				dpre/dt = -pre / tc_pre_ee : 1.0
+				dpost/dt = -post / tc_post_ee : 1.0
+				'''
+
+	eqs_stdp_AeAe = '''
 				dpre/dt = -pre / tc_pre_ee : 1.0
 				dpost/dt = -post / tc_post_ee : 1.0
 				'''
