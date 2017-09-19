@@ -270,7 +270,8 @@ def get_patch_weights():
 				for this_n in xrange(n_e):
 					for other_n in xrange(n_e):
 						if is_lattice_connection(n_e_sqrt, this_n, other_n, lattice_structure):
-							rearranged_weights[feature * n_e + this_n, other_feature * n_e + other_n] = connection[feature * n_e + this_n, other_feature * n_e + other_n]
+							rearranged_weights[feature * n_e + this_n, other_feature * n_e + other_n] = \
+										connection[feature * n_e + this_n, other_feature * n_e + other_n]
 
 	return rearranged_weights
 
@@ -1312,7 +1313,7 @@ if __name__ == '__main__':
 	features_sqrt = int(math.ceil(math.sqrt(conv_features)))
 
 	# time (in seconds) per data example presentation and rest period in between, used to calculate total runtime
-	single_example_time = 0.25 * b.second
+	single_example_time = 0.35 * b.second
 	resting_time = 0.15 * b.second
 	runtime = num_examples * (single_example_time + resting_time)
 
