@@ -21,4 +21,5 @@ slurm*
 inhibition_job*
 !requirements.txt
 results/*
+data/cifar-10-batches-py/*
 *.pyc
