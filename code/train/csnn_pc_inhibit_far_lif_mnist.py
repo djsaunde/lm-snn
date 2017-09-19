@@ -679,6 +679,29 @@ def build_network():
 									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = \
 													- min(max_inhib * wmax_ee, wmax_ee * inhib_const * np.sqrt(euclidean([x, y], [x_, y_])))
 
+					elif inhib_scheme in ['mexican_hat', 'mexican_hat_strengthen']:
+						for other_feature in xrange(conv_features):
+							if n_e == 1:
+								x, y = feature // np.sqrt(n_e_total), feature % np.sqrt(n_e_total)
+								x_, y_ = other_feature // np.sqrt(n_e_total), other_feature % np.sqrt(n_e_total)
+							else:
+								x, y = feature // np.sqrt(conv_features), feature % np.sqrt(conv_features)
+								x_, y_ = other_feature // np.sqrt(conv_features), other_feature % np.sqrt(conv_features)
+
+							if feature != other_feature:
+								for n in xrange(n_e):
+									print '1.', np.sqrt(euclidean([x, y], [x_, y_])) / \
+													np.sqrt(euclidean([0, 0], [features_sqrt, features_sqrt]))
+
+									normed_distance = np.sqrt(euclidean([x, y], [x_, y_])) / np.sqrt(euclidean([0, 0], [features_sqrt, features_sqrt]))
+
+									print '2.', inhib_const * (1.0 - 2.0 * (np.pi ** 2) * (normed_distance ** 2)) * \
+																np.exp(-(np.pi ** 2) * (normed_distance ** 2))
+
+									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = \
+											inhib_const * (1.0 - 2.0 * (np.pi ** 2) * (normed_distance ** 2)) * \
+												np.exp(-(np.pi ** 2) * (normed_distance ** 2))
+
 					elif inhib_scheme == 'constant':
 						for other_feature in xrange(conv_features):
 							if feature != other_feature:
@@ -686,7 +709,8 @@ def build_network():
 									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = - inhib_const * wmax_ee
 
 					else:
-						raise Exception('Expecting one of "far", "increasing", "strengthen", or "constant" for argument "inhib_scheme".')
+						raise Exception('Expecting one of "far", "increasing", "strengthen", "mexican_hat", \
+										"strengthen_mexican_hat", or "constant" for argument "inhib_scheme".')
 
 			elif conn_type == 'ee' and exc_stdp:
 				# create connection name (composed of population and connection types)
@@ -1016,15 +1040,13 @@ def run_simulation():
 				input_groups[name + 'e'].rate = 0
 
 			# let the network relax back to equilibrium
-			if homeostasis:
+			if homeostasis and not reset_state_vars:
 				b.run(resting_time)
 			else:
-				for connection in connections:
-					connections[connection].reinit()
-				for input_connection in input_connections:
-					input_connections[input_connection].reinit()
-				for group in neuron_groups:
-					neuron_groups[group].reinit()
+				for neuron_group in neuron_groups:
+					neuron_groups[neuron_group].v = v_reset_e
+					neuron_groups[neuron_group].ge = 0
+					neuron_groups[neuron_group].gi = 0
 		
 		# otherwise, record results and continue simulation
 		else:			
@@ -1087,16 +1109,14 @@ def run_simulation():
 			for name in input_population_names:
 				input_groups[name + 'e'].rate = 0
 			
-			# run the network for 'resting_time' to relax back to rest potentials
-			if homeostasis:
+			# let the network relax back to equilibrium
+			if homeostasis and not reset_state_vars:
 				b.run(resting_time)
 			else:
-				for connection in connections:
-					connections[connection].reinit()
-				for input_connection in input_connections:
-					input_connections[input_connection].reinit()
-				for group in neuron_groups:
-					neuron_groups[group].reinit()
+				for neuron_group in neuron_groups:
+					neuron_groups[neuron_group].v = v_reset_e
+					neuron_groups[neuron_group].ge = 0
+					neuron_groups[neuron_group].gi = 0
 
 			# bookkeeping
 			input_intensity = start_input_intensity
@@ -1104,8 +1124,6 @@ def run_simulation():
 
 	# ensure weights don't grow without bound
 	normalize_weights()
-
-
 
 	print '\n'
 
@@ -1117,12 +1135,6 @@ def save_results():
 	print '...Saving results'
 
 	if not test_mode:
-
-
-		# save_connections(weights_dir, connections, input_connections, ending, num_examples)
-		# save_theta(weights_dir, population_names, neuron_groups, ending)
-
-
 		save_connections(end_weights_dir, connections, input_connections, ending, 'end')
 		save_theta(end_weights_dir, population_names, neuron_groups, ending, 'end')
 
@@ -1227,6 +1239,7 @@ if __name__ == '__main__':
 	parser.add_argument('--excite_scheme', type=str, default='all', help='The scheme with which one excitatory neuron excites other excitatory neurons.')
 	parser.add_argument('--wmax_AeAe', type=float, default=10.0, help='The max weight on synapses between any two connected excitatory neurons.')
 	parser.add_argument('--max_inhib', type=float, default=17.4, help='The maximum synapse weight for inhibitory to excitatory connections.')
+	parser.add_argument('--reset_state_vars', type=str, default='False', help='Whether to reset neuron / synapse state variables or run a "reset" period.')
 
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
@@ -1239,7 +1252,7 @@ if __name__ == '__main__':
 
 	print '\n'
 
-	for var in [ 'do_plot', 'sort_euclidean', 'reduced_dataset', 'noise', 'plot_all_deltas', 'exc_stdp', \
+	for var in [ 'do_plot', 'sort_euclidean', 'reduced_dataset', 'noise', 'plot_all_deltas', 'exc_stdp', 'reset_state_vars', \
 					'save_weights', 'homeostasis', 'save_best_model', 'accumulate_votes', 'test_remove_inhibition' ]:
 		if locals()[var] == 'True':
 			locals()[var] = True
@@ -1299,8 +1312,8 @@ if __name__ == '__main__':
 	features_sqrt = int(math.ceil(math.sqrt(conv_features)))
 
 	# time (in seconds) per data example presentation and rest period in between, used to calculate total runtime
-	single_example_time = 0.35 * b.second
-	resting_time = 0.35 * b.second
+	single_example_time = 0.25 * b.second
+	resting_time = 0.15 * b.second
 	runtime = num_examples * (single_example_time + resting_time)
 
 	# set the update interval
@@ -1431,10 +1444,10 @@ if __name__ == '__main__':
 				else:
 					raise Exception('Expecting one of "8" or "4" for argument "neighborhood".')
 
-			elif inhib_scheme in [ 'increasing', 'constant' ]:
+			elif inhib_scheme in [ 'increasing', 'constant', 'mexican_hat' ]:
 				pass
 
-			elif inhib_scheme == 'strengthen':
+			elif inhib_scheme in ['strengthen', 'mexican_hat_strengthen']:
 				if neighborhood == '8':
 					if feature != other_feature and euclidean([x, y], [x_, y_]) >= 2.0:
 						neighbor_mapping[feature].remove(other_feature)

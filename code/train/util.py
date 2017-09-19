@@ -9,6 +9,7 @@ from struct import unpack
 
 top_level_path = os.path.join('..', '..')
 MNIST_data_path = os.path.join(top_level_path, 'data')
+CIFAR10_data_path = os.path.join(top_level_path, 'data', 'cifar-10-batches-py')
 
 
 def get_labeled_data(pickle_name, train=True, reduced_dataset=False, classes=range(10), examples_per_class=100):
@@ -84,6 +85,36 @@ def get_labeled_data(pickle_name, train=True, reduced_dataset=False, classes=ran
 		data = {'x': x, 'y': y, 'rows': rows, 'cols': cols}
 
 		p.dump(data, open("%s.pickle" % pickle_name, "wb"))
+
+	return data
+
+
+def get_labeled_CIFAR10_data(train=True, single_channel=True):
+	data = {}
+	if train:
+		files = ['data_batch_1', 'data_batch_2', 'data_batch_3', 'data_batch_4', 'data_batch_5']
+	else:
+		files = ['test_batch']
+	
+	for idx, file in enumerate(files):
+		with open(os.path.join(CIFAR10_data_path, file), 'rb') as open_file:
+			if idx == 0:
+				data = p.load(open_file)
+
+				del data['batch_label']
+				del data['filenames']
+			else:
+				temp_data = p.load(open_file)
+
+				data['data'] = np.vstack([data['data'], temp_data['data']])
+				data['labels'] = np.hstack([data['labels'], temp_data['labels']])
+
+	if single_channel:
+		data['data'] = np.reshape(data['data'], (data['data'].shape[0], 3, 1024))
+		data['data'] = np.mean(data['data'], axis=1)
+		data['data'] = data['data'].reshape((data['data'].shape[0], 32, 32))
+	else:
+		data['data'] = data['data'].reshape((data['data'].shape[0], 3, 32, 32))
 
 	return data
 

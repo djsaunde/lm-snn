@@ -1029,15 +1029,13 @@ def run_simulation():
 				input_groups[name + 'e'].rate = 0
 
 			# let the network relax back to equilibrium
-			if homeostasis:
+			if homeostasis and not reset_state_vars:
 				b.run(resting_time)
 			else:
-				for connection in connections:
-					connections[connection].reinit()
-				for input_connection in input_connections:
-					input_connections[input_connection].reinit()
-				for group in neuron_groups:
-					neuron_groups[group].reinit()
+				for neuron_group in neuron_groups:
+					neuron_groups[neuron_group].v = v_reset_e
+					neuron_groups[neuron_group].ge = 0
+					neuron_groups[neuron_group].gi = 0
 		
 		# otherwise, record results and continue simulation
 		else:			
@@ -1063,7 +1061,7 @@ def run_simulation():
 					update_all_deltas_plot(lines, all_deltas, j, all_deltas_figure)
 			
 			# plot performance if appropriate
-			if (j % update_interval == 0 or j== num_examples-1 ) and j > 0:
+			if (j % update_interval == 0 or j == num_examples - 1) and j > 0:
 
 				if not test_mode and do_plot:
 					# updating the performance plot
@@ -1101,15 +1099,13 @@ def run_simulation():
 				input_groups[name + 'e'].rate = 0
 			
 			# run the network for 'resting_time' to relax back to rest potentials
-			if homeostasis:
+			if homeostasis and not reset_state_vars:
 				b.run(resting_time)
 			else:
-				for connection in connections:
-					connections[connection].reinit()
-				for input_connection in input_connections:
-					input_connections[input_connection].reinit()
-				for group in neuron_groups:
-					neuron_groups[group].reinit()
+				for neuron_group in neuron_groups:
+					neuron_groups[neuron_group].v = v_reset_e
+					neuron_groups[neuron_group].ge = 0
+					neuron_groups[neuron_group].gi = 0
 
 			# bookkeeping
 			input_intensity = start_input_intensity
@@ -1238,6 +1234,7 @@ if __name__ == '__main__':
 	parser.add_argument('--excite_scheme', type=str, default='all', help='The scheme with which one excitatory neuron excites other excitatory neurons.')
 	parser.add_argument('--wmax_AeAe', type=float, default=10.0, help='The max weight on synapses between any two connected excitatory neurons.')
 	parser.add_argument('--max_inhib', type=float, default=17.4, help='The maximum synapse weight for inhibitory to excitatory connections.')
+	parser.add_argument('--reset_state_vars', type=str, default='False', help='Whether to reset neuron / synapse state variables or run a "reset" period.')
 
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
@@ -1250,7 +1247,7 @@ if __name__ == '__main__':
 
 	print '\n'
 
-	for var in [ 'do_plot', 'sort_euclidean', 'reduced_dataset', 'noise', 'plot_all_deltas', 'exc_stdp', \
+	for var in [ 'do_plot', 'sort_euclidean', 'reduced_dataset', 'noise', 'plot_all_deltas', 'exc_stdp', 'reset_state_vars', \
 					'save_weights', 'homeostasis', 'save_best_model', 'accumulate_votes', 'test_remove_inhibition' ]:
 		if locals()[var] == 'True':
 			locals()[var] = True
@@ -1345,6 +1342,7 @@ if __name__ == '__main__':
 		weight['ee_input'] = (conv_size ** 2) * 0.15
 	else:
 		weight['ee_input'] = (conv_size ** 2) * 0.1625
+
 	delay['ee_input'] = (0 * b.ms, 10 * b.ms)
 	delay['ei_input'] = (0 * b.ms, 5 * b.ms)
 	input_intensity = start_input_intensity = 2.0
