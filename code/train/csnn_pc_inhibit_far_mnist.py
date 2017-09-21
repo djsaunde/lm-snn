@@ -721,7 +721,7 @@ def build_network():
 									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = \
 																weight_matrix[feature * n_e + n, other_feature * n_e + n]
 								else:
-									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = b.random() + 0.01 * 0.1 * wmax_AeAe
+									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = b.random() + 0.01 * 0.1 * wmax_exc
 
 					elif excite_scheme == 'all':
 						for other_feature in xrange(conv_features):
@@ -731,7 +731,7 @@ def build_network():
 										connections[conn_name][feature * n_e + n, other_feature * n_e + n] = \
 																	weight_matrix[feature * n_e + n, other_feature * n_e + n]
 									else:
-										connections[conn_name][feature * n_e + n, other_feature * n_e + n] = b.random() + 0.01 * 0.1 * wmax_AeAe								
+										connections[conn_name][feature * n_e + n, other_feature * n_e + n] = b.random() + 0.01 * 0.1 * wmax_exc								
 
 					elif excite_scheme == 'decreasing':
 						for other_feature in xrange(conv_features):
@@ -746,7 +746,7 @@ def build_network():
 								for n in xrange(n_e):
 									# needs rethinking!
 									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = \
-													min(wmax_AeAe, np.sqrt(euclidean([x, y], [x_, y_])))
+													min(wmax_exc, np.sqrt(euclidean([x, y], [x_, y_])))
 
 					else:
 						raise Exception('Expecting one of "near" or "decreasing" for argument "excite_scheme".')
@@ -754,7 +754,7 @@ def build_network():
 		# if STDP from excitatory -> excitatory is on and this connection is excitatory -> excitatory
 		if exc_stdp and 'ee' in recurrent_conn_names and not test_mode:
 			stdp_methods[name + 'e' + name + 'e'] = b.STDP(connections[name + 'e' + name + 'e'], \
-							eqs=eqs_stdp_ee, pre='pre = 1.; w -= 0.001 * post', post='w += 0.1 * pre; post = 1.', wmin=0., wmax=wmax_AeAe)
+							eqs=eqs_stdp_ee, pre='pre = 1.; w -= 0.001 * post', post='w += 0.1 * pre; post = 1.', wmin=0., wmax=wmax_exc)
 
 		print '...Creating monitors for:', name
 
@@ -815,7 +815,7 @@ def build_network():
 	weight['ee_recurr'] = (num_lattice_connections / conv_features) * 0.15
 
 	if exc_stdp:
-		weight['ee_recurr'] = (conv_features - 1) * 0.15 * wmax_AeAe
+		weight['ee_recurr'] = (conv_features - 1) * 0.15 * wmax_exc
 
 	# creating Poission spike train from input image (784 vector, 28x28 image)
 	for name in input_population_names:
@@ -940,7 +940,7 @@ def run_train():
 
 		if exc_stdp:
 			if j == 0:
-				exc_weights_image = plt.matshow(connections['AeAe'][:].todense().T, cmap='binary', vmin=0, vmax=wmax_AeAe)
+				exc_weights_image = plt.matshow(connections['AeAe'][:].todense().T, cmap='binary', vmin=0, vmax=wmax_exc)
 				plt.colorbar()
 				plt.title('Excitatory to excitatory weights')
 			else:
@@ -1126,14 +1126,11 @@ def run_test():
 		# sets the input firing rates
 		input_groups['Xe'].rate = rates.reshape(n_input)
 
-		# get weights before running the network for a single iteration
-		previous_weights = input_connections['XeAe'][:].todense()
-		
 		# run the network for a single example time
 		b.run(single_example_time)
 
 		if do_plot and exc_stdp and j == 0:
-				exc_weights_image = plt.matshow(connections['AeAe'][:].todense().T, cmap='binary', vmin=0, vmax=wmax_AeAe)
+				exc_weights_image = plt.matshow(connections['AeAe'][:].todense().T, cmap='binary', vmin=0, vmax=wmax_exc)
 				plt.colorbar()
 				plt.title('Excitatory to excitatory weights')
 
@@ -1303,11 +1300,11 @@ if __name__ == '__main__':
 	parser.add_argument('--accumulation_decay', type=float, default=0.75, help='How much to decay the influence of past spikes \
 																						on the labeling of the excitatory neurons.')
 	parser.add_argument('--plot_all_deltas', type=str, default='False', help='Whether or not to plot weight changes for all \
-																						synpases from input to excitatory layer.')
+																						synapses from input to excitatory layer.')
 	parser.add_argument('--test_remove_inhibition', type=str, default='False', help='Whether or not to remove lateral inhibition during the test phase.')
 	parser.add_argument('--exc_stdp', type=str, default='False', help='Whether to use STDP synapses between neurons in the excitatory layer.')
 	parser.add_argument('--excite_scheme', type=str, default='all', help='The scheme with which one excitatory neuron excites other excitatory neurons.')
-	parser.add_argument('--wmax_AeAe', type=float, default=10.0, help='The max weight on synapses between any two connected excitatory neurons.')
+	parser.add_argument('--wmax_exc', type=float, default=10.0, help='The max weight on synapses between any two connected excitatory neurons.')
 	parser.add_argument('--max_inhib', type=float, default=17.4, help='The maximum synapse weight for inhibitory to excitatory connections.')
 	parser.add_argument('--reset_state_vars', type=str, default='False', help='Whether to reset neuron / synapse state variables or run a "reset" period.')
 
@@ -1381,10 +1378,13 @@ if __name__ == '__main__':
 	n_i = n_e
 	features_sqrt = int(math.ceil(math.sqrt(conv_features)))
 
-	# time (in seconds) per data example presentation and rest period in between, used to calculate total runtime
-	single_example_time = 0.35 * b.second
-	resting_time = 0.15 * b.second
-	runtime = num_examples * (single_example_time + resting_time)
+	# time (in seconds) per data example presentation and rest period in between
+	if test_mode:
+		single_example_time = 0.5 * b.second
+		resting_time = 0.5 * b.second
+	else:
+		single_example_time = 0.35 * b.second
+		resting_time = 0.15 * b.second
 
 	# set the update interval
 	if test_mode:
