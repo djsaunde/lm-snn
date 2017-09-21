@@ -633,7 +633,8 @@ def build_network():
 				# create connection name (composed of population and connection types)
 				conn_name = name + conn_type[0] + name + conn_type[1]
 				# create a connection from the first group in conn_name with the second group
-				connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='v') # state='g' + conn_type[0])
+				connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], \
+						neuron_groups[conn_name[2:4]], structure='sparse', state='v', delay=5.0 * b.ms)
 				
 				# instantiate the created connection
 				for feature in xrange(conv_features):
@@ -644,17 +645,19 @@ def build_network():
 				# create connection name (composed of population and connection types)
 				conn_name = name + conn_type[0] + name + conn_type[1]
 				# create a connection from the first group in conn_name with the second group
-				connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='v') # state='g' + conn_type[0])
+				connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], \
+						neuron_groups[conn_name[2:4]], structure='sparse', state='v')
 				
 				# define the actual synaptic connections and strengths
 				for feature in xrange(conv_features):
-					if inhib_scheme in ['far', 'strengthen']:
+					if inhib_scheme == 'far':
 						for other_feature in set(range(conv_features)) - set(neighbor_mapping[feature]):
-							if inhib_scheme == 'far':
-								for n in xrange(n_e):
-									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = max_inhib * wmax_ee
+							for n in xrange(n_e):
+								connections[conn_name][feature * n_e + n, other_feature * n_e + n] = max_inhib * wmax_ee
 
-							elif inhib_scheme == 'strengthen':
+					elif inhib_scheme in [ 'strengthen', 'increasing', 'mexican_hat', 'mexican_hat_strengthen' ]:
+						for other_feature in xrange(conv_features):
+							if feature != other_feature:
 								if n_e == 1:
 									x, y = feature // np.sqrt(n_e_total), feature % np.sqrt(n_e_total)
 									x_, y_ = other_feature // np.sqrt(n_e_total), other_feature % np.sqrt(n_e_total)
@@ -663,45 +666,22 @@ def build_network():
 									x_, y_ = other_feature // np.sqrt(conv_features), other_feature % np.sqrt(conv_features)
 
 								for n in xrange(n_e):
-									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = \
-													- min(max_inhib * wmax_ee, wmax_ee * inhib_const * np.sqrt(euclidean([x, y], [x_, y_])))
+									if inhib_scheme in [ 'strengthen', 'increasing' ]:
+										connections[conn_name][feature * n_e + n, other_feature * n_e + n] = \
+												- min(max_inhib * wmax_ee, wmax_ee * inhib_const * np.sqrt(euclidean([x, y], [x_, y_])))
 
-					elif inhib_scheme == 'increasing':
-						for other_feature in xrange(conv_features):
-							if n_e == 1:
-								x, y = feature // np.sqrt(n_e_total), feature % np.sqrt(n_e_total)
-								x_, y_ = other_feature // np.sqrt(n_e_total), other_feature % np.sqrt(n_e_total)
-							else:
-								x, y = feature // np.sqrt(conv_features), feature % np.sqrt(conv_features)
-								x_, y_ = other_feature // np.sqrt(conv_features), other_feature % np.sqrt(conv_features)
-
-							if feature != other_feature:
-								for n in xrange(n_e):
-									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = \
-													- min(max_inhib * wmax_ee, wmax_ee * inhib_const * np.sqrt(euclidean([x, y], [x_, y_])))
-
-					elif inhib_scheme in ['mexican_hat', 'mexican_hat_strengthen']:
-						for other_feature in xrange(conv_features):
-							if n_e == 1:
-								x, y = feature // np.sqrt(n_e_total), feature % np.sqrt(n_e_total)
-								x_, y_ = other_feature // np.sqrt(n_e_total), other_feature % np.sqrt(n_e_total)
-							else:
-								x, y = feature // np.sqrt(conv_features), feature % np.sqrt(conv_features)
-								x_, y_ = other_feature // np.sqrt(conv_features), other_feature % np.sqrt(conv_features)
-
-							if feature != other_feature:
-								for n in xrange(n_e):
-									print '1.', np.sqrt(euclidean([x, y], [x_, y_])) / \
+									elif inhib_scheme in [ 'mexican_hat', 'mexican_hat_strengthen' ]:
+										print '1.', np.sqrt(euclidean([x, y], [x_, y_])) / \
 													np.sqrt(euclidean([0, 0], [features_sqrt, features_sqrt]))
 
-									normed_distance = np.sqrt(euclidean([x, y], [x_, y_])) / np.sqrt(euclidean([0, 0], [features_sqrt, features_sqrt]))
+										normed_distance = np.sqrt(euclidean([x, y], [x_, y_])) / np.sqrt(euclidean([0, 0], [features_sqrt, features_sqrt]))
 
-									print '2.', inhib_const * (1.0 - 2.0 * (np.pi ** 2) * (normed_distance ** 2)) * \
-																np.exp(-(np.pi ** 2) * (normed_distance ** 2))
+										print '2.', inhib_const * (1.0 - 2.0 * (np.pi ** 2) * (normed_distance ** 2)) * \
+																	np.exp(-(np.pi ** 2) * (normed_distance ** 2))
 
-									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = \
-											inhib_const * (1.0 - 2.0 * (np.pi ** 2) * (normed_distance ** 2)) * \
-												np.exp(-(np.pi ** 2) * (normed_distance ** 2))
+										connections[conn_name][feature * n_e + n, other_feature * n_e + n] = \
+												inhib_const * (1.0 - 2.0 * (np.pi ** 2) * (normed_distance ** 2)) * \
+													np.exp(-(np.pi ** 2) * (normed_distance ** 2))
 
 					elif inhib_scheme == 'constant':
 						for other_feature in xrange(conv_features):
@@ -1240,7 +1220,7 @@ if __name__ == '__main__':
 	parser.add_argument('--excite_scheme', type=str, default='all', help='The scheme with which one excitatory neuron excites other excitatory neurons.')
 	parser.add_argument('--wmax_AeAe', type=float, default=10.0, help='The max weight on synapses between any two connected excitatory neurons.')
 	parser.add_argument('--max_inhib', type=float, default=17.4, help='The maximum synapse weight for inhibitory to excitatory connections.')
-	parser.add_argument('--reset_state_vars', type=str, default='False', help='Whether to reset neuron / synapse state variables or run a "reset" period.')
+	parser.add_argument('--reset_state_vars', type=str, default='True', help='Whether to reset neuron / synapse state variables or run a "reset" period.')
 
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
@@ -1313,7 +1293,7 @@ if __name__ == '__main__':
 	features_sqrt = int(math.ceil(math.sqrt(conv_features)))
 
 	# time (in seconds) per data example presentation and rest period in between, used to calculate total runtime
-	single_example_time = 0.35 * b.second
+	single_example_time = 0.25 * b.second
 	resting_time = 0.15 * b.second
 	runtime = num_examples * (single_example_time + resting_time)
 
@@ -1448,7 +1428,7 @@ if __name__ == '__main__':
 			elif inhib_scheme in [ 'increasing', 'constant', 'mexican_hat' ]:
 				pass
 
-			elif inhib_scheme in ['strengthen', 'mexican_hat_strengthen']:
+			elif inhib_scheme in ['strengthen', 'mexican_hat_strengthen' ]:
 				if neighborhood == '8':
 					if feature != other_feature and euclidean([x, y], [x_, y_]) >= 2.0:
 						neighbor_mapping[feature].remove(other_feature)
