@@ -834,7 +834,7 @@ def build_network():
 
 			# create connections from the windows of the input group to the neuron population
 			input_connections[conn_name] = b.Connection(input_groups['Xe'], neuron_groups[name[1] + conn_type[1]], \
-									structure='sparse', state='v', delay=True, max_delay=delay[conn_type][1]) # 'g' + conn_type[0], delay=True, max_delay=delay[conn_type][1])
+									structure='sparse', state='v', delay=True, max_delay=delay[conn_type][1])
 			
 			if test_mode:
 				for feature in xrange(conv_features):
@@ -1053,7 +1053,7 @@ def run_simulation():
 					update_all_deltas_plot(lines, all_deltas, j, all_deltas_figure)
 			
 			# plot performance if appropriate
-			if (j % update_interval == 0 or j== num_examples-1 ) and j > 0:
+			if (j % update_interval == 0 or j == num_examples - 1) and j > 0:
 
 				if not test_mode and do_plot:
 					# updating the performance plot
@@ -1197,7 +1197,7 @@ if __name__ == '__main__':
 	parser.add_argument('--neighborhood', type=str, default='8', help='The structure of neighborhood not to inhibit on firing. One of "4", "8".')
 	parser.add_argument('--inhib_scheme', type=str, default='strengthen', help='The scheme with which one excitatory neuron\'s firing activity \
 																			inhibits others. One of "far", "increasing".')
-	parser.add_argument('--inhib_const', type=float, default=5.0, help='A constant which controls how quickly inhibition strengthens \
+	parser.add_argument('--inhib_const', type=float, default=10.0, help='A constant which controls how quickly inhibition strengthens \
 																			between two neurons as their relative distance increases.')
 	parser.add_argument('--strengthen_const', type=float, default=0.1, help='A constant which controls how much weights learned in \
 																		one iteration are added to neighboring excitatory neurons\' weights.')
@@ -1272,10 +1272,7 @@ if __name__ == '__main__':
 	print 'Time needed to load data:', timeit.default_timer() - start
 
 	# set parameters for simulation based on train / test mode
-	if test_mode:
-		record_spikes = True
-	else:
-		record_spikes = True
+	record_spikes = True
 
 	# number of inputs to the network
 	n_input = 784
