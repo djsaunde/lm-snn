@@ -1097,6 +1097,7 @@ def run_test():
 				kmeans, kmeans_assignments, simple_clusters, simple_cluster_assignments, index_matrix, accumulated_rates, \
 				accumulated_inputs, spike_proportions
 
+	# plot grid of neuron digit assignments
 	if do_plot:
 		assignments_image = plot_assignments(assignments)
 		fig_num += 1
@@ -1111,23 +1112,36 @@ def run_test():
 	# initialize network
 	j = 0
 	num_retries = 0
+	tries = 3
 	b.run(0)
 
 	# start recording time
 	start_time = timeit.default_timer()
 
-	while j < num_examples:
+	while j < num_examples * tries:
+		if j % tries == 0:
+			winners = []
+
 		# get the firing rates of the next input example
 		if noise:
-			rates = (data['x'][j % data_size, :, :] / 8.0) * input_intensity + np.random.normal(loc=32.0 * noise_const, scale=1.0, size=(28, 28))
+			rates = (data['x'][(j // tries) % data_size, :, :] / 8.0) *input_intensity + \
+									np.random.normal(loc=32.0 * noise_const, scale=1.0, size=(28, 28))
 		else:
-			rates = (data['x'][j % data_size, :, :] / 8.0) * input_intensity
+			rates = (data['x'][(j // tries) % data_size, :, :] / 8.0) * input_intensity
 		
 		# sets the input firing rates
 		input_groups['Xe'].rate = rates.reshape(n_input)
 
+		actual_weights = input_connections['XeAe'][:]
+
+		if winners != []:
+			for winner in winners:
+				input_connections['XeAe'][:, winner] = 0.0 
+
 		# run the network for a single example time
 		b.run(single_example_time)
+
+		input_connections['XeAe'] = actual_weights
 
 		if do_plot and exc_stdp and j == 0:
 				exc_weights_image = plt.matshow(connections['AeAe'][:].todense().T, cmap='binary', vmin=0, vmax=wmax_exc)
@@ -1161,19 +1175,22 @@ def run_test():
 		else:			
 			num_retries = 0
 
+			# the "winner" is the neuron which spiked the most on the last iteration
+			winners.append(np.argmax(current_spike_count))
+
 			# record the current number of spikes
 			result_monitor[j % update_interval, :] = current_spike_count
 			
 			# get true label of the past input example
-			input_numbers[j] = data['y'][j % data_size][0]
+			input_numbers[j // tries] = data['y'][(j // tries) % data_size][0]
 			
 			# get the output classifications of the network
 			for scheme, outputs in predict_label(assignments, result_monitor[j % update_interval, :], accumulated_rates, spike_proportions).items():
-				output_numbers[scheme][j, :] = outputs
+				output_numbers[scheme][j // tries, :] = outputs
 
 			# print progress
 			if j % print_progress_interval == 0 and j > 0:
-				print 'runs done:', j, 'of', int(num_examples), '(time taken for past', print_progress_interval, 'runs:', str(timeit.default_timer() - start_time) + ')'
+				print 'runs done:', j, 'of', int(num_examples * tries), '(time taken for past', print_progress_interval, 'runs:', str(timeit.default_timer() - start_time) + ')'
 				start_time = timeit.default_timer()
 						
 			# set input firing rates back to zero
@@ -1222,17 +1239,31 @@ def evaluate_results():
 	'''
 	global update_interval
 
+	tries = 3
+
 	test_results = {}
 	for scheme in voting_schemes:
-		test_results[scheme] = np.zeros((10, num_examples))
+		test_results[scheme] = np.zeros((10, num_examples * tries))
 
 	print '\n...Calculating accuracy per voting scheme'
 
-	# for idx in xrange(end_time_testing - end_time_training):
-	for idx in xrange(num_examples):
-		label_rankings = predict_label(assignments, result_monitor[idx, :], accumulated_rates, spike_proportions)
+	for idx in xrange(0, num_examples * tries, tries):
+		label_rankings = np.zeros((tries, 10))
+		for try_idx in xrange(tries):
+			label_rankings[try_idx] = predict_label(assignments, result_monitor[idx + try_idx, :], accumulated_rates, spike_proportions)
+
+		print 'here.'
+
 		for scheme in voting_schemes:
-			test_results[scheme][:, idx] = label_rankings[scheme]
+			for try_idx in xrange(tries):
+				test_results[scheme][:, idx + try_idx] = label_rankings[try_idx][scheme]
+
+	mod_test_results = {}
+	for scheme in voting_schemes:
+		mod_test_results[scheme] = np.zeros((10, num_examples))
+
+	for idx in xrange(num_examples):
+		mod_test_results[scheme] = np.argmax(np.bincount(test_results[scheme][0, idx + try_idx]))
 
 	differences = { scheme : test_results[scheme][0, :] - input_numbers for scheme in voting_schemes }
 	correct = { scheme : len(np.where(differences[scheme] == 0)[0]) for scheme in voting_schemes }

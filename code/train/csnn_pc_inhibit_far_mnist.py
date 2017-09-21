@@ -1260,7 +1260,7 @@ if __name__ == '__main__':
 														"test" mode holds the weights fixed and evaluates classification accuracy on the test dataset.')
 	parser.add_argument('--connectivity', default='none', help='Between-patch connectivity: choose from "none", "pairs", "linear", and "full".')
 	parser.add_argument('--conv_size', type=int, default=28, help='Side length of the square convolution \
-														window used by the input -> excitatory layer of the network.')
+																			window used by the input -> excitatory layer of the network.')
 	parser.add_argument('--conv_stride', type=int, default=0, help='Horizontal, vertical stride \
 														of the convolution window used by the input -> excitatory layer of the network.')
 	parser.add_argument('--conv_features', type=int, default=100, help='Number of excitatory convolutional features / filters / patches used in the network.')
