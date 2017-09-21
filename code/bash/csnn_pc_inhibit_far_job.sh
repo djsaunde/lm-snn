@@ -11,6 +11,7 @@ conv_size=${2:-28}
 conv_stride=${3:-0}
 conv_features=${4:-100}
 lattice_structure=${5:-4}
+
 top_percent=${6:-10}
 num_train=${7:-10000}
 reduced_dataset=${8:-True}
@@ -32,6 +33,7 @@ python csnn_pc_inhibit_far_mnist.py --mode=train --connectivity=$connectivity --
 	--conv_stride=$conv_stride --conv_features=$conv_features --lattice_structure=$lattice_structure --top_percent=$top_percent \
 	--num_train=$num_train --reduced_dataset=$reduced_dataset --examples_per_class=$examples_per_class --neighborhood=$neighborhood \
 	--inhib_scheme=$inhib_scheme --inhib_const=$inhib_const --strengthen_const=$strengthen_const --noise=$noise --noise_const=$noise_const --random_seed=$random_seed
+
 python csnn_pc_inhibit_far_mnist.py --mode=test --connectivity=$connectivity --conv_size=$conv_size \
 	--conv_stride=$conv_stride --conv_features=$conv_features --lattice_structure=$lattice_structure --top_percent=$top_percent \
 	--num_train=$num_train --num_test=10000 --reduced_dataset=$reduced_dataset --examples_per_class=$examples_per_class --neighborhood=$neighborhood \

@@ -1,10 +1,15 @@
+*.zip
+*.DS_Store
+*.gz
 *.npy
 *ubyte
 *.pickle
 *.p
+*.dat
 *.txt
 *.pdf
 *.jpg
+*.png
 *.swp
 performance/*
 weights/*
@@ -13,6 +18,8 @@ plots/*
 random/*
 time_series/*
 slurm*
+inhibition_job*
 !requirements.txt
 results/*
+data/cifar-10-batches-py/*
 *.pyc

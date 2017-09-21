@@ -11,7 +11,7 @@ do
 	do
 		for strengthen_const in 0.01 0.1 0.175 0.25
 		do
-			sbatch csnn_pc_inhibit_far_job.sh none 28 0 $conv_features 4 10 $num_train $reduced_dataset 1000 8 $inhib_scheme $inhib_const $strengthen_const False 0.0 $random_seed
+			sh csnn_pc_inhibit_far_job.sh none 28 0 $conv_features 4 10 $num_train $reduced_dataset 1000 8 $inhib_scheme $inhib_const $strengthen_const False 0.0 $random_seed &
 		done
 	done
 done

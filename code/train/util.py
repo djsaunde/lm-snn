@@ -5,11 +5,11 @@ Supporting functions for use in training scripts.
 import cPickle as p
 import numpy as np
 import os
-
 from struct import unpack
 
 top_level_path = os.path.join('..', '..')
 MNIST_data_path = os.path.join(top_level_path, 'data')
+CIFAR10_data_path = os.path.join(top_level_path, 'data', 'cifar-10-batches-py')
 
 
 def get_labeled_data(pickle_name, train=True, reduced_dataset=False, classes=range(10), examples_per_class=100):
@@ -89,6 +89,36 @@ def get_labeled_data(pickle_name, train=True, reduced_dataset=False, classes=ran
 	return data
 
 
+def get_labeled_CIFAR10_data(train=True, single_channel=True):
+	data = {}
+	if train:
+		files = ['data_batch_1', 'data_batch_2', 'data_batch_3', 'data_batch_4', 'data_batch_5']
+	else:
+		files = ['test_batch']
+	
+	for idx, file in enumerate(files):
+		with open(os.path.join(CIFAR10_data_path, file), 'rb') as open_file:
+			if idx == 0:
+				data = p.load(open_file)
+
+				del data['batch_label']
+				del data['filenames']
+			else:
+				temp_data = p.load(open_file)
+
+				data['data'] = np.vstack([data['data'], temp_data['data']])
+				data['labels'] = np.hstack([data['labels'], temp_data['labels']])
+
+	if single_channel:
+		data['data'] = np.reshape(data['data'], (data['data'].shape[0], 3, 1024))
+		data['data'] = np.mean(data['data'], axis=1)
+		data['data'] = data['data'].reshape((data['data'].shape[0], 32, 32))
+	else:
+		data['data'] = data['data'].reshape((data['data'].shape[0], 3, 32, 32))
+
+	return data
+
+
 def is_lattice_connection(sqrt, i, j, lattice_structure):
 	'''
 	Boolean method which checks if two indices in a network correspond to neighboring nodes in a 4-, 8-, or all-lattice.
@@ -119,6 +149,7 @@ def save_connections(weights_dir, connections, input_connections, ending, suffix
 	connections.update(input_connections)
 
 	# save out each connection's parameters to disk
+
 	for connection_name in connections.keys():		
 		# get parameters of this connection
 		connection_matrix = connections[connection_name][:].todense()
@@ -126,7 +157,10 @@ def save_connections(weights_dir, connections, input_connections, ending, suffix
 		np.save(os.path.join(weights_dir, connection_name + '_' + ending + '_' + str(suffix)), connection_matrix)
 
 
+
+
 def save_theta(weights_dir, populations, neuron_groups, ending, suffix):
+
 	'''
 	Save the adaptive threshold parameters out to disk.
 	'''
@@ -135,3 +169,21 @@ def save_theta(weights_dir, populations, neuron_groups, ending, suffix):
 	for population in populations:
 		# save out the theta parameters to file
 		np.save(os.path.join(weights_dir, 'theta_' + population + '_' + ending + '_' + str(suffix)), neuron_groups[population + 'e'].theta)
+
+
+def save_assignments(weights_dir, assignments, ending, suffix):
+	'''
+	Save neuron class labels out to disk.
+	'''
+
+	# save the labels assigned to excitatory neurons out to disk
+	np.save(os.path.join(weights_dir, '_'.join(['assignments', ending, str(suffix)])), assignments)
+
+
+def save_accumulated_rates(weights_dir, accumulated_rates, ending, suffix):
+	'''
+	Save neuron class labels out to disk.
+	'''
+
+	# save the labels assigned to excitatory neurons out to disk
+	np.save(os.path.join(weights_dir, '_'.join(['accumulated_rates', ending, str(suffix)])), assignments)
