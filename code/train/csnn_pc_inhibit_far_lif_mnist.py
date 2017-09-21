@@ -1208,7 +1208,7 @@ if __name__ == '__main__':
 	parser.add_argument('--homeostasis', type=str, default='True', help='Whether or not to use the homeostasis mechanism.')
 	parser.add_argument('--weight_update_interval', type=int, default=10, help='How often to update the plot of network filter weights.')
 	parser.add_argument('--save_best_model', type=str, default='True', help='Whether to save the current best version of the model.')
-	parser.add_argument('--update_interval', type=int, default=100, help='How often to update neuron labels and classify new inputs.')
+	parser.add_argument('--update_interval', type=int, default=250, help='How often to update neuron labels and classify new inputs.')
 	parser.add_argument('--accumulate_votes', type=str, default='True', help='Whether to base neuron votes on all past spikes \
 																					or only on the spikes from the last "update_interval"')
 	parser.add_argument('--accumulation_decay', type=float, default=0.75, help='How much to decay the influence of past spikes \
