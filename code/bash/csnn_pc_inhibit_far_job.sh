@@ -4,6 +4,8 @@
 #SBATCH --time=01-00:00:00
 #SBATCH --mem=30000
 #SBATCH --account=rkozma
+#SBATCH --output=/mnt/nfs/work1/rkozma/djsaunde/stdp-mnist/code/bash/job_reports/%j.out
+
 connectivity=${1:-none}
 conv_size=${2:-28}
 conv_stride=${3:-0}
