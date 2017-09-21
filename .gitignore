@@ -23,3 +23,5 @@ inhibition_job*
 results/*
 data/cifar-10-batches-py/*
 *.pyc
+code/bash/job_reports/*
+*.out
