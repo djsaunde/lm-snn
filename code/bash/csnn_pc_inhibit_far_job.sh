@@ -11,7 +11,6 @@ conv_size=${2:-28}
 conv_stride=${3:-0}
 conv_features=${4:-100}
 lattice_structure=${5:-4}
-
 top_percent=${6:-10}
 num_train=${7:-10000}
 reduced_dataset=${8:-True}
@@ -23,6 +22,7 @@ strengthen_const=${13:-0.5}
 noise=${14:-True}
 noise_const=${15:-0.1}
 random_seed=${16:-42}
+reset_state_vars=${17:-True}
 
 cd ../train/
 
@@ -31,12 +31,12 @@ echo 1 $connectivity 2 $conv_size 3 $conv_stride 4 $conv_features 5 $lattice_str
 
 python csnn_pc_inhibit_far_mnist.py --mode=train --connectivity=$connectivity --conv_size=$conv_size \
 	--conv_stride=$conv_stride --conv_features=$conv_features --lattice_structure=$lattice_structure --top_percent=$top_percent \
-	--num_train=$num_train --reduced_dataset=$reduced_dataset --examples_per_class=$examples_per_class --neighborhood=$neighborhood \
+	--num_train=$num_train --reduced_dataset=$reduced_dataset --examples_per_class=$examples_per_class --neighborhood=$neighborhood --reset_state_vars=$reset_state_vars \
 	--inhib_scheme=$inhib_scheme --inhib_const=$inhib_const --strengthen_const=$strengthen_const --noise=$noise --noise_const=$noise_const --random_seed=$random_seed
 
 python csnn_pc_inhibit_far_mnist.py --mode=test --connectivity=$connectivity --conv_size=$conv_size \
 	--conv_stride=$conv_stride --conv_features=$conv_features --lattice_structure=$lattice_structure --top_percent=$top_percent \
-	--num_train=$num_train --num_test=10000 --reduced_dataset=$reduced_dataset --examples_per_class=$examples_per_class --neighborhood=$neighborhood \
+	--num_train=$num_train --num_test=10000 --reduced_dataset=$reduced_dataset --examples_per_class=$examples_per_class --neighborhood=$neighborhood --reset_state_vars=$reset_state_vars \
         --inhib_scheme=$inhib_scheme --inhib_const=$inhib_const --strengthen_const=$strengthen_const --noise=$noise --noise_const=$noise_const --random_seed=$random_seed
 
 exit
