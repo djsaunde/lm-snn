@@ -1309,6 +1309,7 @@ if __name__ == '__main__':
 	parser.add_argument('--homeostasis', type=str, default='True', help='Whether or not to use the homeostasis mechanism.')
 	parser.add_argument('--weight_update_interval', type=int, default=10, help='How often to update the plot of network filter weights.')
 	parser.add_argument('--save_best_model', type=str, default='True', help='Whether to save the current best version of the model.')
+	parser.add_argument('--load_best_model', type=str, default='True', help='Whether to load the best version of the model from training.')
 	parser.add_argument('--update_interval', type=int, default=250, help='How often to update neuron labels and classify new inputs.')
 	parser.add_argument('--accumulate_votes', type=str, default='True', help='Whether to base neuron votes on all past spikes \
 																					or only on the spikes from the last "update_interval"')
@@ -1335,7 +1336,7 @@ if __name__ == '__main__':
 	print '\n'
 
 	for var in [ 'do_plot', 'sort_euclidean', 'reduced_dataset', 'noise', 'plot_all_deltas', 'exc_stdp', 'reset_state_vars', \
-					'save_weights', 'homeostasis', 'save_best_model', 'accumulate_votes', 'test_remove_inhibition' ]:
+					'save_weights', 'homeostasis', 'save_best_model', 'accumulate_votes', 'test_remove_inhibition', 'load_best_model' ]:
 		if locals()[var] == 'True':
 			locals()[var] = True
 		elif locals()[var] == 'False':
@@ -1564,7 +1565,7 @@ if __name__ == '__main__':
 	rates = np.zeros((n_input_sqrt, n_input_sqrt))
 
 	if test_mode:
-		if save_best_model:
+		if load_best_model:
 			assignments = np.load(os.path.join(best_misc_dir, '_'.join(['assignments', ending, 'best.npy'])))
 			accumulated_rates = np.load(os.path.join(best_misc_dir, '_'.join(['accumulated_rates', ending, 'best.npy'])))
 			spike_proportions = np.load(os.path.join(best_misc_dir, '_'.join(['spike_proportions', ending, 'best.npy'])))

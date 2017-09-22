@@ -28,19 +28,24 @@ np.set_printoptions(threshold=np.nan, linewidth=200)
 b.log_level_error()
 
 model_name = 'csnn_pc_inhibit_far'
+
 best_weights_dir = os.path.join('..', '..', 'weights', model_name, 'best')
 best_misc_dir = os.path.join('..', '..', 'misc', model_name, 'best')
+confusion_histogram_dir = os.path.join('..', '..', 'confusion_histograms', model_name)
+
+if not os.path.isdir(confusion_histogram_dir):
+	os.makedirs(confusion_histogram_dir)
 
 filenames = [ filename for filename in os.listdir(best_weights_dir) if 'XeAe' in filename and 'True_0.75' in filename ]
 
 print '\n'.join([ str(idx + 1) + ' - ' + filename for idx, filename in enumerate(filenames) ])
 
 model_idx = int(raw_input('\nEnter the index of the model to view max firing of: ')) - 1
-model_title = '_'.join(filenames[model_idx].split('_')[1:])[:-9]
+ending = '_'.join(filenames[model_idx].split('_')[1:])[:-9]
 
-print model_title
+print ending
 
-model_params = model_title.split('_')
+model_params = ending.split('_')
 
 conv_size = int(model_params[1])
 conv_stride = int(model_params[2])
@@ -272,7 +277,7 @@ def build_network():
 	print '...Creating recurrent connections'
 
 	for name in [ 'A' ]:
-		neuron_groups['e'].theta = np.load(os.path.join(best_weights_dir, '_'.join(['theta_A', model_title +'_best.npy'])))
+		neuron_groups['e'].theta = np.load(os.path.join(best_weights_dir, '_'.join(['theta_A', ending +'_best.npy'])))
 		
 		for conn_type in ['ei', 'ie']:
 			if conn_type == 'ei':
@@ -339,17 +344,21 @@ def build_network():
 			spike_monitors[name + 'e'] = b.SpikeMonitor(neuron_groups[name + 'e'])
 			spike_monitors[name + 'i'] = b.SpikeMonitor(neuron_groups[name + 'i'])
 
-	if record_spikes:
+	if record_spikes and do_plot:
+		if reset_state_vars:
+			time_window = single_example_time * 1000
+		else:
+			time_window = (single_example_time + resting_time) * 1000
+		
 		b.figure(fig_num, figsize=(8, 6))
-		
-		fig_num += 1
-		
 		b.ion()
 		b.subplot(211)
-		b.raster_plot(spike_monitors['Ae'], refresh=1000 * b.ms, showlast=1000 * b.ms, title='Excitatory spikes per neuron')
+		b.raster_plot(spike_monitors['Ae'], refresh=time_window * b.ms, showlast=time_window * b.ms, title='Excitatory spikes per neuron')
 		b.subplot(212)
-		b.raster_plot(spike_monitors['Ai'], refresh=1000 * b.ms, showlast=1000 * b.ms, title='Inhibitory spikes per neuron')
+		b.raster_plot(spike_monitors['Ai'], refresh=time_window * b.ms, showlast=time_window * b.ms, title='Inhibitory spikes per neuron')
 		b.tight_layout()
+
+		fig_num += 1
 
 	# creating Poission spike train from input image (784 vector, 28x28 image)
 	for name in [ 'X' ]:
@@ -366,7 +375,7 @@ def build_network():
 			conn_name = name[0] + conn_type[0] + name[1] + conn_type[1]
 
 			# get weight matrix depending on training or test phase
-			weight_matrix = np.load(os.path.join(best_weights_dir, '_'.join([conn_name, model_title + '_best.npy'])))
+			weight_matrix = np.load(os.path.join(best_weights_dir, '_'.join([conn_name, ending + '_best.npy'])))
 
 			# create connections from the windows of the input group to the neuron population
 			input_connections[conn_name] = b.Connection(input_groups['Xe'], neuron_groups[name[1] + \
@@ -400,7 +409,12 @@ def run_test():
 	# start recording time
 	start_time = timeit.default_timer()
 
+	activity = None
 	max_fired = None
+
+	confusion_histogram = np.zeros((num_examples, 4))
+
+	print '\n'
 
 	while j < num_examples:
 		# get the firing rates of the next input example
@@ -411,11 +425,6 @@ def run_test():
 
 		# run the network for a single example time
 		b.run(single_example_time)
-
-		# if exc_stdp and j == 0:
-		# 		exc_weights_image = plt.matshow(connections['AeAe'][:].todense().T, cmap='binary', vmin=0, vmax=wmax_exc)
-		# 		plt.colorbar()
-		# 		plt.title('Excitatory to excitatory weights')
 
 		# get count of spikes over the past iteration
 		current_spike_count = np.copy(spike_counters['Ae'].count[:]).reshape((conv_features, n_e)) - previous_spike_count
@@ -432,10 +441,19 @@ def run_test():
 				input_groups[name + 'e'].rate = 0
 
 			# let the network relax back to equilibrium
-			b.run(resting_time)
+			if not reset_state_vars:
+				b.run(resting_time)
+			else:
+				for neuron_group in neuron_groups:
+					neuron_groups[neuron_group].v = v_reset_e
+					neuron_groups[neuron_group].ge = 0
+					neuron_groups[neuron_group].gi = 0
 
 		# otherwise, record results and continue simulation
-		else:			
+		else:
+			if (j + 1) % 25 == 0:
+				print '-', j + 1, '/', num_examples
+
 			num_retries = 0
 
 			# record the current number of spikes
@@ -448,39 +466,53 @@ def run_test():
 			for scheme, outputs in predict_label(assignments, result_monitor[j % update_interval, :], accumulated_rates, spike_proportions).items():
 				output_numbers[scheme][j, :] = outputs
 
-			max_fired = np.argmax(result_monitor[j % update_interval, :])
+			activity = result_monitor[j % update_interval, :] / np.sum(result_monitor[j % update_interval, :])
 
 			rates = (data['x'][j % data_size, :, :] / 8.0) * input_intensity
-			fig = plt.figure(9, figsize = (8, 8))
-			plt.imshow(rates.reshape((28, 28)), interpolation='nearest', vmin=0, vmax=64, cmap='binary')
-			plt.title(str(data['y'][j % data_size][0]) + ' : ' + ', '.join([str(int(output_numbers[scheme][j, 0])) for scheme in voting_schemes]))
-			# plt.title('Misclassified with ' + performance + ' as ' + str(int(wrong_label)) + \
-			# 	' in location (' + str(int(max_fired // features_sqrt)) + ', ' + \
-			# 			str(int(max_fired % features_sqrt)) + ')')
 
-			max_fired_location = np.zeros((conv_features))
-			max_fired_location[max_fired] = 1
-			fig = plt.figure(10, figsize = (7, 7))
-			plt.xticks(xrange(features_sqrt))
-			plt.yticks(xrange(features_sqrt))
-			plt.imshow(max_fired_location.reshape((features_sqrt, features_sqrt)).T, interpolation='nearest', cmap='binary')
-			plt.grid(True)
-			
-			fig.canvas.draw()
+			if do_plot:
+				fig = plt.figure(9, figsize = (8, 8))
+				plt.imshow(rates.reshape((28, 28)), interpolation='nearest', vmin=0, vmax=64, cmap='binary')
+				plt.title(str(data['y'][j % data_size][0]) + ' : ' + ', '.join([str(int(output_numbers[scheme][j, 0])) for scheme in voting_schemes]))
+				fig = plt.figure(10, figsize = (7, 7))
+				plt.xticks(xrange(features_sqrt))
+				plt.yticks(xrange(features_sqrt))
+				plt.title('Activity heatmap (total spikes = ' + str(np.sum(result_monitor[j % update_interval, :])) + ')')
+				plt.imshow(activity.reshape((features_sqrt, features_sqrt)).T, interpolation='nearest', cmap='binary')
+				plt.grid(True)
+				
+				fig.canvas.draw()
 
-			time.sleep(5.0)
+				if sleep:
+					time.sleep(5.0)
+
+			max_fired = np.argmax(result_monitor[j % update_interval, :])
+			max_firing = np.max(result_monitor[j % update_interval, :])
+
+			confusion_histogram[j, 0] = input_numbers[j]
+			confusion_histogram[j, 1] = max_fired
+			confusion_histogram[j, 2] = assignments[max_fired]
+			confusion_histogram[j, 3] = max_firing
 						
 			# set input firing rates back to zero
 			input_groups['Xe'].rate = 0
 			
-			# run the network for 'resting_time' to relax back to rest potentials
-			b.run(resting_time)
+			# let the network relax back to equilibrium
+			if not reset_state_vars:
+				b.run(resting_time)
+			else:
+				for neuron_group in neuron_groups:
+					neuron_groups[neuron_group].v = v_reset_e
+					neuron_groups[neuron_group].ge = 0
+					neuron_groups[neuron_group].gi = 0
 			
 			# bookkeeping
 			input_intensity = start_input_intensity
 			j += 1
 
 	print '\n'
+
+	np.save(os.path.join(confusion_histogram_dir, '_'.join([ending, str(num_examples)])), confusion_histogram)
 
 
 if __name__ == '__main__':
@@ -517,6 +549,9 @@ if __name__ == '__main__':
 			input_connections, connections, input_groups = {}, {}, {}, {}, {}, {}, {}, {}, {}
 
 	record_spikes = True
+	reset_state_vars = False
+	sleep = False
+	do_plot = False
 
 	delay['ee_input'] = (0 * b.ms, 10 * b.ms)
 	delay['ei_input'] = (0 * b.ms, 5 * b.ms)
@@ -638,7 +673,7 @@ if __name__ == '__main__':
 
 	build_network()
 
-	num_examples = 10000
+	num_examples = 100
 
 	voting_schemes = ['all', 'most_spiked_patch', 'top_percent', 'most_spiked_location', 'confidence_weighting']
 
@@ -649,8 +684,8 @@ if __name__ == '__main__':
 	input_numbers = np.zeros(num_examples)
 	rates = np.zeros((n_input_sqrt, n_input_sqrt))
 
-	assignments = np.load(os.path.join(best_misc_dir, '_'.join(['assignments', model_title, 'best.npy'])))
-	accumulated_rates = np.load(os.path.join(best_misc_dir, '_'.join(['accumulated_rates', model_title, 'best.npy'])))
-	spike_proportions = np.load(os.path.join(best_misc_dir, '_'.join(['spike_proportions', model_title, 'best.npy'])))
+	assignments = np.load(os.path.join(best_misc_dir, '_'.join(['assignments', ending, 'best.npy'])))
+	accumulated_rates = np.load(os.path.join(best_misc_dir, '_'.join(['accumulated_rates', ending, 'best.npy'])))
+	spike_proportions = np.load(os.path.join(best_misc_dir, '_'.join(['spike_proportions', ending, 'best.npy'])))
 
 	run_test()
