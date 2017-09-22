@@ -673,7 +673,7 @@ if __name__ == '__main__':
 
 	build_network()
 
-	num_examples = 100
+	num_examples = 10000
 
 	voting_schemes = ['all', 'most_spiked_patch', 'top_percent', 'most_spiked_location', 'confidence_weighting']
 
