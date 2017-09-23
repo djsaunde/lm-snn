@@ -160,6 +160,7 @@ def plot_assignments(assignments):
 	im = plt.matshow(assignments.reshape((int(np.sqrt(n_e_total)), int(np.sqrt(n_e_total)))).T, cmap=cmap, vmin=-1.5, vmax=9.5)
 	plt.colorbar(im, ticks=np.arange(-1, 10))
 	plt.title('Neuron labels')
+
 	return im
 
 
@@ -291,7 +292,7 @@ def build_network():
 					for n in xrange(n_e):
 						connections[conn_name][feature * n_e + n, feature * n_e + n] = 10.4
 
-			elif conn_type == 'ie':
+			elif conn_type == 'ie' and not remove_inhibition:
 				# create connection name (composed of population and connection types)
 				conn_name = name + conn_type[0] + name + conn_type[1]
 				# create a connection from the first group in conn_name with the second group
@@ -387,8 +388,9 @@ def build_network():
 						input_connections[conn_name][convolution_locations[n][idx], feature * n_e + n] = \
 											weight_matrix[convolution_locations[n][idx], feature * n_e + n]
 
-			plot_2d_input_weights()
-			fig_num += 1	
+			if do_plot:
+				plot_2d_input_weights()
+				fig_num += 1	
 
 	print '\n'
 
@@ -398,8 +400,9 @@ def run_test():
 				kmeans, kmeans_assignments, simple_clusters, simple_cluster_assignments, index_matrix, accumulated_rates, \
 				accumulated_inputs, spike_proportions
 
-	assignments_image = plot_assignments(assignments)
-	fig_num += 1
+	# if do_plot:
+	# 	assignments_image, assignments_figure = plot_assignments(assignments)
+	# 	fig_num += 1
 
 	# initialize network
 	j = 0
@@ -474,14 +477,16 @@ def run_test():
 				fig = plt.figure(9, figsize = (8, 8))
 				plt.imshow(rates.reshape((28, 28)), interpolation='nearest', vmin=0, vmax=64, cmap='binary')
 				plt.title(str(data['y'][j % data_size][0]) + ' : ' + ', '.join([str(int(output_numbers[scheme][j, 0])) for scheme in voting_schemes]))
-				fig = plt.figure(10, figsize = (7, 7))
-				plt.xticks(xrange(features_sqrt))
-				plt.yticks(xrange(features_sqrt))
-				plt.title('Activity heatmap (total spikes = ' + str(np.sum(result_monitor[j % update_interval, :])) + ')')
-				plt.imshow(activity.reshape((features_sqrt, features_sqrt)).T, interpolation='nearest', cmap='binary')
-				plt.grid(True)
 				
-				fig.canvas.draw()
+				# fig = plt.figure(10, figsize = (7, 7))
+				# plt.xticks(xrange(features_sqrt))
+				# plt.yticks(xrange(features_sqrt))
+
+				img1 = plt.imshow(assignments.reshape((int(np.sqrt(n_e_total)), int(np.sqrt(n_e_total)))).T, cmap=plt.get_cmap('RdBu', 11), vmin=-1.5, vmax=9.5)
+				img2 = plt.imshow(activity.reshape((features_sqrt, features_sqrt)).T, interpolation='nearest', cmap='binary')
+				plt.show()
+
+				# fig.canvas.draw()
 
 				if sleep:
 					time.sleep(5.0)
@@ -526,7 +531,7 @@ if __name__ == '__main__':
 	v_thresh_e, v_thresh_i = -52. * b.mV, -40. * b.mV
 	refrac_e, refrac_i = 5. * b.ms, 2. * b.ms
 
-	b.ion()
+	# b.ion()
 	fig_num = 1
 
 	data_size = 10000
@@ -551,7 +556,8 @@ if __name__ == '__main__':
 	record_spikes = True
 	reset_state_vars = False
 	sleep = False
-	do_plot = False
+	do_plot = True
+	remove_inhibition = True
 
 	delay['ee_input'] = (0 * b.ms, 10 * b.ms)
 	delay['ei_input'] = (0 * b.ms, 5 * b.ms)

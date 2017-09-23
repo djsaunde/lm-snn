@@ -1095,6 +1095,111 @@ def run_train():
 	print '\n'
 
 
+def run_relabeling():
+	global fig_num, input_intensity, previous_spike_count, rates, assignments, clusters, cluster_assignments, \
+				kmeans, kmeans_assignments, simple_clusters, simple_cluster_assignments, index_matrix, accumulated_rates, \
+				accumulated_inputs, spike_proportions
+
+	if do_plot:
+		assignments_image = plot_assignments(assignments)
+		fig_num += 1
+
+	# initialize network
+	j = 0
+	num_retries = 0
+	b.run(0)
+
+	# start recording time
+	start_time = timeit.default_timer()
+
+	while j < num_examples:
+		# get the firing rates of the next input example
+		if noise:
+			rates = (data['x'][j % data_size, :, :] / 8.0) * input_intensity + \
+					np.random.normal(loc=32.0 * noise_const, scale=1.0, size=(28, 28))
+		else:
+			rates = (data['x'][j % data_size, :, :] / 8.0) * input_intensity
+		
+		# sets the input firing rates
+		input_groups['Xe'].rate = rates.reshape(n_input)
+
+		# run the network for a single example time
+		b.run(single_example_time)
+
+		if do_plot and exc_stdp and j == 0:
+			exc_weights_image = plt.matshow(connections['AeAe'][:].todense().T, cmap='binary', vmin=0, vmax=wmax_exc)
+			plt.colorbar()
+			plt.title('Excitatory to excitatory weights')
+
+		# get count of spikes over the past iteration
+		current_spike_count = np.copy(spike_counters['Ae'].count[:]).reshape((conv_features, n_e)) - previous_spike_count
+		previous_spike_count = np.copy(spike_counters['Ae'].count[:]).reshape((conv_features, n_e))
+
+		# if the neurons in the network didn't spike more than four times
+		if np.sum(current_spike_count) < 5 and num_retries < 3:
+			# increase the intensity of input
+			input_intensity += 2
+			num_retries += 1
+			
+			# set all network firing rates to zero
+			for name in input_population_names:
+				input_groups[name + 'e'].rate = 0
+
+			# let the network relax back to equilibrium
+			if homeostasis and not reset_state_vars:
+				b.run(resting_time)
+			else:
+				for neuron_group in neuron_groups:
+					neuron_groups[neuron_group].v = v_reset_e
+					neuron_groups[neuron_group].ge = 0
+					neuron_groups[neuron_group].gi = 0
+
+		# otherwise, record results and continue simulation
+		else:			
+			num_retries = 0
+
+			# record the current number of spikes
+			result_monitor[j % update_interval, :] = current_spike_count
+			
+			# get true label of the past input example
+			input_numbers[j] = data['y'][j % data_size][0]
+			
+			# get the output classifications of the network
+			for scheme, outputs in predict_label(assignments, result_monitor[j % update_interval, :], accumulated_rates, spike_proportions).items():
+				output_numbers[scheme][j, :] = outputs
+
+			# print progress
+			if j % print_progress_interval == 0 and j > 0:
+				print 'runs done:', j, 'of', int(num_examples), '(time taken for past', print_progress_interval, 'runs:', str(timeit.default_timer() - start_time) + ')'
+				start_time = timeit.default_timer()
+						
+			# set input firing rates back to zero
+			for name in input_population_names:
+				input_groups[name + 'e'].rate = 0
+			
+			# run the network for 'resting_time' to relax back to rest potentials
+			if homeostasis and not reset_state_vars:
+				b.run(resting_time)
+			else:
+				for neuron_group in neuron_groups:
+					neuron_groups[neuron_group].v = v_reset_e
+					neuron_groups[neuron_group].ge = 0
+					neuron_groups[neuron_group].gi = 0
+
+			# bookkeeping
+			input_intensity = start_input_intensity
+			j += 1
+
+	# get new neuron label assignments every 'update_interval'
+	assignments, accumulated_rates, spike_proportions = assign_labels(result_monitor, input_numbers[j - update_interval : j], accumulated_rates, accumulated_inputs)
+
+	np.save(os.path.join(best_misc_dir, '_'.join(['assignments', ending, 'best'])), assignments)
+	np.save(os.path.join(best_misc_dir, '_'.join(['accumulated_rates', ending, 'best'])), accumulated_rates)
+	np.save(os.path.join(best_misc_dir, '_'.join(['spike_proportions', ending, 'best'])), spike_proportions)
+
+	print '\n'
+
+
 def run_test():
 	global fig_num, input_intensity, previous_spike_count, rates, assignments, clusters, cluster_assignments, \
 				kmeans, kmeans_assignments, simple_clusters, simple_cluster_assignments, index_matrix, accumulated_rates, \
@@ -1347,17 +1452,19 @@ if __name__ == '__main__':
 
 	# test or training mode
 	test_mode = mode == 'test'
+	relabel_mode = mode == 'relabel'
+	train_mode = mode == 'train'
 
 	if test_mode:
 		num_examples = num_test
-	else:
+	elif train_mode or relabel_mode:
 		num_examples = num_train
 
 	if reduced_dataset:
 		data_size = len(classes) * examples_per_class
 	elif test_mode:
 		data_size = 10000
-	else:
+	elif train_mode or relabel_mode:
 		data_size = 60000
 
 	# set brian global preferences
@@ -1375,10 +1482,7 @@ if __name__ == '__main__':
 	print 'Time needed to load data:', timeit.default_timer() - start
 
 	# set parameters for simulation based on train / test mode
-	if test_mode:
-		record_spikes = True
-	else:
-		record_spikes = True
+	record_spikes = True
 
 	# number of inputs to the network
 	n_input = 784
@@ -1566,14 +1670,9 @@ if __name__ == '__main__':
 	rates = np.zeros((n_input_sqrt, n_input_sqrt))
 
 	if test_mode:
-		if load_best_model:
-			assignments = np.load(os.path.join(best_misc_dir, '_'.join(['assignments', ending, 'best.npy'])))
-			accumulated_rates = np.load(os.path.join(best_misc_dir, '_'.join(['accumulated_rates', ending, 'best.npy'])))
-			spike_proportions = np.load(os.path.join(best_misc_dir, '_'.join(['spike_proportions', ending, 'best.npy'])))
-		else:
-			assignments = np.load(os.path.join(end_misc_dir, '_'.join(['assignments', ending, 'end.npy'])))
-			accumulated_rates = np.load(os.path.join(end_misc_dir, '_'.join(['accumulated_rates', ending, 'end.npy'])))
-			spike_proportions = np.load(os.path.join(end_misc_dir, '_'.join(['spike_proportions', ending, 'end.npy'])))
+		assignments = np.load(os.path.join(end_misc_dir, '_'.join(['assignments', ending, 'relabel.npy'])))
+		accumulated_rates = np.load(os.path.join(end_misc_dir, '_'.join(['accumulated_rates', ending, 'relabel.npy'])))
+		spike_proportions = np.load(os.path.join(end_misc_dir, '_'.join(['spike_proportions', ending, 'relabel.npy'])))
 	else:
 		assignments = -1 * np.ones((conv_features, n_e))
 
@@ -1590,6 +1689,8 @@ if __name__ == '__main__':
 	# run the simulation of the network
 	if test_mode:
 		run_test()
+	elif relabel_mode:
+		run_relabeling()
 	else:
 		run_train()
 

@@ -19,6 +19,10 @@ def plot_labels(labels):
 	plt.colorbar(im, ticks=np.arange(-1, 10))
 	plt.title('Neuron labels')
 	fig.canvas.draw()
+
+	if fig_num == 10:
+		plt.savefig(os.path.join(plots_dir, '_'.join(file_name.split('_')[2:])[:-4] + '.png'))
+
 	plt.show()
 	return im, fig
 

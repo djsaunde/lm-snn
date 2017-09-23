@@ -89,7 +89,7 @@ def normalize_weights():
 		connection = input_connections[conn_name][:].todense()
 		for feature in xrange(conv_features):
 			feature_connection = connection[:, feature * n_e : (feature + 1) * n_e]
-			column_sums = np.sum(np.asarray(feature_connection), axis=0)
+			column_sums = np.sum(np.abs(np.asarray(feature_connection)), axis=0)
 			column_factors = weight['ee_input'] / column_sums
 
 			for n in xrange(n_e):
@@ -237,7 +237,7 @@ def plot_2d_input_weights():
 	else:
 		fig = plt.figure(fig_num, figsize=(9, 9))
 
-	im = plt.imshow(weights, interpolation='nearest', vmin=0, vmax=wmax_ee, cmap=cmap.get_cmap('hot_r'))
+	im = plt.imshow(weights, interpolation='nearest', vmin=-wmax_ee, vmax=wmax_ee, cmap=cmap.get_cmap('hot_r'))
 	
 	if n_e != 1:
 		plt.colorbar(im, fraction=0.06)
@@ -294,7 +294,7 @@ def plot_patch_weights():
 	'''
 	weights = get_patch_weights()
 	fig = b.figure(fig_num, figsize=(8, 8))
-	im = b.imshow(weights, interpolation='nearest', vmin=0, vmax=wmax_ee, cmap=cmap.get_cmap('hot_r'))
+	im = b.imshow(weights, interpolation='nearest', vmin=-wmax_ee, vmax=wmax_ee, cmap=cmap.get_cmap('hot_r'))
 	for idx in xrange(n_e, n_e * conv_features, n_e):
 		b.axvline(idx, ls='--', lw=1)
 		b.axhline(idx, ls='--', lw=1)
@@ -756,7 +756,7 @@ def build_network():
 		# if STDP from excitatory -> excitatory is on and this connection is excitatory -> excitatory
 		if exc_stdp and 'ee' in recurrent_conn_names and not test_mode:
 			stdp_methods[name + 'e' + name + 'e'] = b.STDP(connections[name + 'e' + name + 'e'], \
-							eqs=eqs_stdp_ee, pre='pre = 1.; w -= 0.001 * post', post='w += 0.1 * pre; post = 1.', wmin=0., wmax=wmax_exc)
+					eqs=eqs_stdp_ee, pre='pre = 1.; w -= 0.001 * post', post='w += 0.1 * pre; post = 1.', wmin=0., wmax=wmax_exc)
 
 		print '...Creating monitors for:', name
 
@@ -869,7 +869,7 @@ def build_network():
 			conn_name = name[0] + conn_type[0] + name[1] + conn_type[1]
 			# create the STDP object
 			stdp_methods[conn_name] = b.STDP(input_connections[conn_name], eqs=eqs_stdp_ee, \
-							pre=eqs_stdp_pre_ee, post=eqs_stdp_post_ee, wmin=0., wmax=wmax_ee)
+							pre=eqs_stdp_pre_ee, post=eqs_stdp_post_ee, wmin=-wmax_ee, wmax=wmax_ee)
 
 	print '\n'
 
@@ -1437,7 +1437,7 @@ if __name__ == '__main__':
 
 	# time constants, learning rates, max weights, weight dependence, etc.
 	tc_pre_ee, tc_post_ee = 20 * b.ms, 20 * b.ms
-	nu_ee_pre, nu_ee_post = 0.0001, 0.01
+	nu_ee_pre, nu_ee_post = 0.005, 0.01
 	nu_AeAe_pre, nu_Ae_Ae_post = 0.1, 0.5
 	wmax_ee = 1.0
 	exp_ee_post = exp_ee_pre = 0.2
