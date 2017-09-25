@@ -149,14 +149,14 @@ def save_connections(weights_dir, connections, input_connections, ending, suffix
 	connections.update(input_connections)
 
 	# save out each connection's parameters to disk
-
 	for connection_name in connections.keys():		
 		# get parameters of this connection
 		connection_matrix = connections[connection_name][:].todense()
 		# save it out to disk
-		np.save(os.path.join(weights_dir, connection_name + '_' + ending + '_' + str(suffix)), connection_matrix)
-
-
+		if suffix != None:
+			np.save(os.path.join(weights_dir, connection_name + '_' + ending + '_' + str(suffix)), connection_matrix)
+		else:
+			np.save(os.path.join(weights_dir, connection_name + '_' + ending), connection_matrix)
 
 
 def save_theta(weights_dir, populations, neuron_groups, ending, suffix):
@@ -168,7 +168,10 @@ def save_theta(weights_dir, populations, neuron_groups, ending, suffix):
 	# iterate over population for which to save theta parameters
 	for population in populations:
 		# save out the theta parameters to file
-		np.save(os.path.join(weights_dir, 'theta_' + population + '_' + ending + '_' + str(suffix)), neuron_groups[population + 'e'].theta)
+		if suffix != None:
+			np.save(os.path.join(weights_dir, 'theta_' + population + '_' + ending + '_' + str(suffix)), neuron_groups[population + 'e'].theta)
+		else:
+			np.save(os.path.join(weights_dir, 'theta_' + population + '_' + ending), neuron_groups[population + 'e'].theta)
 
 
 def save_assignments(weights_dir, assignments, ending, suffix):

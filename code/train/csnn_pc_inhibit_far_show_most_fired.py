@@ -199,8 +199,8 @@ def get_2d_input_weights():
 					for f_2 in xrange(features_sqrt):
 						square_weights[conv_size * (n_2 * features_sqrt + f_2) : conv_size * (n_2 * features_sqrt + f_2 + 1), \
 								conv_size * (n_1 * features_sqrt + f_1) : conv_size * (n_1 * features_sqrt + f_1 + 1)] = \
-						 		rearranged_weights[(f_1 * features_sqrt + f_2) * conv_size : (f_1 * features_sqrt + f_2 + 1) * conv_size, \
-						 				(n_1 * n_e_sqrt + n_2) * conv_size : (n_1 * n_e_sqrt + n_2 + 1) * conv_size]
+								rearranged_weights[(f_1 * features_sqrt + f_2) * conv_size : (f_1 * features_sqrt + f_2 + 1) * conv_size, \
+										(n_1 * n_e_sqrt + n_2) * conv_size : (n_1 * n_e_sqrt + n_2 + 1) * conv_size]
 
 		return square_weights.T
 
@@ -392,8 +392,6 @@ def build_network():
 				plot_2d_input_weights()
 				fig_num += 1	
 
-	print '\n'
-
 
 def run_test():
 	global fig_num, input_intensity, previous_spike_count, rates, assignments, clusters, cluster_assignments, \
@@ -477,16 +475,14 @@ def run_test():
 				fig = plt.figure(9, figsize = (8, 8))
 				plt.imshow(rates.reshape((28, 28)), interpolation='nearest', vmin=0, vmax=64, cmap='binary')
 				plt.title(str(data['y'][j % data_size][0]) + ' : ' + ', '.join([str(int(output_numbers[scheme][j, 0])) for scheme in voting_schemes]))
+				fig = plt.figure(10, figsize = (7, 7))
+				plt.xticks(xrange(features_sqrt))
+				plt.yticks(xrange(features_sqrt))
+				plt.title('Activity heatmap (total spikes = ' + str(np.sum(result_monitor[j % update_interval, :])) + ')')
+				plt.imshow(activity.reshape((features_sqrt, features_sqrt)).T, interpolation='nearest', cmap='binary')
+				plt.grid(True)
 				
-				# fig = plt.figure(10, figsize = (7, 7))
-				# plt.xticks(xrange(features_sqrt))
-				# plt.yticks(xrange(features_sqrt))
-
-				img1 = plt.imshow(assignments.reshape((int(np.sqrt(n_e_total)), int(np.sqrt(n_e_total)))).T, cmap=plt.get_cmap('RdBu', 11), vmin=-1.5, vmax=9.5)
-				img2 = plt.imshow(activity.reshape((features_sqrt, features_sqrt)).T, interpolation='nearest', cmap='binary')
-				plt.show()
-
-				# fig.canvas.draw()
+				fig.canvas.draw()
 
 				if sleep:
 					time.sleep(5.0)
@@ -515,8 +511,6 @@ def run_test():
 			input_intensity = start_input_intensity
 			j += 1
 
-	print '\n'
-
 	np.save(os.path.join(confusion_histogram_dir, '_'.join([ending, str(num_examples)])), confusion_histogram)
 
 
@@ -531,7 +525,7 @@ if __name__ == '__main__':
 	v_thresh_e, v_thresh_i = -52. * b.mV, -40. * b.mV
 	refrac_e, refrac_i = 5. * b.ms, 2. * b.ms
 
-	# b.ion()
+	b.ion()
 	fig_num = 1
 
 	data_size = 10000
