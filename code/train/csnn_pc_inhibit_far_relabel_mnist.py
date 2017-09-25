@@ -43,12 +43,13 @@ plots_path = os.path.join(top_level_path, 'plots', model_name)
 performance_dir = os.path.join(top_level_path, 'performance', model_name)
 activity_dir = os.path.join(top_level_path, 'activity', model_name)
 weights_dir = os.path.join(top_level_path, 'weights', model_name)
+best_weights_dir = os.path.join(top_level_path, 'weights', model_name, 'best')
 deltas_dir = os.path.join(top_level_path, 'deltas', model_name)
 random_dir = os.path.join(top_level_path, 'random', model_name)
-assignments_dir = os.path.join(top_level_path, 'assignments', model_name)
+best_assignments_dir = os.path.join(top_level_path, 'assignments', model_name, 'best')
 
-for d in [ performance_dir, activity_dir, weights_dir, deltas_dir, random_dir, \
-			MNIST_data_path, results_path, plots_path, assignments_dir ]:
+for d in [ performance_dir, activity_dir, best_weights_dir, deltas_dir, random_dir, \
+			MNIST_data_path, results_path, plots_path, best_assignments_dir, weights_dir ]:
 	if not os.path.isdir(d):
 		os.makedirs(d)
 
@@ -625,7 +626,7 @@ def build_network():
 		# if we're in test mode / using some stored weights
 		if label_mode or test_mode:
 			# load up adaptive threshold parameters
-			neuron_groups['e'].theta = np.load(os.path.join(weights_dir, '_'.join(['theta_A', ending +'.npy'])))
+			neuron_groups['e'].theta = np.load(os.path.join(best_weights_dir, '_'.join(['theta_A', ending + '_best.npy'])))
 		else:
 			# otherwise, set the adaptive additive threshold parameter at 20mV
 			neuron_groups['e'].theta = np.ones((n_e_total)) * 20.0 * b.mV
@@ -696,7 +697,7 @@ def build_network():
 
 				# get weights from file if we are in test mode
 				if label_mode or test_mode:
-					weight_matrix = np.load(os.path.join(weights_dir, '_'.join([conn_name, ending + '.npy'])))
+					weight_matrix = np.load(os.path.join(best_weights_dir, '_'.join([conn_name, ending + '_best.npy'])))
 
 				# create a connection from the first group in conn_name with the second group
 				connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
@@ -822,7 +823,7 @@ def build_network():
 
 			# get weight matrix depending on training or test phase
 			if label_mode or test_mode:
-				weight_matrix = np.load(os.path.join(weights_dir, '_'.join([conn_name, ending + '.npy'])))
+				weight_matrix = np.load(os.path.join(best_weights_dir, '_'.join([conn_name, ending + '_best.npy'])))
 
 			# create connections from the windows of the input group to the neuron population
 			input_connections[conn_name] = b.Connection(input_groups['Xe'], neuron_groups[name[1] + conn_type[1]], \
@@ -1079,6 +1080,9 @@ def run_labeling():
 
 			# record the current number of spikes
 			result_monitor[j % update_interval, :] = current_spike_count
+
+			# get true label of last input example
+			input_numbers[j] = data['y'][j % data_size][0]
 			
 			# print progress
 			if j % print_progress_interval == 0 and j > 0:
@@ -1217,11 +1221,11 @@ def save_results():
 	print '...Saving results'
 
 	if train_mode:
-		save_connections(weights_dir, connections, input_connections, ending, None)
-		save_theta(weights_dir, population_names, neuron_groups, ending, None)
+		save_connections(best_weights_dir, connections, input_connections, ending, 'best')
+		save_theta(best_weights_dir, population_names, neuron_groups, ending, 'best')
 
 	if label_mode:
-		np.save(os.path.join(assignments_dir, '_'.join(['assignments', ending + '.npy'])), assignments)
+		np.save(os.path.join(best_assignments_dir, '_'.join(['assignments', ending + '_best.npy'])), assignments)
 	
 	else:
 		np.save(os.path.join(activity_dir, '_'.join(['results', str(num_examples), ending])), result_monitor)
@@ -1577,7 +1581,7 @@ if __name__ == '__main__':
 	rates = np.zeros((n_input_sqrt, n_input_sqrt))
 
 	if test_mode:
-		assignments = np.load(os.path.join(assignments_dir, '_'.join(['assignments', ending + '.npy'])))
+		assignments = np.load(os.path.join(best_assignments_dir, '_'.join(['assignments', ending + '_best.npy'])))
 
 	voting_schemes = ['all', 'most_spiked_patch', 'top_percent', 'most_spiked_location']
 
