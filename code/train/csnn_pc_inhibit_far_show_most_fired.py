@@ -30,7 +30,7 @@ b.log_level_error()
 model_name = 'csnn_pc_inhibit_far'
 
 best_weights_dir = os.path.join('..', '..', 'weights', model_name, 'best')
-best_misc_dir = os.path.join('..', '..', 'misc', model_name, 'best')
+assignments_dir = os.path.join('..', '..', 'assignments', model_name, 'best')
 confusion_histogram_dir = os.path.join('..', '..', 'confusion_histograms', model_name)
 
 if not os.path.isdir(confusion_histogram_dir):
@@ -77,7 +77,7 @@ input_connections = {}
 top_percent = 10
 
 
-def predict_label(assignments, spike_rates, accumulated_rates, spike_proportions):
+def predict_label(assignments, spike_rates):
 	'''
 	Given the label assignments of the excitatory layer and their spike rates over
 	the past 'update_interval', get the ranking of each of the categories of input.
@@ -143,12 +143,6 @@ def predict_label(assignments, spike_rates, accumulated_rates, spike_proportions
 				if len(np.where(assignments[top_percents] == i)) > 0:
 					# sum the spike rates of all excitatory neurons with this label, which fired the most in its patch
 					summed_rates[i] = len(spike_rates[np.where(np.logical_and(assignments == i, top_percents))])
-
-		elif scheme == 'confidence_weighting':
-			for i in xrange(10):
-				num_assignments[i] = np.count_nonzero(assignments == i)
-				if num_assignments[i] > 0:
-					summed_rates[i] = np.sum(spike_rates[assignments == i] * spike_proportions[(assignments == i).ravel(), i]) / num_assignments[i]
 		
 		output_numbers[scheme] = np.argsort(summed_rates)[::-1]
 	
@@ -395,8 +389,7 @@ def build_network():
 
 def run_test():
 	global fig_num, input_intensity, previous_spike_count, rates, assignments, clusters, cluster_assignments, \
-				kmeans, kmeans_assignments, simple_clusters, simple_cluster_assignments, index_matrix, accumulated_rates, \
-				accumulated_inputs, spike_proportions
+				kmeans, kmeans_assignments, simple_clusters, simple_cluster_assignments, index_matrix
 
 	# if do_plot:
 	# 	assignments_image, assignments_figure = plot_assignments(assignments)
@@ -464,7 +457,7 @@ def run_test():
 			input_numbers[j] = data['y'][j % data_size][0]
 			
 			# get the output classifications of the network
-			for scheme, outputs in predict_label(assignments, result_monitor[j % update_interval, :], accumulated_rates, spike_proportions).items():
+			for scheme, outputs in predict_label(assignments, result_monitor[j % update_interval, :]).items():
 				output_numbers[scheme][j, :] = outputs
 
 			activity = result_monitor[j % update_interval, :] / np.sum(result_monitor[j % update_interval, :])
@@ -675,7 +668,7 @@ if __name__ == '__main__':
 
 	num_examples = 10000
 
-	voting_schemes = ['all', 'most_spiked_patch', 'top_percent', 'most_spiked_location', 'confidence_weighting']
+	voting_schemes = ['all', 'most_spiked_patch', 'top_percent', 'most_spiked_location']
 
 	for scheme in voting_schemes:
 		output_numbers[scheme] = np.zeros((num_examples, 10))
@@ -684,8 +677,6 @@ if __name__ == '__main__':
 	input_numbers = np.zeros(num_examples)
 	rates = np.zeros((n_input_sqrt, n_input_sqrt))
 
-	assignments = np.load(os.path.join(best_misc_dir, '_'.join(['assignments', ending, 'best.npy'])))
-	accumulated_rates = np.load(os.path.join(best_misc_dir, '_'.join(['accumulated_rates', ending, 'best.npy'])))
-	spike_proportions = np.load(os.path.join(best_misc_dir, '_'.join(['spike_proportions', ending, 'best.npy'])))
+	assignments = np.load(os.path.join(assignments_dir, '_'.join(['assignments', ending, 'best.npy'])))
 
 	run_test()
