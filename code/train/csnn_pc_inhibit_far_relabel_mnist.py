@@ -36,7 +36,7 @@ b.log_level_error()
 # set these appropriate to your directory structure
 top_level_path = os.path.join('..', '..')
 MNIST_data_path = os.path.join(top_level_path, 'data')
-model_name = 'csnn_pc_inhibit_far'
+model_name = 'csnn_pc_inhibit_far_relabel'
 results_path = os.path.join(top_level_path, 'results', model_name)
 plots_path = os.path.join(top_level_path, 'plots', model_name)
 
