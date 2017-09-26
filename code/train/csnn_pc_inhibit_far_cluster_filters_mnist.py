@@ -36,7 +36,7 @@ b.log_level_error()
 # set these appropriate to your directory structure
 top_level_path = os.path.join('..', '..')
 MNIST_data_path = os.path.join(top_level_path, 'data')
-model_name = 'csnn_pc_inhibit_far'
+model_name = 'csnn_pc_inhibit_far_cluster_filters'
 results_path = os.path.join(top_level_path, 'results', model_name)
 plots_path = os.path.join(top_level_path, 'plots', model_name)
 
@@ -48,7 +48,10 @@ deltas_dir = os.path.join(top_level_path, 'deltas', model_name)
 random_dir = os.path.join(top_level_path, 'random', model_name)
 best_assignments_dir = os.path.join(top_level_path, 'assignments', model_name, 'best')
 
-for d in [ performance_dir, activity_dir, best_weights_dir, deltas_dir, random_dir, \
+clustering_dir = os.path.join(top_level_path, 'clustering', model_name)
+csnn_pc_inhibit_far_weights_dir = os.path.join(top_level_path, 'weights', 'csnn_pc_inhibit_far', 'end')
+
+for d in [ performance_dir, activity_dir, best_weights_dir, deltas_dir, random_dir, clustering_dir, \
 			MNIST_data_path, results_path, plots_path, best_assignments_dir, weights_dir ]:
 	if not os.path.isdir(d):
 		os.makedirs(d)
@@ -127,11 +130,19 @@ def update_input(rates, im, fig):
 	return im
 
 
-def plot_assignments(assignments):
-	cmap = plt.get_cmap('RdBu', 11)
-	im = plt.matshow(assignments.reshape((int(np.sqrt(n_e_total)), int(np.sqrt(n_e_total)))).T, cmap=cmap, vmin=-1.5, vmax=9.5)
+def plot_assignments(assignments, clustering):
+	to_plot = np.zeros(n_e_total)
+
+	clustering = dict(clustering)
+
+	for cluster in clustering:
+		to_plot[clustering[cluster]] = assignments[cluster]
+
+	cmap = plt.get_cmap('RdBu', 10)
+	im = plt.matshow(to_plot.reshape((int(np.sqrt(n_e_total)), int(np.sqrt(n_e_total)))).T, cmap=cmap, vmin=-0.5, vmax=9.5)
 	plt.colorbar(im, ticks=np.arange(-1, 10))
 	plt.title('Neuron labels')
+
 	return im
 
 
@@ -509,95 +520,41 @@ def update_all_deltas_plot(lines, all_deltas, current_example_num, fig):
 	return lines, deltas
 
 
-def predict_label(assignments, spike_rates):
+def predict_label_from_cluster_assignments(assignments, spike_rates, clustering):
 	'''
 	Given the label assignments of the excitatory layer and their spike rates over
 	the past 'update_interval', get the ranking of each of the categories of input.
 	'''
-	output_numbers = {}
+	summed_rates = [0] * 10
+	num_assignments = [0] * 10
 
-	for scheme in voting_schemes:
-		summed_rates = [0] * 10
-		num_assignments = [0] * 10
+	new_assignments = -1 * np.ones(np.shape(spike_rates))
 
-		if scheme == 'all':
-			for i in xrange(10):
-				num_assignments[i] = len(np.where(assignments == i)[0])
-				if num_assignments[i] > 0:
-					summed_rates[i] = np.sum(spike_rates[assignments == i]) / num_assignments[i]
+	for idx, label in enumerate(assignments):
+		new_assignments[clustering[idx]] = assignments[idx]
 
-		elif scheme == 'most_spiked_patch':
-			most_spiked_array = np.array(np.zeros((conv_features, n_e)), dtype=bool)
-
-			for feature in xrange(conv_features):
-				# count up the spikes for the neurons in this convolution patch
-				column_sums = np.sum(spike_rates[feature : feature + 1, :], axis=0)
-
-				# find the excitatory neuron which spiked the most
-				most_spiked_array[feature, np.argmax(column_sums)] = True
-
-			# for each label
-			for i in xrange(10):
-				# get the number of label assignments of this type
-				num_assignments[i] = len(np.where(assignments[most_spiked_array] == i)[0])
-
-				if len(spike_rates[np.where(assignments[most_spiked_array] == i)]) > 0:
-					# sum the spike rates of all excitatory neurons with this label, which fired the most in its patch
-					summed_rates[i] = np.sum(spike_rates[np.where(np.logical_and(assignments == i,
-													 most_spiked_array))]) / float(np.sum(spike_rates[most_spiked_array]))
-
-		elif scheme == 'most_spiked_location':
-			most_spiked_array = np.array(np.zeros((conv_features, n_e)), dtype=bool)
-
-			for n in xrange(n_e):
-				# find the excitatory neuron which spiked the most in this input location
-				most_spiked_array[np.argmax(spike_rates[:, n : n + 1]), n] = True
-
-			# for each label
-			for i in xrange(10):
-				# get the number of label assignments of this type
-				num_assignments[i] = len(np.where(assignments[most_spiked_array] == i)[0])
-
-				if len(spike_rates[np.where(assignments[most_spiked_array] == i)]) > 0:
-					# sum the spike rates of all excitatory neurons with this label, which fired the most in its patch
-					summed_rates[i] = np.sum(spike_rates[np.where(np.logical_and(assignments == i,
-													 most_spiked_array))]) / float(np.sum(spike_rates[most_spiked_array]))
-
-		elif scheme == 'top_percent':
-			top_percents = np.array(np.zeros((conv_features, n_e)), dtype=bool)
-			top_percents[np.where(spike_rates > np.percentile(spike_rates, 100 - top_percent))] = True
-
-			# for each label
-			for i in xrange(10):
-				# get the number of label assignments of this type
-				num_assignments[i] = len(np.where(assignments[top_percents] == i)[0])
-
-				if len(np.where(assignments[top_percents] == i)) > 0:
-					# sum the spike rates of all excitatory neurons with this label, which fired the most in its patch
-					summed_rates[i] = len(spike_rates[np.where(np.logical_and(assignments == i, top_percents))])
-		
-		output_numbers[scheme] = np.argsort(summed_rates)[::-1]
+	for i in xrange(10):
+		num_assignments[i] = len(np.where(new_assignments == i)[0])
+		if num_assignments[i] > 0:
+			summed_rates[i] = np.sum(spike_rates[new_assignments == i]) / num_assignments[i]
+	
+	output_numbers = np.argsort(summed_rates)[::-1]
 	
 	return output_numbers
 
 
-def assign_labels(result_monitor, input_numbers):
-	'''
-	Based on the results from the previous 'update_interval', assign labels to the
-	excitatory neurons.
-	'''
-	assignments = np.ones((conv_features, n_e))
-	input_nums = np.asarray(input_numbers)
-	maximum_rate = np.zeros(conv_features * n_e)	
-	
+def assign_labels_to_clusters(result_monitor, input_numbers, clustering):
+	assignments = np.ones(n_clusters)
+	maximum_rate = np.zeros(n_clusters)
+
 	for j in xrange(10):
-		num_assignments = len(np.where(input_nums == j)[0])
+		num_assignments = len(np.where(input_numbers == j)[0])
 		if num_assignments > 0:
-			rate = np.sum(result_monitor[input_nums == j], axis=0) / num_assignments
-			for i in xrange(conv_features * n_e):
-				if rate[i // n_e, i % n_e] > maximum_rate[i]:
-					maximum_rate[i] = rate[i // n_e, i % n_e]
-					assignments[i // n_e, i % n_e] = j
+			rate = np.sum(result_monitor[input_numbers == j], axis=0) / num_assignments
+			for cluster in clustering:
+				if np.sum(rate[clustering[cluster]]) > maximum_rate[cluster]:
+					maximum_rate[cluster] = np.sum(rate[clustering[cluster]])
+					assignments[cluster] = j
 
 	return assignments
 
@@ -626,7 +583,7 @@ def build_network():
 		# if we're in test mode / using some stored weights
 		if label_mode or test_mode:
 			# load up adaptive threshold parameters
-			neuron_groups['e'].theta = np.load(os.path.join(best_weights_dir, '_'.join(['theta_A', ending + '_best.npy'])))
+			neuron_groups['e'].theta = np.load(os.path.join(csnn_pc_inhibit_far_weights_dir, '_'.join(['theta_A', ending + '_end.npy'])))
 		else:
 			# otherwise, set the adaptive additive threshold parameter at 20mV
 			neuron_groups['e'].theta = np.ones((n_e_total)) * 20.0 * b.mV
@@ -697,7 +654,7 @@ def build_network():
 
 				# get weights from file if we are in test mode
 				if label_mode or test_mode:
-					weight_matrix = np.load(os.path.join(best_weights_dir, '_'.join([conn_name, ending + '_best.npy'])))
+					weight_matrix = np.load(os.path.join(csnn_pc_inhibit_far_weights_dir, '_'.join([conn_name, ending + '_end.npy'])))
 
 				# create a connection from the first group in conn_name with the second group
 				connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
@@ -823,7 +780,7 @@ def build_network():
 
 			# get weight matrix depending on training or test phase
 			if label_mode or test_mode:
-				weight_matrix = np.load(os.path.join(best_weights_dir, '_'.join([conn_name, ending + '_best.npy'])))
+				weight_matrix = np.load(os.path.join(csnn_pc_inhibit_far_weights_dir, '_'.join([conn_name, ending + '_end.npy'])))
 
 			# create connections from the windows of the input group to the neuron population
 			input_connections[conn_name] = b.Connection(input_groups['Xe'], neuron_groups[name[1] + conn_type[1]], \
@@ -898,7 +855,8 @@ def run_train():
 	while j < num_examples:
 		# get the firing rates of the next input example
 		if noise:
-			rates = (data['x'][j % data_size, :, :] / 8.0) * input_intensity + np.random.normal(loc=32.0 * noise_const, scale=1.0, size=(28, 28))
+			rates = (data['x'][j % data_size, :, :] / 8.0) * input_intensity + \
+					np.random.normal(loc=32.0 * noise_const, scale=1.0, size=(28, 28))
 		else:
 			rates = (data['x'][j % data_size, :, :] / 8.0) * input_intensity
 		
@@ -1017,21 +975,28 @@ def run_train():
 	# ensure weights don't grow without bound
 	normalize_weights()
 
-	print '\n'
+	print '\n' 
 
 
 def run_labeling():
-	kmeans = KMeans(n_clusters=10)
-	weight_matrix = np.load(os.path.join(best_weights_dir, '_'.join(['XeAe', ending + '_best.npy'])))
+	global fig_num, input_intensity, previous_spike_count, rates, assignments, clusters, cluster_assignments, \
+				kmeans, kmeans_assignments, simple_clusters, simple_cluster_assignments, index_matrix 
+
+	kmeans = KMeans(n_clusters=n_clusters)
+	weight_matrix = np.load(os.path.join(csnn_pc_inhibit_far_weights_dir, '_'.join(['XeAe', ending + '_end.npy'])))
 	filters = weight_matrix.reshape((conv_size ** 2, n_e_total))
 	kmeans.fit(filters.T)
 
-	label_mapping = { idx : [] for idx in xrange(10) }
-	for fltr, label in zip(filters.T, kmeans.labels_):
-		label_mapping[label].append(fltr)
+	clustering = { idx : [] for idx in xrange(n_clusters) }
+	for idx, label in enumerate(kmeans.labels_):
+		clustering[kmeans.labels_[idx]].append(idx)
+
+	label_mapping = { idx : [] for idx in xrange(n_clusters) }
+	for fltr, cluster in zip(filters.T, kmeans.labels_):
+		label_mapping[cluster].append(fltr)
 
 	if do_plot:
-		weight_matrix = np.zeros((conv_size * max([len(label_mapping[key]) for key in label_mapping]), conv_size * 10))
+		weight_matrix = np.zeros((conv_size * max([len(label_mapping[key]) for key in label_mapping]), conv_size * n_clusters))
 		
 		for label in label_mapping:
 			for idx, fltr in enumerate(label_mapping[label]):
@@ -1044,7 +1009,93 @@ def run_labeling():
 		plt.savefig(os.path.join(plots_path, '_'.join(['clusters', ending + '.png'])))
 		fig.canvas.draw()
 
-	
+	if do_plot :
+		input_weight_monitor, fig_weights = plot_2d_input_weights()
+		fig_num += 1
+		
+		if connectivity != 'none':
+			patch_weight_monitor, fig2_weights = plot_patch_weights()
+			fig_num += 1
+
+	# initialize network
+	j = 0
+	num_retries = 0
+	b.run(0)
+
+	# start recording time
+	start_time = timeit.default_timer()
+
+	while j < num_examples:
+		# get the firing rates of the next input example
+		if noise:
+			rates = (data['x'][j % data_size, :, :] / 8.0) * input_intensity + np.random.normal(loc=32.0 * noise_const, scale=1.0, size=(28, 28))
+		else:
+			rates = (data['x'][j % data_size, :, :] / 8.0) * input_intensity
+		
+		# sets the input firing rates
+		input_groups['Xe'].rate = rates.reshape(n_input)
+		
+		# run the network for a single example time
+		b.run(single_example_time)
+
+		# get count of spikes over the past iteration
+		current_spike_count = np.copy(spike_counters['Ae'].count[:]).reshape((conv_features, n_e)) - previous_spike_count
+		previous_spike_count = np.copy(spike_counters['Ae'].count[:]).reshape((conv_features, n_e))
+		
+		# if the neurons in the network didn't spike more than four times
+		if np.sum(current_spike_count) < 5 and num_retries < 3:
+			# increase the intensity of input
+			input_intensity += 2
+			num_retries += 1
+			
+			# set all network firing rates to zero
+			for name in input_population_names:
+				input_groups[name + 'e'].rate = 0
+
+			# let the network relax back to equilibrium
+			if homeostasis and not reset_state_vars:
+				b.run(resting_time)
+			else:
+				for neuron_group in neuron_groups:
+					neuron_groups[neuron_group].v = v_reset_e
+					neuron_groups[neuron_group].ge = 0
+					neuron_groups[neuron_group].gi = 0
+
+		# otherwise, record results and continue simulation
+		else:			
+			num_retries = 0
+
+			# record the current number of spikes
+			result_monitor[j % update_interval, :] = current_spike_count
+			
+			# get true label of last input example
+			input_numbers[j] = data['y'][j % data_size][0]
+			
+			# print progress
+			if j % print_progress_interval == 0 and j > 0:
+				print 'runs done:', j, 'of', int(num_examples), '(time taken for past', print_progress_interval, 'runs:', str(timeit.default_timer() - start_time) + ')'
+				start_time = timeit.default_timer()
+			
+			# set input firing rates back to zero
+			for name in input_population_names:
+				input_groups[name + 'e'].rate = 0
+			
+			# run the network for 'resting_time' to relax back to rest potentials
+			if homeostasis and not reset_state_vars:
+				b.run(resting_time)
+			else:
+				for neuron_group in neuron_groups:
+					neuron_groups[neuron_group].v = v_reset_e
+					neuron_groups[neuron_group].ge = 0
+					neuron_groups[neuron_group].gi = 0
+
+			# bookkeeping
+			input_intensity = start_input_intensity
+			j += 1
+
+	assignments = assign_labels_to_clusters(result_monitor, input_numbers, clustering)
+
+	return clustering
 
 
 def run_test():
@@ -1052,7 +1103,7 @@ def run_test():
 				kmeans, kmeans_assignments, simple_clusters, simple_cluster_assignments, index_matrix
 
 	if do_plot:
-		assignments_image = plot_assignments(assignments)
+		assignments_image = plot_assignments(assignments, clustering)
 		fig_num += 1
 
 	# set up performance recording and plotting
@@ -1122,8 +1173,7 @@ def run_test():
 			input_numbers[j] = data['y'][j % data_size][0]
 			
 			# get the output classifications of the network
-			for scheme, outputs in predict_label(assignments, result_monitor[j % update_interval, :]).items():
-				output_numbers[scheme][j, :] = outputs
+			output_numbers[j, :] = predict_label_from_cluster_assignments(assignments, result_monitor[j % update_interval, :], clustering)
 
 			# print progress
 			if j % print_progress_interval == 0 and j > 0:
@@ -1162,7 +1212,8 @@ def save_results():
 
 	if label_mode:
 		np.save(os.path.join(best_assignments_dir, '_'.join(['assignments', ending + '_best.npy'])), assignments)
-	
+		p.dump(clustering, open(os.path.join(clustering_dir, '_'.join(['clustering', ending + '.p'])), 'wb'))
+
 	else:
 		np.save(os.path.join(activity_dir, '_'.join(['results', str(num_examples), ending])), result_monitor)
 		np.save(os.path.join(activity_dir, '_'.join(['input_numbers', str(num_examples), ending])), input_numbers)
@@ -1176,24 +1227,21 @@ def evaluate_results():
 	'''
 	global update_interval
 
-	test_results = {}
-	for scheme in voting_schemes:
-		test_results[scheme] = np.zeros((10, num_examples))
+	test_results = np.zeros((10, num_examples))
 
 	print '\n...Calculating accuracy per voting scheme'
 
 	# for idx in xrange(end_time_testing - end_time_training):
 	for idx in xrange(num_examples):
-		label_rankings = predict_label(assignments, result_monitor[idx, :])
-		for scheme in voting_schemes:
-			test_results[scheme][:, idx] = label_rankings[scheme]
+		label_rankings = predict_label_from_cluster_assignments(assignments, result_monitor[idx, :], clustering)
+		test_results[:, idx] = label_rankings
 
-	differences = { scheme : test_results[scheme][0, :] - input_numbers for scheme in voting_schemes }
-	correct = { scheme : len(np.where(differences[scheme] == 0)[0]) for scheme in voting_schemes }
-	incorrect = { scheme : len(np.where(differences[scheme] != 0)[0]) for scheme in voting_schemes }
-	accuracies = { scheme : correct[scheme] / float(num_examples) * 100 for scheme in voting_schemes }
+	differences = test_results[0, :] - input_numbers
+	correct = len(np.where(differences == 0)[0])
+	incorrect = len(np.where(differences != 0)[0])
+	accuracies = correct / float(num_examples) * 100
 
-	conf_matrix = confusion_matrix(test_results[scheme][0, :], input_numbers)
+	conf_matrix = confusion_matrix(test_results[0, :], input_numbers)
 
 	print '\nConfusion matrix:\n\n', conf_matrix
 
@@ -1204,18 +1252,15 @@ def evaluate_results():
 		plt.title('Confusion matrix')
 		fig.canvas.draw()
 
-		time.sleep(100)
+	print '\n- "all" voting scheme accuracy:', accuracies
 
-	for scheme in voting_schemes:
-		print '\n-', scheme, 'accuracy:', accuracies[scheme]
-
-	results = pd.DataFrame([ [ ending ] + accuracies.values() ], columns=[ 'Model' ] + accuracies.keys())
-	if not 'results.csv' in os.listdir(results_path):
-		results.to_csv(os.path.join(results_path, 'results.csv'), index=False)
-	else:
-		all_results = pd.read_csv(os.path.join(results_path, 'results.csv'))
-		all_results = pd.concat([all_results, results], ignore_index=True)
-		all_results.to_csv(os.path.join(results_path, 'results.csv'), index=False)
+	# results = pd.DataFrame([ [ ending, accuracies ] ], columns=[ 'Model' ] + 'all')
+	# if not 'results.csv' in os.listdir(results_path):
+	# 	results.to_csv(os.path.join(results_path, 'results.csv'), index=False)
+	# else:
+	# 	all_results = pd.read_csv(os.path.join(results_path, 'results.csv'))
+	# 	all_results = pd.concat([all_results, results], ignore_index=True)
+	# 	all_results.to_csv(os.path.join(results_path, 'results.csv'), index=False)
 
 	print '\n'
 
@@ -1274,6 +1319,7 @@ if __name__ == '__main__':
 	parser.add_argument('--wmax_exc', type=float, default=10.0, help='The max weight on synapses between any two connected excitatory neurons.')
 	parser.add_argument('--max_inhib', type=float, default=17.4, help='The maximum synapse weight for inhibitory to excitatory connections.')
 	parser.add_argument('--reset_state_vars', type=str, default='False', help='Whether to reset neuron / synapse state variables or run a "reset" period.')
+	parser.add_argument('--n_clusters', type=int, default=40, help='The number of clusters to use in running KMeans on neuron filters.')
 
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
@@ -1459,7 +1505,7 @@ if __name__ == '__main__':
 	
 	# creating dictionaries for various objects
 	neuron_groups, input_groups, connections, input_connections, stdp_methods, \
-		rate_monitors, spike_monitors, spike_counters, output_numbers = {}, {}, {}, {}, {}, {}, {}, {}, {}
+		rate_monitors, spike_monitors, spike_counters = {}, {}, {}, {}, {}, {}, {}, {}
 
 	# creating convolution locations inside the input image
 	convolution_locations = {}
@@ -1509,8 +1555,7 @@ if __name__ == '__main__':
 				raise Exception('Expecting one of "far", "increasing", or "strengthen" for argument "inhib_scheme".')
 
 	# build the spiking neural network
-	if not label_mode:
-		build_network()
+	build_network()
 
 	# bookkeeping variables
 	previous_spike_count = np.zeros((conv_features, n_e))
@@ -1519,17 +1564,17 @@ if __name__ == '__main__':
 
 	if test_mode:
 		assignments = np.load(os.path.join(best_assignments_dir, '_'.join(['assignments', ending + '_best.npy'])))
+		clustering = p.load(open(os.path.join(clustering_dir, '_'.join(['clustering', ending + '.p'])), 'rb'))
 
 	voting_schemes = ['all', 'most_spiked_patch', 'top_percent', 'most_spiked_location']
 
-	for scheme in voting_schemes:
-		output_numbers[scheme] = np.zeros((num_examples, 10))
+	output_numbers = np.zeros((num_examples, 10))
 
 	# run the simulation of the network
 	if test_mode:
 		run_test()
 	elif label_mode:
-		run_labeling()
+		clustering = run_labeling()
 	else:
 		run_train()
 

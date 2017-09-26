@@ -1112,7 +1112,6 @@ def run_test():
 	# initialize network
 	j = 0
 	num_retries = 0
-	tries = 3
 	b.run(0)
 
 	# start recording time
@@ -1239,8 +1238,6 @@ def evaluate_results():
 	'''
 	global update_interval
 
-	tries = 3
-
 	test_results = {}
 	for scheme in voting_schemes:
 		test_results[scheme] = np.zeros((10, num_examples * tries))
@@ -1248,11 +1245,9 @@ def evaluate_results():
 	print '\n...Calculating accuracy per voting scheme'
 
 	for idx in xrange(0, num_examples * tries, tries):
-		label_rankings = np.zeros((tries, 10))
+		label_rankings = {}
 		for try_idx in xrange(tries):
 			label_rankings[try_idx] = predict_label(assignments, result_monitor[idx + try_idx, :], accumulated_rates, spike_proportions)
-
-		print 'here.'
 
 		for scheme in voting_schemes:
 			for try_idx in xrange(tries):
@@ -1338,6 +1333,7 @@ if __name__ == '__main__':
 	parser.add_argument('--wmax_exc', type=float, default=10.0, help='The max weight on synapses between any two connected excitatory neurons.')
 	parser.add_argument('--max_inhib', type=float, default=17.4, help='The maximum synapse weight for inhibitory to excitatory connections.')
 	parser.add_argument('--reset_state_vars', type=str, default='False', help='Whether to reset neuron / synapse state variables or run a "reset" period.')
+	parser.add_argument('--tries', type=int, default=3)
 
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
@@ -1531,7 +1527,7 @@ if __name__ == '__main__':
 						conv_stride) + (x * n_input_sqrt) + y for y in xrange(conv_size) for x in xrange(conv_size) ]
 
 	# instantiating neuron "vote" monitor
-	result_monitor = np.zeros((update_interval, conv_features, n_e))
+	result_monitor = np.zeros((update_interval * tries, conv_features, n_e))
 
 	neighbor_mapping = {}
 	for feature in xrange(conv_features):

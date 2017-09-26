@@ -600,7 +600,10 @@ def assign_labels(result_monitor, input_numbers, accumulated_rates, accumulated_
 		num_assignments = len(np.where(input_numbers == j)[0])
 		if num_assignments > 0:
 			accumulated_inputs[j] += num_assignments
-			accumulated_rates[:, j] = accumulated_rates[:, j] * accumulation_decay + np.ravel(np.sum(result_monitor[input_numbers == j], axis=0) / num_assignments)
+			accumulated_rates[:, j] = accumulated_rates[:, j] * accumulation_decay + \
+					np.ravel(np.sum(result_monitor[input_numbers == j], axis=0) / num_assignments)
+
+	print accumulated_rates.shape
 	
 	assignments = np.argmax(accumulated_rates, axis=1).reshape((conv_features, n_e))
 
@@ -1376,10 +1379,7 @@ if __name__ == '__main__':
 	print 'Time needed to load data:', timeit.default_timer() - start
 
 	# set parameters for simulation based on train / test mode
-	if test_mode:
-		record_spikes = True
-	else:
-		record_spikes = True
+	record_spikes = True
 
 	# number of inputs to the network
 	n_input = 784
@@ -1427,8 +1427,10 @@ if __name__ == '__main__':
 	recurrent_conn_names = [ 'ei', 'ie', 'ee' ]
 	
 	# setting weight, delay, and intensity parameters
-	if conv_size == 28 and conv_stride == 0:
+	if conv_size == 28 and conv_stride == 0 and not inhib_scheme == 'constant':
 		weight['ee_input'] = (conv_size ** 2) * 0.15
+	elif inhib_scheme == 'constant':
+		weight['ee_input'] = (conv_size ** 2) * 0.125
 	else:
 		weight['ee_input'] = (conv_size ** 2) * 0.1625
 

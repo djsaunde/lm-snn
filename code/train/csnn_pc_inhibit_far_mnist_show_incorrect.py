@@ -40,17 +40,21 @@ plots_path = os.path.join(top_level_path, 'plots', model_name)
 
 performance_dir = os.path.join(top_level_path, 'performance', model_name)
 activity_dir = os.path.join(top_level_path, 'activity', model_name)
-weights_dir = os.path.join(top_level_path, 'weights', model_name)
 deltas_dir = os.path.join(top_level_path, 'deltas', model_name)
 random_dir = os.path.join(top_level_path, 'random', model_name)
+
+weights_dir = os.path.join(top_level_path, 'weights', model_name)
 best_weights_dir = os.path.join(weights_dir, 'best')
 end_weights_dir = os.path.join(weights_dir, 'end')
+
 misc_dir = os.path.join(top_level_path, 'misc', model_name)
 best_misc_dir = os.path.join(misc_dir, 'best')
 end_misc_dir = os.path.join(misc_dir, 'end')
 
+misclassified_dir = os.path.join(top_level_path, 'misclassified', model_name)
+
 for d in [ performance_dir, activity_dir, weights_dir, deltas_dir, random_dir, misc_dir, best_misc_dir, \
-			MNIST_data_path, results_path, plots_path, best_weights_dir, end_weights_dir, end_misc_dir ]:
+			MNIST_data_path, results_path, plots_path, best_weights_dir, end_weights_dir, end_misc_dir, misclassified_dir ]:
 	if not os.path.isdir(d):
 		os.makedirs(d)
 
