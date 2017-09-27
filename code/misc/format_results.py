@@ -1,22 +1,17 @@
-'''
-Script which parses .csv file of all results into desired LaTeX table. Abandoned (for now) in favor of Jupyter notebook
-entitled "Format Results.ipynb".
-'''
-
+import os
+import numpy as np
 import pandas as pd
 
 top_level_path = '../../'
+results_path = os.path.join(top_level_path, 'docs', 'results.csv')
 
-results = pd.read_csv(top_level_path + 'data/all_accuracy_results.csv', index_col=0, delimiter=',', encoding="utf-8-sig", header=0)
+results = pd.read_csv(results_path)
+results['random seed'] = pd.Series([entry.split('_')[22] for entry in results['Model']])
+results['inhibition'] = pd.Series([entry.split('_')[19] for entry in results['Model']])
+results['strengthen'] = pd.Series([entry.split('_')[20] for entry in results['Model']])
 
-print results
+del results['Model']
 
-# results = results.set_index('Network')
+averaged_results = results.groupby(['inhibition', 'strengthen']).mean()
 
-print results.columns
-print results.index
-
-# for ending in results.index.values:
-# 	print results.get(ending)
-
-ending_mapping = pd.DataFrame.from_dict({ results[idx] : accuracy for idx, accuracy in enumerate(results['All']) })
+print averaged_results.to_latex(float_format='%.2f')

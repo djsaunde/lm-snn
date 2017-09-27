@@ -1257,7 +1257,7 @@ def evaluate_results():
 		plt.title('Confusion matrix')
 		fig.canvas.draw()
 
-		time.sleep(100)
+		time.sleep(10)
 
 	for scheme in voting_schemes:
 		print '\n-', scheme, 'accuracy:', accuracies[scheme]
@@ -1322,7 +1322,10 @@ if __name__ == '__main__':
 																						on the labeling of the excitatory neurons.')
 	parser.add_argument('--plot_all_deltas', type=str, default='False', help='Whether or not to plot weight changes for all \
 																						synapses from input to excitatory layer.')
-	parser.add_argument('--test_remove_inhibition', type=str, default='False', help='Whether or not to remove lateral inhibition during the test phase.')
+	parser.add_argument('--train_remove_inhibition', type=str, default='False', help='Whether or not to \
+																			remove lateral inhibition during the training phase.')
+	parser.add_argument('--test_remove_inhibition', type=str, default='False', help='Whether or not to \
+																			remove lateral inhibition during the test phase.')
 	parser.add_argument('--exc_stdp', type=str, default='False', help='Whether to use STDP synapses between neurons in the excitatory layer.')
 	parser.add_argument('--excite_scheme', type=str, default='all', help='The scheme with which one excitatory neuron excites other excitatory neurons.')
 	parser.add_argument('--wmax_exc', type=float, default=10.0, help='The max weight on synapses between any two connected excitatory neurons.')

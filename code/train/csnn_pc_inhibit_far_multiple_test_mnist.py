@@ -22,6 +22,7 @@ import os
 from scipy.spatial.distance import euclidean
 from sklearn.cluster import KMeans
 from struct import unpack
+from copy import deepcopy
 from brian import *
 
 from util import *
@@ -597,7 +598,8 @@ def assign_labels(result_monitor, input_numbers, accumulated_rates, accumulated_
 		num_assignments = len(np.where(input_numbers == j)[0])
 		if num_assignments > 0:
 			accumulated_inputs[j] += num_assignments
-			accumulated_rates[:, j] = accumulated_rates[:, j] * accumulation_decay + np.ravel(np.sum(result_monitor[input_numbers == j], axis=0) / num_assignments)
+			accumulated_rates[:, j] = accumulated_rates[:, j] * accumulation_decay + \
+				np.ravel(np.sum(result_monitor[input_numbers == j], axis=0) / num_assignments)
 	
 	assignments = np.argmax(accumulated_rates, axis=1).reshape((conv_features, n_e))
 
@@ -854,11 +856,6 @@ def build_network():
 						for idx in xrange(conv_size ** 2):
 							input_connections[conn_name][convolution_locations[n][idx], feature * n_e + n] = (b.random() + 0.01) * 0.3
 
-			if test_mode:
-				if do_plot:
-					plot_2d_input_weights()
-					fig_num += 1	
-
 		# if excitatory -> excitatory STDP is specified, add it here (input to excitatory populations)
 		if not test_mode:
 			print '...Creating STDP for connection', name
@@ -1102,6 +1099,15 @@ def run_test():
 		assignments_image = plot_assignments(assignments)
 		fig_num += 1
 
+	# plot input intensities
+	if do_plot:
+		input_image_monitor, input_image = plot_input(rates)
+		fig_num += 1
+
+	if do_plot:
+		input_weight_monitor, fig_weights = plot_2d_input_weights()
+		fig_num += 1
+
 	# set up performance recording and plotting
 	num_evaluations = int(num_examples / update_interval) + 1
 	performances = { voting_scheme : np.zeros(num_evaluations) for voting_scheme in voting_schemes }
@@ -1127,15 +1133,21 @@ def run_test():
 									np.random.normal(loc=32.0 * noise_const, scale=1.0, size=(28, 28))
 		else:
 			rates = (data['x'][(j // tries) % data_size, :, :] / 8.0) * input_intensity
-		
+
 		# sets the input firing rates
 		input_groups['Xe'].rate = rates.reshape(n_input)
 
-		actual_weights = input_connections['XeAe'][:]
+		# plot the input at this step
+		if do_plot:
+			input_image_monitor = update_input(rates, input_image_monitor, input_image)
+
+		actual_weights = deepcopy(input_connections['XeAe'][:])
 
 		if winners != []:
 			for winner in winners:
-				input_connections['XeAe'][:, winner] = 0.0 
+				input_connections['XeAe'][:, winner] = 0.0
+
+		update_2d_input_weights(input_weight_monitor, fig_weights)
 
 		# run the network for a single example time
 		b.run(single_example_time)
@@ -1255,12 +1267,15 @@ def evaluate_results():
 
 	mod_test_results = {}
 	for scheme in voting_schemes:
-		mod_test_results[scheme] = np.zeros((10, num_examples))
+		mod_test_results[scheme] = np.zeros(num_examples)
 
 	for idx in xrange(num_examples):
-		mod_test_results[scheme] = np.argmax(np.bincount(test_results[scheme][0, idx + try_idx]))
+		for scheme in voting_schemes:
+			mod_test_results[scheme][idx] = np.argmax(np.bincount(test_results[scheme][0, idx : idx + tries].astype(np.int64)))
 
-	differences = { scheme : test_results[scheme][0, :] - input_numbers for scheme in voting_schemes }
+	print mod_test_results, input_numbers
+
+	differences = { scheme : mod_test_results[scheme] - input_numbers for scheme in voting_schemes }
 	correct = { scheme : len(np.where(differences[scheme] == 0)[0]) for scheme in voting_schemes }
 	incorrect = { scheme : len(np.where(differences[scheme] != 0)[0]) for scheme in voting_schemes }
 	accuracies = { scheme : correct[scheme] / float(num_examples) * 100 for scheme in voting_schemes }
@@ -1333,7 +1348,7 @@ if __name__ == '__main__':
 	parser.add_argument('--wmax_exc', type=float, default=10.0, help='The max weight on synapses between any two connected excitatory neurons.')
 	parser.add_argument('--max_inhib', type=float, default=17.4, help='The maximum synapse weight for inhibitory to excitatory connections.')
 	parser.add_argument('--reset_state_vars', type=str, default='False', help='Whether to reset neuron / synapse state variables or run a "reset" period.')
-	parser.add_argument('--tries', type=int, default=3)
+	parser.add_argument('--tries', type=int, default=1)	
 
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
@@ -1406,7 +1421,7 @@ if __name__ == '__main__':
 	features_sqrt = int(math.ceil(math.sqrt(conv_features)))
 
 	# time (in seconds) per data example presentation and rest period in between
-	single_example_time = 0.35 * b.second
+	single_example_time = 1.0 * b.second
 	resting_time = 0.15 * b.second
 
 	# set the update interval
@@ -1527,7 +1542,10 @@ if __name__ == '__main__':
 						conv_stride) + (x * n_input_sqrt) + y for y in xrange(conv_size) for x in xrange(conv_size) ]
 
 	# instantiating neuron "vote" monitor
-	result_monitor = np.zeros((update_interval * tries, conv_features, n_e))
+	if not test_mode:
+		result_monitor = np.zeros((update_interval, conv_features, n_e))
+	else:
+		result_monitor = np.zeros((update_interval * tries, conv_features, n_e))
 
 	neighbor_mapping = {}
 	for feature in xrange(conv_features):
