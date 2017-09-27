@@ -1,6 +1,6 @@
 # Grid search over hyperparameters for experiments with new inhibition schemes.
 
-num_train=15000
+num_train=30000
 reduced_dataset="False"
 inhib_scheme="strengthen"
 conv_features=625
