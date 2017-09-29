@@ -2,6 +2,8 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
 top_level_path = os.path.join('..', '..')
 model_name = 'csnn_pc_inhibit_far'
 best_misc_dir = os.path.join(top_level_path, 'misc', model_name, 'best')
@@ -9,21 +11,29 @@ plots_dir = os.path.join(top_level_path, 'plots', model_name)
 
 fig_num = 1
 
-plt.ion()
-
 def plot_labels(labels):
 	fig = plt.figure(fig_num, figsize = (5, 5))
+	ax = plt.gca()
+
 	cmap = plt.get_cmap('RdBu', 11)
 	labels = labels.reshape((int(np.sqrt(n_e_total)), int(np.sqrt(n_e_total)))).T
-	im = plt.matshow(labels, cmap=cmap, vmin=-1.5, vmax=9.5)
-	plt.colorbar(im, ticks=np.arange(-1, 10))
+	
+	im = ax.matshow(labels, cmap=cmap, vmin=-0.5, vmax=9.5)
+
 	plt.title('Neuron labels')
+
+	divider = make_axes_locatable(ax)
+	cax = divider.append_axes("right", size="5%", pad=0.1)
+	
+	plt.colorbar(im, cax=cax, ticks=np.arange(0, 10))
+
 	fig.canvas.draw()
 
 	if fig_num == 10:
 		plt.savefig(os.path.join(plots_dir, '_'.join(file_name.split('_')[2:])[:-4] + '.png'))
 
 	plt.show()
+
 	return im, fig
 
 print '\n'
@@ -50,8 +60,4 @@ else:
 
 accumulated_rates = np.load(os.path.join(best_misc_dir, file_name))
 
-for i in xrange(10):
-	plot_labels(np.argsort(accumulated_rates, axis=1)[:, i].reshape((conv_features, n_e)))
-	fig_num += 1
-
-x = raw_input('Quit? ')
+plot_labels(np.argsort(accumulated_rates, axis=1)[:, -1].reshape((conv_features, n_e)))

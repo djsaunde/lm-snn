@@ -4,16 +4,23 @@ import time, os, scipy, math, sys, timeit
 import cPickle as p
 import brian_no_units
 import brian as b
+import argparse
 
 from scipy.sparse import coo_matrix
 from struct import unpack
 from brian import *
 
+parser = argparse.ArgumentParser()
+parser.add_argument('--directory', default='best')
+args = parser.parse_args()
+
+directory = args.directory
+
 fig_num = 0
 
 top_level_path = os.path.join('..', '..')
 model_name = 'csnn_pc_inhibit_far'
-weight_dir = os.path.join(top_level_path, 'weights', model_name, 'best')
+weight_dir = os.path.join(top_level_path, 'weights', model_name, directory)
 plots_dir = os.path.join(top_level_path, 'plots', model_name)
 
 
