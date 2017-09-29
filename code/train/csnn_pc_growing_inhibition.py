@@ -143,7 +143,6 @@ def get_2d_input_weights():
 
 	# get the input -> excitatory synaptic weights
 	connection = input_connections['XeAe'][:]
-
 	
 	for n in xrange(n_e):
 		for feature in xrange(conv_features):
@@ -524,8 +523,6 @@ def assign_labels(result_monitor, input_numbers, accumulated_rates, accumulated_
 			accumulated_inputs[j] += num_assignments
 			accumulated_rates[:, j] = accumulated_rates[:, j] * 0.9 + \
 					np.ravel(np.sum(result_monitor[input_numbers == j], axis=0) / num_assignments)
-
-	print accumulated_rates.shape
 	
 	assignments = np.argmax(accumulated_rates, axis=1).reshape((conv_features, n_e))
 
@@ -588,8 +585,16 @@ def build_network():
 				for feature in xrange(conv_features):
 					for other_feature in xrange(conv_features):
 						if feature != other_feature:
+							if n_e == 1:
+								x, y = feature // np.sqrt(n_e_total), feature % np.sqrt(n_e_total)
+								x_, y_ = other_feature // np.sqrt(n_e_total), other_feature % np.sqrt(n_e_total)
+							else:
+								x, y = feature // np.sqrt(conv_features), feature % np.sqrt(conv_features)
+								x_, y_ = other_feature // np.sqrt(conv_features), other_feature % np.sqrt(conv_features)
+
 							for n in xrange(n_e):
-								connections[conn_name][feature * n_e + n, other_feature * n_e + n] = 0.0
+								connections[conn_name][feature * n_e + n, other_feature * n_e + n] = \
+													min(max_inhib, 0.1 * np.sqrt(euclidean([x, y], [x_, y_])))
 
 		print '...Creating monitors for:', name
 
@@ -784,6 +789,21 @@ def run_train():
 		# otherwise, record results and continue simulation
 		else:			
 			num_retries = 0
+
+			if j > 0 and j % 100 == 0:
+				for feature in xrange(conv_features):
+					for other_feature in xrange(conv_features):
+						if feature != other_feature:
+							if n_e == 1:
+								x, y = feature // np.sqrt(n_e_total), feature % np.sqrt(n_e_total)
+								x_, y_ = other_feature // np.sqrt(n_e_total), other_feature % np.sqrt(n_e_total)
+							else:
+								x, y = feature // np.sqrt(conv_features), feature % np.sqrt(conv_features)
+								x_, y_ = other_feature // np.sqrt(conv_features), other_feature % np.sqrt(conv_features)
+
+							for n in xrange(n_e):
+								connections['AiAe'][feature * n_e + n, other_feature * n_e + n] = \
+													min(max_inhib, (j * inhib_increase) * 1.0 * np.sqrt(euclidean([x, y], [x_, y_])))
 
 			# record the current number of spikes
 			result_monitor[j % update_interval, :] = current_spike_count
@@ -1057,6 +1077,7 @@ if __name__ == '__main__':
 																			remove lateral inhibition during the test phase.')
 	parser.add_argument('--max_inhib', type=float, default=17.4, help='The maximum synapse weight for inhibitory to excitatory connections.')
 	parser.add_argument('--reset_state_vars', type=str, default='False', help='Whether to reset neuron / synapse state variables or run a "reset" period.')
+	parser.add_argument('--inhib_increase', type=float, default=0.001)
 
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
@@ -1069,8 +1090,8 @@ if __name__ == '__main__':
 
 	print '\n'
 
-	for var in [ 'do_plot', 'reduced_dataset', 'plot_all_deltas', 'reset_state_vars', \
-					'save_weights', 'save_best_model', 'test_remove_inhibition', 'load_best_model' ]:
+	for var in [ 'do_plot', 'plot_all_deltas', 'reset_state_vars', \
+				'save_weights', 'save_best_model', 'test_remove_inhibition' ]:
 		if locals()[var] == 'True':
 			locals()[var] = True
 		elif locals()[var] == 'False':
@@ -1086,9 +1107,7 @@ if __name__ == '__main__':
 	else:
 		num_examples = num_train
 
-	if reduced_dataset:
-		data_size = len(classes) * examples_per_class
-	elif test_mode:
+	if test_mode:
 		data_size = 10000
 	else:
 		data_size = 60000
@@ -1103,7 +1122,7 @@ if __name__ == '__main__':
 
 	start = timeit.default_timer()
 	data = get_labeled_data(os.path.join(MNIST_data_path, 'testing' if test_mode else 'training'), 
-												not test_mode, reduced_dataset, classes, examples_per_class)
+												not test_mode, False, xrange(10), 1000)
 	
 	print 'Time needed to load data:', timeit.default_timer() - start
 
@@ -1229,8 +1248,7 @@ if __name__ == '__main__':
 	print '\n'
 
 	# set ending of filename saves
-	ending = '_'.join([ str(conv_size), str(conv_stride), str(conv_features), \
-				str(n_e), str(examples_per_class), str(num_train), str(random_seed) ])
+	ending = '_'.join([ str(conv_size), str(conv_stride), str(conv_features), str(n_e), str(num_train), str(random_seed) ])
 
 	b.ion()
 	fig_num = 1
@@ -1257,14 +1275,9 @@ if __name__ == '__main__':
 	rates = np.zeros((n_input_sqrt, n_input_sqrt))
 
 	if test_mode:
-		if load_best_model:
-			assignments = np.load(os.path.join(best_assignments_dir, '_'.join(['assignments', ending, 'best.npy'])))
-			accumulated_rates = np.load(os.path.join(best_misc_dir, '_'.join(['accumulated_rates', ending, 'best.npy'])))
-			spike_proportions = np.load(os.path.join(best_misc_dir, '_'.join(['spike_proportions', ending, 'best.npy'])))
-		else:
-			assignments = np.load(os.path.join(end_assignments_dir, '_'.join(['assignments', ending, 'end.npy'])))
-			accumulated_rates = np.load(os.path.join(end_misc_dir, '_'.join(['accumulated_rates', ending, 'end.npy'])))
-			spike_proportions = np.load(os.path.join(end_misc_dir, '_'.join(['spike_proportions', ending, 'end.npy'])))
+		assignments = np.load(os.path.join(end_assignments_dir, '_'.join(['assignments', ending, 'end.npy'])))
+		accumulated_rates = np.load(os.path.join(end_misc_dir, '_'.join(['accumulated_rates', ending, 'end.npy'])))
+		spike_proportions = np.load(os.path.join(end_misc_dir, '_'.join(['spike_proportions', ending, 'end.npy'])))
 	else:
 		assignments = -1 * np.ones((conv_features, n_e))
 
