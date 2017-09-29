@@ -315,51 +315,6 @@ def update_patch_weights(im, fig):
 	return im
 
 
-def plot_neuron_votes(assignments, spike_rates):
-	'''
-	Plot the votes of the neurons per label.
-	'''
-	all_summed_rates = [0] * 10
-	num_assignments = [0] * 10
-
-	for i in xrange(10):
-		num_assignments[i] = len(np.where(assignments == i)[0])
-		if num_assignments[i] > 0:
-			all_summed_rates[i] = np.sum(spike_rates[:, assignments == i]) / num_assignments[i]
-
-	fig = plt.figure(fig_num, figsize=(6, 4))
-	rects = plt.bar(xrange(10), [ 0.1 ] * 10, align='center')
-	
-	plt.ylim([0, 1])
-	plt.xticks(xrange(10))
-	plt.title('Percentage votes per label')
-	
-	fig.canvas.draw()
-	return rects, fig
-
-
-def update_neuron_votes(rects, fig, spike_rates):
-	'''
-	Update the plot of the votes of the neurons by label.
-	'''
-	all_summed_rates = [0] * 10
-	num_assignments = [0] * 10
-
-	for i in xrange(10):
-		num_assignments[i] = len(np.where(assignments == i)[0])
-		if num_assignments[i] > 0:
-			all_summed_rates[i] = np.sum(spike_rates[:, assignments == i]) / num_assignments[i]
-
-	total_votes = np.sum(all_summed_rates)
-
-	if total_votes != 0:
-		for rect, h in zip(rects, all_summed_rates):
-			rect.set_height(h / float(total_votes))
-
-	fig.canvas.draw()
-	return rects
-
-
 def get_current_performance(performances, current_example_num):
 	'''
 	Evaluate the performance of the network on the past 'update_interval' training
@@ -526,7 +481,7 @@ def predict_label(assignments, spike_rates, accumulated_rates, spike_proportions
 
 		if scheme == 'all':
 			for i in xrange(10):
-				num_assignments[i] = len(np.where(assignments == i)[0])
+				num_assignments[i] = np.size(np.where(assignments == i))
 				if num_assignments[i] > 0:
 					summed_rates[i] = np.sum(spike_rates[assignments == i]) / num_assignments[i]
 
@@ -543,7 +498,7 @@ def predict_label(assignments, spike_rates, accumulated_rates, spike_proportions
 			# for each label
 			for i in xrange(10):
 				# get the number of label assignments of this type
-				num_assignments[i] = len(np.where(assignments[most_spiked_array] == i)[0])
+				num_assignments[i] = np.size(np.where(assignments[most_spiked_array] == i))
 
 				if len(spike_rates[np.where(assignments[most_spiked_array] == i)]) > 0:
 					# sum the spike rates of all excitatory neurons with this label, which fired the most in its patch
@@ -560,7 +515,7 @@ def predict_label(assignments, spike_rates, accumulated_rates, spike_proportions
 			# for each label
 			for i in xrange(10):
 				# get the number of label assignments of this type
-				num_assignments[i] = len(np.where(assignments[most_spiked_array] == i)[0])
+				num_assignments[i] = np.size(np.where(assignments[most_spiked_array] == i))
 
 				if len(spike_rates[np.where(assignments[most_spiked_array] == i)]) > 0:
 					# sum the spike rates of all excitatory neurons with this label, which fired the most in its patch
@@ -574,9 +529,9 @@ def predict_label(assignments, spike_rates, accumulated_rates, spike_proportions
 			# for each label
 			for i in xrange(10):
 				# get the number of label assignments of this type
-				num_assignments[i] = len(np.where(assignments[top_percents] == i)[0])
+				num_assignments[i] = np.size(np.where(assignments[top_percents] == i))
 
-				if len(np.where(assignments[top_percents] == i)) > 0:
+				if np.size(np.where(assignments[top_percents] == i)) > 0:
 					# sum the spike rates of all excitatory neurons with this label, which fired the most in its patch
 					summed_rates[i] = len(spike_rates[np.where(np.logical_and(assignments == i, top_percents))])
 
@@ -597,7 +552,7 @@ def assign_labels(result_monitor, input_numbers, accumulated_rates, accumulated_
 	excitatory neurons.
 	'''
 	for j in xrange(10):
-		num_assignments = len(np.where(input_numbers == j)[0])
+		num_assignments = np.size(np.where(input_numbers == j))
 		if num_assignments > 0:
 			accumulated_inputs[j] += num_assignments
 			accumulated_rates[:, j] = accumulated_rates[:, j] * accumulation_decay + \
