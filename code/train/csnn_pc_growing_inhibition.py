@@ -808,8 +808,6 @@ def run_train():
 								connections['AiAe'][feature * n_e + n, other_feature * n_e + n] = \
 										min(max_inhib, current_inhib * np.sqrt(euclidean([x, y], [x_, y_])))
 
-				print current_inhib
-
 			# record the current number of spikes
 			result_monitor[j % update_interval, :] = current_spike_count
 			
@@ -1119,8 +1117,6 @@ if __name__ == '__main__':
 		data_size = 60000
 
 	inhib_increase = ((max_inhib - start_inhib) / float(num_train) * inhibition_update_interval)
-
-	print inhib_increase
 
 	# set brian global preferences
 	b.set_global_preferences(defaultclock = b.Clock(dt=0.5*b.ms), useweave = True, gcc_options = ['-ffast-math -march=native'], usecodegen = True,
