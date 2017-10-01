@@ -594,7 +594,7 @@ def build_network():
 
 							for n in xrange(n_e):
 								connections[conn_name][feature * n_e + n, other_feature * n_e + n] = \
-													min(max_inhib, 0.1 * np.sqrt(euclidean([x, y], [x_, y_])))
+													min(max_inhib, start_inhib * np.sqrt(euclidean([x, y], [x_, y_])))
 
 		print '...Creating monitors for:', name
 
@@ -716,6 +716,8 @@ def run_train():
 
 	last_weights = input_connections['XeAe'][:].todense()
 
+	current_inhib = start_inhib
+
 	while j < num_examples:
 		# get the firing rates of the next input example
 		rates = (data['x'][j % data_size, :, :] / 8.0) * input_intensity
@@ -790,7 +792,8 @@ def run_train():
 		else:			
 			num_retries = 0
 
-			if j > 0 and j % 100 == 0:
+			if j > 0 and j % inhibition_update_interval == 0:
+				current_inhib = current_inhib + inhib_increase
 				for feature in xrange(conv_features):
 					for other_feature in xrange(conv_features):
 						if feature != other_feature:
@@ -803,7 +806,9 @@ def run_train():
 
 							for n in xrange(n_e):
 								connections['AiAe'][feature * n_e + n, other_feature * n_e + n] = \
-													min(max_inhib, (j * inhib_increase) * 1.0 * np.sqrt(euclidean([x, y], [x_, y_])))
+										min(max_inhib, current_inhib * np.sqrt(euclidean([x, y], [x_, y_])))
+
+				print current_inhib
 
 			# record the current number of spikes
 			result_monitor[j % update_interval, :] = current_spike_count
@@ -1075,9 +1080,10 @@ if __name__ == '__main__':
 																			remove lateral inhibition during the training phase.')
 	parser.add_argument('--test_remove_inhibition', type=str, default='False', help='Whether or not to \
 																			remove lateral inhibition during the test phase.')
+	parser.add_argument('--start_inhib', type=float, default=0.1, help='The beginning value of inhibiton for the increasing scheme.')
 	parser.add_argument('--max_inhib', type=float, default=17.4, help='The maximum synapse weight for inhibitory to excitatory connections.')
 	parser.add_argument('--reset_state_vars', type=str, default='False', help='Whether to reset neuron / synapse state variables or run a "reset" period.')
-	parser.add_argument('--inhib_increase', type=float, default=0.001)
+	parser.add_argument('--inhibition_update_interval', type=int, default=100, help='How often to increase the inhibition strength.')
 
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
@@ -1111,6 +1117,10 @@ if __name__ == '__main__':
 		data_size = 10000
 	else:
 		data_size = 60000
+
+	inhib_increase = ((max_inhib - start_inhib) / float(num_train) * inhibition_update_interval)
+
+	print inhib_increase
 
 	# set brian global preferences
 	b.set_global_preferences(defaultclock = b.Clock(dt=0.5*b.ms), useweave = True, gcc_options = ['-ffast-math -march=native'], usecodegen = True,
