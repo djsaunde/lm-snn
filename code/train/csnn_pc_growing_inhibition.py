@@ -593,7 +593,10 @@ def build_network():
 								x_, y_ = other_feature // np.sqrt(conv_features), other_feature % np.sqrt(conv_features)
 
 							for n in xrange(n_e):
-								connections[conn_name][feature * n_e + n, other_feature * n_e + n] = \
+								if test_mode:
+									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = max_inhib
+								else:
+									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = \
 													min(max_inhib, start_inhib * np.sqrt(euclidean([x, y], [x_, y_])))
 
 		print '...Creating monitors for:', name
