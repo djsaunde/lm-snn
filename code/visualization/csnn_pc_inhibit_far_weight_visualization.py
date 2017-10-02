@@ -6,9 +6,11 @@ import brian_no_units
 import brian as b
 import argparse
 
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.sparse import coo_matrix
 from struct import unpack
 from brian import *
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--directory', default='best')
@@ -103,14 +105,16 @@ def plot_2d_input_weights(title):
 	else:
 		fig = plt.figure(fig_num, figsize=(9, 9))
 
-	im = plt.imshow(weights, interpolation='nearest', vmin=0, vmax=wmax_ee, cmap=cmap.get_cmap('hot_r'))
-	
-	if n_e != 1:
-		plt.colorbar(im, fraction=0.016)
-	else:
-		plt.colorbar(im, fraction=0.06)
-
 	plt.title(title)
+
+	ax = plt.gca()
+
+	im = ax.imshow(weights, interpolation='nearest', vmin=0, vmax=wmax_ee, cmap=cmap.get_cmap('hot_r'))
+	
+	divider = make_axes_locatable(ax)
+	cax = divider.append_axes("right", size="5%", pad=0.1)
+	
+	plt.colorbar(im, cax=cax, ylim=[0, 1])
 
 	if n_e != 1:
 		plt.xticks(xrange(conv_size, conv_size * (conv_features + 1), conv_size), xrange(1, conv_features + 1))

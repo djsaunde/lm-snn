@@ -677,13 +677,6 @@ def build_network():
 	print '\n'
 
 
-def increase_inhibition():
-	global current_inhibition
-
-	connections['AiAe'][:] = current_inhibition * 1.1
-	current_inhibition = current_inhibition * 1.1
-
-
 def run_train():
 	global fig_num, input_intensity, previous_spike_count, rates, assignments, clusters, cluster_assignments, \
 				simple_clusters, simple_cluster_assignments, index_matrix, accumulated_rates, \
@@ -826,8 +819,6 @@ def run_train():
 			# get the output classifications of the network
 			for scheme, outputs in predict_label(assignments, result_monitor[j % update_interval, :], accumulated_rates, spike_proportions).items():
 				output_numbers[scheme][j, :] = outputs
-
-			increase_inhibition()
 
 			# print progress
 			if j % print_progress_interval == 0 and j > 0:
@@ -1191,7 +1182,7 @@ if __name__ == '__main__':
 	
 	# setting weight, delay, and intensity parameters
 	if conv_size == 28 and conv_stride == 0:
-		weight['ee_input'] = (conv_size ** 2) * 0.1
+		weight['ee_input'] = (conv_size ** 2) * 0.15
 	else:
 		weight['ee_input'] = (conv_size ** 2) * 0.1625
 

@@ -18,7 +18,7 @@ def plot_labels(labels):
 	cmap = plt.get_cmap('RdBu', 11)
 	labels = labels.reshape((int(np.sqrt(n_e_total)), int(np.sqrt(n_e_total)))).T
 	
-	im = ax.matshow(labels, cmap=cmap, vmin=-0.5, vmax=9.5)
+	im = ax.matshow(labels, cmap=cmap, vmin=0.5, vmax=9.5)
 
 	plt.title('Neuron labels')
 
