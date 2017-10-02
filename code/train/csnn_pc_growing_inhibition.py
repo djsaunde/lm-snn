@@ -22,7 +22,6 @@ import os
 
 from scipy.spatial.distance import euclidean
 from sklearn.metrics import confusion_matrix
-from sklearn.cluster import KMeans
 from struct import unpack
 from brian import *
 
@@ -143,7 +142,6 @@ def get_2d_input_weights():
 
 	# get the input -> excitatory synaptic weights
 	connection = input_connections['XeAe'][:]
-
 	
 	for n in xrange(n_e):
 		for feature in xrange(conv_features):
@@ -589,7 +587,7 @@ def build_network():
 					for other_feature in xrange(conv_features):
 						if feature != other_feature:
 							for n in xrange(n_e):
-								connections[conn_name][feature * n_e + n, other_feature * n_e + n] = 0.0
+								connections[conn_name][feature * n_e + n, other_feature * n_e + n] = 1.0
 
 		print '...Creating monitors for:', name
 
@@ -670,9 +668,16 @@ def build_network():
 	print '\n'
 
 
+def increase_inhibition():
+	global current_inhibition
+
+	connections['AiAe'][:] = current_inhibition * 1.1
+	current_inhibition = current_inhibition * 1.1
+
+
 def run_train():
 	global fig_num, input_intensity, previous_spike_count, rates, assignments, clusters, cluster_assignments, \
-				kmeans, kmeans_assignments, simple_clusters, simple_cluster_assignments, index_matrix, accumulated_rates, \
+				simple_clusters, simple_cluster_assignments, index_matrix, accumulated_rates, \
 				accumulated_inputs, spike_proportions
 
 	if do_plot:
@@ -795,6 +800,8 @@ def run_train():
 			for scheme, outputs in predict_label(assignments, result_monitor[j % update_interval, :], accumulated_rates, spike_proportions).items():
 				output_numbers[scheme][j, :] = outputs
 
+			increase_inhibition()
+
 			# print progress
 			if j % print_progress_interval == 0 and j > 0:
 				print 'runs done:', j, 'of', int(num_examples), '(time taken for past', print_progress_interval, 'runs:', str(timeit.default_timer() - start_time) + ')'
@@ -829,7 +836,6 @@ def run_train():
 							np.save(os.path.join(best_assignments_dir, '_'.join(['assignments', ending, 'best'])), assignments)
 							np.save(os.path.join(best_misc_dir, '_'.join(['accumulated_rates', ending, 'best'])), accumulated_rates)
 							np.save(os.path.join(best_misc_dir, '_'.join(['spike_proportions', ending, 'best'])), spike_proportions)
-							
 
 				# Print out performance progress intermittently
 				for performance in performances:
@@ -863,7 +869,7 @@ def run_train():
 
 def run_test():
 	global fig_num, input_intensity, previous_spike_count, rates, assignments, clusters, cluster_assignments, \
-				kmeans, kmeans_assignments, simple_clusters, simple_cluster_assignments, index_matrix, accumulated_rates, \
+				simple_clusters, simple_cluster_assignments, index_matrix, accumulated_rates, \
 				accumulated_inputs, spike_proportions
 
 	if do_plot:
@@ -1069,8 +1075,7 @@ if __name__ == '__main__':
 
 	print '\n'
 
-	for var in [ 'do_plot', 'reduced_dataset', 'plot_all_deltas', 'reset_state_vars', \
-					'save_weights', 'save_best_model', 'test_remove_inhibition', 'load_best_model' ]:
+	for var in [ 'do_plot', 'plot_all_deltas', 'reset_state_vars', 'save_weights', 'save_best_model', 'test_remove_inhibition' ]:
 		if locals()[var] == 'True':
 			locals()[var] = True
 		elif locals()[var] == 'False':
@@ -1086,9 +1091,7 @@ if __name__ == '__main__':
 	else:
 		num_examples = num_train
 
-	if reduced_dataset:
-		data_size = len(classes) * examples_per_class
-	elif test_mode:
+	if test_mode:
 		data_size = 10000
 	else:
 		data_size = 60000
@@ -1103,7 +1106,7 @@ if __name__ == '__main__':
 
 	start = timeit.default_timer()
 	data = get_labeled_data(os.path.join(MNIST_data_path, 'testing' if test_mode else 'training'), 
-												not test_mode, reduced_dataset, classes, examples_per_class)
+												not test_mode, False, xrange(10), 1000)
 	
 	print 'Time needed to load data:', timeit.default_timer() - start
 
@@ -1157,13 +1160,15 @@ if __name__ == '__main__':
 	
 	# setting weight, delay, and intensity parameters
 	if conv_size == 28 and conv_stride == 0:
-		weight['ee_input'] = (conv_size ** 2) * 0.15
+		weight['ee_input'] = (conv_size ** 2) * 0.1
 	else:
 		weight['ee_input'] = (conv_size ** 2) * 0.1625
 
 	delay['ee_input'] = (0 * b.ms, 10 * b.ms)
 	delay['ei_input'] = (0 * b.ms, 5 * b.ms)
 	input_intensity = start_input_intensity = 2.0
+
+	current_inhibition = 1.0
 
 	# time constants, learning rates, max weights, weight dependence, etc.
 	tc_pre_ee, tc_post_ee = 20 * b.ms, 20 * b.ms
@@ -1229,8 +1234,7 @@ if __name__ == '__main__':
 	print '\n'
 
 	# set ending of filename saves
-	ending = '_'.join([ str(conv_size), str(conv_stride), str(conv_features), \
-				str(n_e), str(examples_per_class), str(num_train), str(random_seed) ])
+	ending = '_'.join([ str(conv_size), str(conv_stride), str(conv_features), str(n_e), str(num_train), str(random_seed) ])
 
 	b.ion()
 	fig_num = 1

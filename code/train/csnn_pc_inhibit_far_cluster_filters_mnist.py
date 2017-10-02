@@ -583,7 +583,7 @@ def build_network():
 		# if we're in test mode / using some stored weights
 		if label_mode or test_mode:
 			# load up adaptive threshold parameters
-			neuron_groups['e'].theta = np.load(os.path.join(csnn_pc_inhibit_far_weights_dir, '_'.join(['theta_A', ending + '_end.npy'])))
+			neuron_groups['e'].theta = np.load(os.path.join(csnn_pc_inhibit_far_weights_dir, '_'.join(['theta_A', ending + '_best.npy'])))
 		else:
 			# otherwise, set the adaptive additive threshold parameter at 20mV
 			neuron_groups['e'].theta = np.ones((n_e_total)) * 20.0 * b.mV
@@ -654,7 +654,7 @@ def build_network():
 
 				# get weights from file if we are in test mode
 				if label_mode or test_mode:
-					weight_matrix = np.load(os.path.join(csnn_pc_inhibit_far_weights_dir, '_'.join([conn_name, ending + '_end.npy'])))
+					weight_matrix = np.load(os.path.join(csnn_pc_inhibit_far_weights_dir, '_'.join([conn_name, ending + '_best.npy'])))
 
 				# create a connection from the first group in conn_name with the second group
 				connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
@@ -780,7 +780,7 @@ def build_network():
 
 			# get weight matrix depending on training or test phase
 			if label_mode or test_mode:
-				weight_matrix = np.load(os.path.join(csnn_pc_inhibit_far_weights_dir, '_'.join([conn_name, ending + '_end.npy'])))
+				weight_matrix = np.load(os.path.join(csnn_pc_inhibit_far_weights_dir, '_'.join([conn_name, ending + '_best.npy'])))
 
 			# create connections from the windows of the input group to the neuron population
 			input_connections[conn_name] = b.Connection(input_groups['Xe'], neuron_groups[name[1] + conn_type[1]], \
@@ -983,7 +983,7 @@ def run_labeling():
 				kmeans, kmeans_assignments, simple_clusters, simple_cluster_assignments, index_matrix 
 
 	kmeans = KMeans(n_clusters=n_clusters)
-	weight_matrix = np.load(os.path.join(csnn_pc_inhibit_far_weights_dir, '_'.join(['XeAe', ending + '_end.npy'])))
+	weight_matrix = np.load(os.path.join(csnn_pc_inhibit_far_weights_dir, '_'.join(['XeAe', ending + '_best.npy'])))
 	filters = weight_matrix.reshape((conv_size ** 2, n_e_total))
 	kmeans.fit(filters.T)
 
