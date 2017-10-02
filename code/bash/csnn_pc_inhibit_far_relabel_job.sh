@@ -36,7 +36,7 @@ python csnn_pc_inhibit_far_relabel_mnist.py --mode=train --connectivity=$connect
 
 python csnn_pc_inhibit_far_relabel_mnist.py --mode=label --connectivity=$connectivity --conv_size=$conv_size \
         --conv_stride=$conv_stride --conv_features=$conv_features --lattice_structure=$lattice_structure --top_percent=$top_percent \
-        --num_train=$num_train --num_label=$num_label --reduced_dataset=$reduced_dataset --examples_per_class=$examples_per_class --neighborhood=$neighborhood --reset_state_vars=$reset_state_vars \
+        --num_train=$num_train --num_label=$num_train --reduced_dataset=$reduced_dataset --examples_per_class=$examples_per_class --neighborhood=$neighborhood --reset_state_vars=$reset_state_vars \
         --inhib_scheme=$inhib_scheme --inhib_const=$inhib_const --strengthen_const=$strengthen_const --noise=$noise --noise_const=$noise_const --random_seed=$random_seed
 
 python csnn_pc_inhibit_far_relabel_mnist.py --mode=test --connectivity=$connectivity --conv_size=$conv_size \

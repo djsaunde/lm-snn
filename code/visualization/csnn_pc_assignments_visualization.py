@@ -29,8 +29,7 @@ def plot_labels(labels):
 
 	fig.canvas.draw()
 
-	if fig_num == 10:
-		plt.savefig(os.path.join(plots_dir, '_'.join(file_name.split('_')[2:])[:-4] + '.png'))
+	plt.savefig(os.path.join(plots_dir, '_'.join(file_name.split('_')[2:])[:-4] + '.png'))
 
 	plt.show()
 
