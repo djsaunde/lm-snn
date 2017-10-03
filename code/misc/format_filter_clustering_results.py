@@ -15,6 +15,8 @@ results['clusters'] = pd.Series([entry.split('_')[25] for entry in results['Mode
 
 print results.columns.values
 
+results = results.drop_duplicates(['Model'])
+
 del results['Model']
 
 results = results[results['strengthen'] == 0.0]
