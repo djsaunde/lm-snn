@@ -30,6 +30,11 @@ cd ../train/
 echo 1 $connectivity 2 $conv_size 3 $conv_stride 4 $conv_features 5 $lattice_structure 6 $top_percent 7 $num_train 8 $reduced_dataset 9 $examples_per_class 10 \
 	$neighborhood 11 $inhib_scheme 12 $inhib_const 13 $strengthen_const 14 $noise 15 $noise_const 16 $random_seed
 
+python csnn_pc_inhibit_far_cluster_filters_mnist.py --mode=train --connectivity=$connectivity --conv_size=$conv_size \
+	--conv_stride=$conv_stride --conv_features=$conv_features --lattice_structure=$lattice_structure --top_percent=$top_percent \
+	--num_train=$num_train --num_test=10000 --reduced_dataset=$reduced_dataset --examples_per_class=$examples_per_class --neighborhood=$neighborhood --reset_state_vars=$reset_state_vars \
+        --inhib_scheme=$inhib_scheme --inhib_const=$inhib_const --strengthen_const=$strengthen_const --noise=$noise --noise_const=$noise_const --random_seed=$random_seed --n_clusters=$n_clusters
+
 python csnn_pc_inhibit_far_cluster_filters_mnist.py --mode=label --connectivity=$connectivity --conv_size=$conv_size \
 	--conv_stride=$conv_stride --conv_features=$conv_features --lattice_structure=$lattice_structure --top_percent=$top_percent \
 	--num_train=$num_train --num_test=10000 --reduced_dataset=$reduced_dataset --examples_per_class=$examples_per_class --neighborhood=$neighborhood --reset_state_vars=$reset_state_vars \

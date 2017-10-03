@@ -1253,13 +1253,13 @@ def evaluate_results():
 
 	print '\n- "all" voting scheme accuracy:', accuracies
 
-	# results = pd.DataFrame([ [ ending, accuracies ] ], columns=[ 'Model' ] + 'all')
-	# if not 'results.csv' in os.listdir(results_path):
-	# 	results.to_csv(os.path.join(results_path, 'results.csv'), index=False)
-	# else:
-	# 	all_results = pd.read_csv(os.path.join(results_path, 'results.csv'))
-	# 	all_results = pd.concat([all_results, results], ignore_index=True)
-	# 	all_results.to_csv(os.path.join(results_path, 'results.csv'), index=False)
+	results = pd.DataFrame([ [ ending, accuracies ] ], columns=[ 'Model' ] + [ 'all' ])
+	if not 'results.csv' in os.listdir(results_path):
+		results.to_csv(os.path.join(results_path, 'results.csv'), index=False)
+	else:
+		all_results = pd.read_csv(os.path.join(results_path, 'results.csv'))
+		all_results = pd.concat([all_results, results], ignore_index=True)
+		all_results.to_csv(os.path.join(results_path, 'results.csv'), index=False)
 
 	print '\n'
 

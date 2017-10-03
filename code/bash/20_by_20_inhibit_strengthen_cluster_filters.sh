@@ -7,11 +7,11 @@ inhib_scheme="strengthen"
 conv_features=400
 reset_state_vars="False"
 
-for random_seed in 1
+for random_seed in 1 2 3
 do
 	for inhib_const in 0.5 1.0 2.5 5.0 10.0
 	do
-		for strengthen_const in 0.0 0.05 0.1 0.25 0.5
+		for strengthen_const in 0.0
 		do
 			for n_clusters in 10 20 30 40 50 60 70 80 90 100
 			do

@@ -2,7 +2,7 @@
 #
 #SBATCH --partition=longq
 #SBATCH --time=02-00:00:00
-#SBATCH --mem=50000
+#SBATCH --mem=60000
 #SBATCH --account=rkozma
 #SBATCH --output=/mnt/nfs/work1/rkozma/djsaunde/stdp-mnist/code/bash/job_reports/%j.out
 
@@ -15,8 +15,6 @@ random_seed=${5:-42}
 cd ../train/
 
 echo "csnn_pc_growing_inhibition_job.sh"
-
-python csnn_pc_growing_inhibition.py --mode=train --num_train=$num_train --conv_size=$conv_size --conv_stride=$conv_stride --conv_features=$conv_features --random_seed=$random_seed
 
 python csnn_pc_growing_inhibition.py --mode=test --num_test=10000 --conv_size=$conv_size --conv_stride=$conv_stride --conv_features=$conv_features --num_train=$num_train --random_seed=$random_seed
 

@@ -1283,9 +1283,9 @@ if __name__ == '__main__':
 	rates = np.zeros((n_input_sqrt, n_input_sqrt))
 
 	if test_mode:
-		assignments = np.load(os.path.join(end_assignments_dir, '_'.join(['assignments', ending, 'best.npy'])))
-		accumulated_rates = np.load(os.path.join(end_misc_dir, '_'.join(['accumulated_rates', ending, 'best.npy'])))
-		spike_proportions = np.load(os.path.join(end_misc_dir, '_'.join(['spike_proportions', ending, 'best.npy'])))
+		assignments = np.load(os.path.join(best_assignments_dir, '_'.join(['assignments', ending, 'best.npy'])))
+		accumulated_rates = np.load(os.path.join(best_misc_dir, '_'.join(['accumulated_rates', ending, 'best.npy'])))
+		spike_proportions = np.load(os.path.join(best_misc_dir, '_'.join(['spike_proportions', ending, 'best.npy'])))
 	else:
 		assignments = -1 * np.ones((conv_features, n_e))
 
