@@ -418,19 +418,6 @@ def predict_label(assignments, spike_rates, accumulated_rates, spike_proportions
 					summed_rates[i] = np.sum(spike_rates[np.where(np.logical_and(assignments == i,
 													 most_spiked_array))]) / float(np.sum(spike_rates[most_spiked_array]))
 
-		elif scheme == 'top_percent':
-			top_percents = np.array(np.zeros((conv_features, n_e)), dtype=bool)
-			top_percents[np.where(spike_rates > np.percentile(spike_rates, 100 - top_percent))] = True
-
-			# for each label
-			for i in xrange(10):
-				# get the number of label assignments of this type
-				num_assignments[i] = len(np.where(assignments[top_percents] == i)[0])
-
-				if len(np.where(assignments[top_percents] == i)) > 0:
-					# sum the spike rates of all excitatory neurons with this label, which fired the most in its patch
-					summed_rates[i] = len(spike_rates[np.where(np.logical_and(assignments == i, top_percents))])
-
 		elif scheme == 'confidence_weighting':
 			for i in xrange(10):
 				num_assignments[i] = np.count_nonzero(assignments == i)
@@ -726,7 +713,12 @@ def run_train():
 			num_retries = 0
 
 			if j > 0 and j % inhibition_update_interval == 0:
-				current_inhib = current_inhib + inhib_increase
+
+				if inhib_schedule == 'linear':
+					current_inhib = current_inhib + inhib_increase
+				elif inhib_schedule == 'log':
+					current_inhib = inhib_increase[j // inhibition_update_interval]
+
 				for feature in xrange(conv_features):
 					for other_feature in xrange(conv_features):
 						if feature != other_feature:
@@ -992,8 +984,6 @@ if __name__ == '__main__':
 	parser.add_argument('--conv_stride', type=int, default=0, help='Horizontal, vertical stride \
 														of the convolution window used by the input -> excitatory layer of the network.')
 	parser.add_argument('--conv_features', type=int, default=100, help='Number of excitatory convolutional features / filters / patches used in the network.')
-	parser.add_argument('--top_percent', type=int, default=10, help='The percentage of neurons which are allowed \
-																to cast "votes" in the "top_percent" labeling scheme.')
 	parser.add_argument('--do_plot', type=str, default='False', help='Whether or not to display plots during network \
 																	training / testing. Defaults to False, as this makes the network operation \
 																	speedier, and possible to run on HPC resources.')
@@ -1014,6 +1004,7 @@ if __name__ == '__main__':
 	parser.add_argument('--max_inhib', type=float, default=17.4, help='The maximum synapse weight for inhibitory to excitatory connections.')
 	parser.add_argument('--reset_state_vars', type=str, default='False', help='Whether to reset neuron / synapse state variables or run a "reset" period.')
 	parser.add_argument('--inhibition_update_interval', type=int, default=100, help='How often to increase the inhibition strength.')
+	parser.add_argument('--inhib_schedule', type=str, default='linear', help='How to update the strength of inhibition as the training progresses.')
 
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
@@ -1047,7 +1038,14 @@ if __name__ == '__main__':
 	else:
 		data_size = 60000
 
-	inhib_increase = ((max_inhib - start_inhib) / float(num_train) * inhibition_update_interval)
+	if inhib_schedule == 'linear':
+		inhib_increase = ((max_inhib - start_inhib) / float(num_train) * inhibition_update_interval)
+	elif inhib_schedule == 'log':
+		num_updates = num_train / inhibition_update_interval
+		c = max_inhib / log(1 + num_updates)
+		inhib_increase = [ c * np.log(1 + t) for t in xrange(num_updates) ]
+	else:
+		raise Exception('Exception one of "linear" or "log" for argument "inhib_schedule".')
 
 	# set brian global preferences
 	b.set_global_preferences(defaultclock = b.Clock(dt=0.5*b.ms), useweave = True, gcc_options = ['-ffast-math -march=native'], usecodegen = True,
@@ -1113,7 +1111,7 @@ if __name__ == '__main__':
 	
 	# setting weight, delay, and intensity parameters
 	if conv_size == 28 and conv_stride == 0:
-		weight['ee_input'] = (conv_size ** 2) * 0.15
+		weight['ee_input'] = (conv_size ** 2) * 0.1
 	else:
 		weight['ee_input'] = (conv_size ** 2) * 0.1625
 
@@ -1220,7 +1218,7 @@ if __name__ == '__main__':
 	else:
 		assignments = -1 * np.ones((conv_features, n_e))
 
-	voting_schemes = ['all', 'most_spiked_patch', 'top_percent', 'most_spiked_location', 'confidence_weighting']
+	voting_schemes = ['all', 'most_spiked_patch', 'most_spiked_location', 'confidence_weighting']
 
 	for scheme in voting_schemes:
 		output_numbers[scheme] = np.zeros((num_examples, 10))
