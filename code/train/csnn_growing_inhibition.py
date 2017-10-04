@@ -35,7 +35,7 @@ b.log_level_error()
 # set these appropriate to your directory structure
 top_level_path = os.path.join('..', '..')
 MNIST_data_path = os.path.join(top_level_path, 'data')
-model_name = 'csnn_pc_growing_inhibition'
+model_name = 'csnn_growing_inhibition'
 results_path = os.path.join(top_level_path, 'results', model_name)
 
 performance_dir = os.path.join(top_level_path, 'performance', model_name)
@@ -55,30 +55,6 @@ for d in [ performance_dir, activity_dir, weights_dir, deltas_dir, misc_dir, bes
 		MNIST_data_path, results_path, best_weights_dir, end_weights_dir, end_misc_dir, end_assignments_dir ]:
 	if not os.path.isdir(d):
 		os.makedirs(d)
-
-
-def set_weights_most_fired(current_spike_count):
-	'''
-	For each convolutional patch, set the weights to those of the neuron which
-	fired the most in the last iteration.
-	'''
-	for conn_name in input_connections:
-		for feature in xrange(conv_features):
-			# count up the spikes for the neurons in this convolution patch
-			column_sums = np.sum(current_spike_count[feature : feature + 1, :], axis=0)
-
-			# find the excitatory neuron which spiked the most
-			most_spiked = np.argmax(column_sums)
-
-			# create a "dense" version of the most spiked excitatory neuron's weight
-			most_spiked_dense = input_connections[conn_name][:, feature * n_e + most_spiked].todense()
-
-			# set all other neurons' (in the same convolution patch) weights the same as the most-spiked neuron in the patch
-			for n in xrange(n_e):
-				if n != most_spiked:
-					other_dense = input_connections[conn_name][:, feature * n_e + n].todense()
-					other_dense[convolution_locations[n]] = most_spiked_dense[convolution_locations[most_spiked]]
-					input_connections[conn_name][:, feature * n_e + n] = other_dense
 
 
 def normalize_weights():
@@ -233,51 +209,6 @@ def update_2d_input_weights(im, fig):
 	im.set_array(weights)
 	fig.canvas.draw()
 	return im
-
-
-def plot_neuron_votes(assignments, spike_rates):
-	'''
-	Plot the votes of the neurons per label.
-	'''
-	all_summed_rates = [0] * 10
-	num_assignments = [0] * 10
-
-	for i in xrange(10):
-		num_assignments[i] = len(np.where(assignments == i)[0])
-		if num_assignments[i] > 0:
-			all_summed_rates[i] = np.sum(spike_rates[:, assignments == i]) / num_assignments[i]
-
-	fig = plt.figure(fig_num, figsize=(6, 4))
-	rects = plt.bar(xrange(10), [ 0.1 ] * 10, align='center')
-	
-	plt.ylim([0, 1])
-	plt.xticks(xrange(10))
-	plt.title('Percentage votes per label')
-	
-	fig.canvas.draw()
-	return rects, fig
-
-
-def update_neuron_votes(rects, fig, spike_rates):
-	'''
-	Update the plot of the votes of the neurons by label.
-	'''
-	all_summed_rates = [0] * 10
-	num_assignments = [0] * 10
-
-	for i in xrange(10):
-		num_assignments[i] = len(np.where(assignments == i)[0])
-		if num_assignments[i] > 0:
-			all_summed_rates[i] = np.sum(spike_rates[:, assignments == i]) / num_assignments[i]
-
-	total_votes = np.sum(all_summed_rates)
-
-	if total_votes != 0:
-		for rect, h in zip(rects, all_summed_rates):
-			rect.set_height(h / float(total_votes))
-
-	fig.canvas.draw()
-	return rects
 
 
 def get_current_performance(performances, current_example_num):
@@ -487,19 +418,6 @@ def predict_label(assignments, spike_rates, accumulated_rates, spike_proportions
 					summed_rates[i] = np.sum(spike_rates[np.where(np.logical_and(assignments == i,
 													 most_spiked_array))]) / float(np.sum(spike_rates[most_spiked_array]))
 
-		elif scheme == 'top_percent':
-			top_percents = np.array(np.zeros((conv_features, n_e)), dtype=bool)
-			top_percents[np.where(spike_rates > np.percentile(spike_rates, 100 - top_percent))] = True
-
-			# for each label
-			for i in xrange(10):
-				# get the number of label assignments of this type
-				num_assignments[i] = len(np.where(assignments[top_percents] == i)[0])
-
-				if len(np.where(assignments[top_percents] == i)) > 0:
-					# sum the spike rates of all excitatory neurons with this label, which fired the most in its patch
-					summed_rates[i] = len(spike_rates[np.where(np.logical_and(assignments == i, top_percents))])
-
 		elif scheme == 'confidence_weighting':
 			for i in xrange(10):
 				num_assignments[i] = np.count_nonzero(assignments == i)
@@ -694,7 +612,7 @@ def run_train():
 	num_evaluations = int(num_examples / update_interval) + 1
 	performances = { voting_scheme : np.zeros(num_evaluations) for voting_scheme in voting_schemes }
 	num_weight_updates = int(num_examples / weight_update_interval)
-	all_deltas = np.zeros((num_weight_updates, (conv_size ** 2) * n_e_total))
+	all_deltas = np.zeros((num_weight_updates, n_e_total))
 	deltas = np.zeros(num_weight_updates)
 
 	if do_plot:
@@ -795,7 +713,12 @@ def run_train():
 			num_retries = 0
 
 			if j > 0 and j % inhibition_update_interval == 0:
-				current_inhib = current_inhib + inhib_increase
+
+				if inhib_schedule == 'linear':
+					current_inhib = current_inhib + inhib_increase
+				elif inhib_schedule == 'log':
+					current_inhib = inhib_increase[j // inhibition_update_interval]
+
 				for feature in xrange(conv_features):
 					for other_feature in xrange(conv_features):
 						if feature != other_feature:
@@ -1061,8 +984,6 @@ if __name__ == '__main__':
 	parser.add_argument('--conv_stride', type=int, default=0, help='Horizontal, vertical stride \
 														of the convolution window used by the input -> excitatory layer of the network.')
 	parser.add_argument('--conv_features', type=int, default=100, help='Number of excitatory convolutional features / filters / patches used in the network.')
-	parser.add_argument('--top_percent', type=int, default=10, help='The percentage of neurons which are allowed \
-																to cast "votes" in the "top_percent" labeling scheme.')
 	parser.add_argument('--do_plot', type=str, default='False', help='Whether or not to display plots during network \
 																	training / testing. Defaults to False, as this makes the network operation \
 																	speedier, and possible to run on HPC resources.')
@@ -1083,6 +1004,7 @@ if __name__ == '__main__':
 	parser.add_argument('--max_inhib', type=float, default=17.4, help='The maximum synapse weight for inhibitory to excitatory connections.')
 	parser.add_argument('--reset_state_vars', type=str, default='False', help='Whether to reset neuron / synapse state variables or run a "reset" period.')
 	parser.add_argument('--inhibition_update_interval', type=int, default=100, help='How often to increase the inhibition strength.')
+	parser.add_argument('--inhib_schedule', type=str, default='linear', help='How to update the strength of inhibition as the training progresses.')
 
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
@@ -1116,7 +1038,14 @@ if __name__ == '__main__':
 	else:
 		data_size = 60000
 
-	inhib_increase = ((max_inhib - start_inhib) / float(num_train) * inhibition_update_interval)
+	if inhib_schedule == 'linear':
+		inhib_increase = ((max_inhib - start_inhib) / float(num_train) * inhibition_update_interval)
+	elif inhib_schedule == 'log':
+		num_updates = num_train / inhibition_update_interval
+		c = max_inhib / log(1 + num_updates)
+		inhib_increase = [ c * np.log(1 + t) for t in xrange(num_updates) ]
+	else:
+		raise Exception('Exception one of "linear" or "log" for argument "inhib_schedule".')
 
 	# set brian global preferences
 	b.set_global_preferences(defaultclock = b.Clock(dt=0.5*b.ms), useweave = True, gcc_options = ['-ffast-math -march=native'], usecodegen = True,
@@ -1182,7 +1111,7 @@ if __name__ == '__main__':
 	
 	# setting weight, delay, and intensity parameters
 	if conv_size == 28 and conv_stride == 0:
-		weight['ee_input'] = (conv_size ** 2) * 0.15
+		weight['ee_input'] = (conv_size ** 2) * 0.1
 	else:
 		weight['ee_input'] = (conv_size ** 2) * 0.1625
 
@@ -1289,7 +1218,7 @@ if __name__ == '__main__':
 	else:
 		assignments = -1 * np.ones((conv_features, n_e))
 
-	voting_schemes = ['all', 'most_spiked_patch', 'top_percent', 'most_spiked_location', 'confidence_weighting']
+	voting_schemes = ['all', 'most_spiked_patch', 'most_spiked_location', 'confidence_weighting']
 
 	for scheme in voting_schemes:
 		output_numbers[scheme] = np.zeros((num_examples, 10))

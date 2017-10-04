@@ -5,6 +5,7 @@ import cPickle as p
 import brian_no_units
 import brian as b
 import argparse
+import os
 
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.sparse import coo_matrix
@@ -21,9 +22,12 @@ directory = args.directory
 fig_num = 0
 
 top_level_path = os.path.join('..', '..')
-model_name = 'csnn_pc_inhibit_far'
+model_name = 'csnn_pc_growing_inhibition'
 weight_dir = os.path.join(top_level_path, 'weights', model_name, directory)
 plots_dir = os.path.join(top_level_path, 'plots', model_name)
+
+if not os.path.isdir(plots_dir):
+	os.makedirs(plots_dir)
 
 
 def normalize_weights():
@@ -162,10 +166,9 @@ else:
 n_input = 784
 n_input_sqrt = int(math.sqrt(n_input))
 
-conv_size = int(file_name.split('_')[2])
-conv_stride = int(file_name.split('_')[3])
-conv_features = int(file_name.split('_')[4])
-lattice_structure = file_name[-9:-8]
+conv_size = int(file_name.split('_')[1])
+conv_stride = int(file_name.split('_')[2])
+conv_features = int(file_name.split('_')[3])
 
 # number of excitatory neurons (number output from convolutional layer)
 if conv_size == 28 and conv_stride == 0:
