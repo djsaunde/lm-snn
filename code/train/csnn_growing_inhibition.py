@@ -79,7 +79,7 @@ def plot_input(rates):
 	Plot the current input example during the training procedure.
 	'''
 	fig = plt.figure(fig_num, figsize = (5, 5))
-	im = plt.imshow(rates.reshape((28, 28)), interpolation = 'nearest', vmin=0, vmax=64, cmap='binary')
+	im = plt.imshow(rates.reshape((28, 28)), interpolation='nearest', vmin=0, vmax=64, cmap='binary')
 	plt.colorbar(im)
 	plt.title('Current input example')
 	fig.canvas.draw()
@@ -492,9 +492,19 @@ def build_network():
 					for n in xrange(n_e):
 						connections[conn_name][feature * n_e + n, feature * n_e + n] = 10.4
 
-			elif conn_type == 'ie' and not (test_remove_inhibition and test_mode):
+			elif conn_type == 'ie' and not (test_no_inhibition and test_mode):
 				# create connection name (composed of population and connection types)
 				conn_name = name + conn_type[0] + name + conn_type[1]
+				
+				# get weight matrix depending on training or test phase
+				if test_mode:
+					if save_best_model and not test_max_inhibition:
+						weight_matrix = np.load(os.path.join(best_weights_dir, '_'.join([conn_name, ending + '_best.npy'])))
+					elif test_max_inhibition:
+						weight_matrix = max_inhib * np.ones((n_e_total, n_e_total))
+					else:
+						weight_matrix = np.load(os.path.join(end_weights_dir, '_'.join([conn_name, ending + '_end.npy'])))
+				
 				# create a connection from the first group in conn_name with the second group
 				connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
 				
@@ -511,7 +521,8 @@ def build_network():
 
 							for n in xrange(n_e):
 								if test_mode:
-									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = max_inhib
+									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = \
+													weight_matrix[feature * n_e + n, other_feature * n_e + n]
 								else:
 									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = \
 													min(max_inhib, start_inhib * np.sqrt(euclidean([x, y], [x_, y_])))
@@ -712,12 +723,13 @@ def run_train():
 		else:			
 			num_retries = 0
 
-			if j > 0 and j % inhibition_update_interval == 0:
-
+			if j > 0 and j % inhib_update_interval == 0:
 				if inhib_schedule == 'linear':
 					current_inhib = current_inhib + inhib_increase
 				elif inhib_schedule == 'log':
-					current_inhib = inhib_increase[j // inhibition_update_interval]
+					current_inhib = inhib_increase[j // inhib_update_interval]
+
+				print '\nCurrent inhibition level:', curret_inhib
 
 				for feature in xrange(conv_features):
 					for other_feature in xrange(conv_features):
@@ -963,7 +975,7 @@ def evaluate_results():
 	for scheme in voting_schemes:
 		print '\n-', scheme, 'accuracy:', accuracies[scheme]
 
-	results = pd.DataFrame([ [ ending ] + accuracies.values() ], columns=[ 'Model' ] + accuracies.keys())
+	results = pd.DataFrame([ [ test_ending ] + accuracies.values() ], columns=[ 'Model' ] + accuracies.keys())
 	if not 'results.csv' in os.listdir(results_path):
 		results.to_csv(os.path.join(results_path, 'results.csv'), index=False)
 	else:
@@ -977,34 +989,50 @@ def evaluate_results():
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
 
-	parser.add_argument('--mode', default='train', help='Network operating mode: "train" mode learns the synaptic weights of the network, and \
-														"test" mode holds the weights fixed and evaluates classification accuracy on the test dataset.')
+	parser.add_argument('--mode', default='train', help='Network operating mode: \
+							"train" mode learns the synaptic weights of the network, and \
+							"test" mode holds the weights fixed / evaluates accuracy on test data.')
 	parser.add_argument('--conv_size', type=int, default=28, help='Side length of the square convolution \
-																			window used by the input -> excitatory layer of the network.')
+											window used by the input -> excitatory layer of the network.')
 	parser.add_argument('--conv_stride', type=int, default=0, help='Horizontal, vertical stride \
-														of the convolution window used by the input -> excitatory layer of the network.')
-	parser.add_argument('--conv_features', type=int, default=100, help='Number of excitatory convolutional features / filters / patches used in the network.')
+									of the convolution window used by input layer of the network.')
+	parser.add_argument('--conv_features', type=int, default=100, help='Number of excitatory \
+								convolutional features / filters / patches used in the network.')
 	parser.add_argument('--do_plot', type=str, default='False', help='Whether or not to display plots during network \
-																	training / testing. Defaults to False, as this makes the network operation \
-																	speedier, and possible to run on HPC resources.')
-	parser.add_argument('--num_train', type=int, default=10000, help='The number of examples for which to train the network on.')
-	parser.add_argument('--num_test', type=int, default=10000, help='The number of examples for which to test the network on.')
-	parser.add_argument('--random_seed', type=int, default=42, help='The random seed (any integer) from which to generate random numbers.')
-	parser.add_argument('--save_weights', type=str, default='False', help='Whether or not to save the weights of the model every `weight_update_interval`.')
-	parser.add_argument('--weight_update_interval', type=int, default=10, help='How often to update the plot of network filter weights.')
-	parser.add_argument('--save_best_model', type=str, default='True', help='Whether to save the current best version of the model.')
-	parser.add_argument('--update_interval', type=int, default=250, help='How often to update neuron labels and classify new inputs.')
-	parser.add_argument('--plot_all_deltas', type=str, default='False', help='Whether or not to plot weight changes for all \
-																						synapses from input to excitatory layer.')
+													training / testing. Defaults to False, as this makes the \
+												network operation speedier, and possible to run on HPC resources.')
+	parser.add_argument('--num_train', type=int, default=10000, help='The number of \
+											examples for which to train the network on.')
+	parser.add_argument('--num_test', type=int, default=10000, help='The number of \
+											examples for which to test the network on.')
+	parser.add_argument('--random_seed', type=int, default=42, help='The random seed \
+									(any integer) from which to generate random numbers.')
+	parser.add_argument('--save_weights', type=str, default='False', help='Whether or not to \
+									save the weights of the model every `weight_update_interval`.')
+	parser.add_argument('--weight_update_interval', type=int, default=10, help='How often \
+												to update the plot of network filter weights.')
+	parser.add_argument('--save_best_model', type=str, default='True', help='Whether \
+										to save the current best version of the model.')
+	parser.add_argument('--update_interval', type=int, default=250, help='How often \
+										to update neuron labels and classify new inputs.')
+	parser.add_argument('--plot_all_deltas', type=str, default='False', help='Whether or not to \
+								plot weight changes for all neurons from input to excitatory layer.')
 	parser.add_argument('--train_remove_inhibition', type=str, default='False', help='Whether or not to \
-																			remove lateral inhibition during the training phase.')
-	parser.add_argument('--test_remove_inhibition', type=str, default='False', help='Whether or not to \
-																			remove lateral inhibition during the test phase.')
-	parser.add_argument('--start_inhib', type=float, default=0.1, help='The beginning value of inhibiton for the increasing scheme.')
-	parser.add_argument('--max_inhib', type=float, default=17.4, help='The maximum synapse weight for inhibitory to excitatory connections.')
-	parser.add_argument('--reset_state_vars', type=str, default='False', help='Whether to reset neuron / synapse state variables or run a "reset" period.')
-	parser.add_argument('--inhibition_update_interval', type=int, default=100, help='How often to increase the inhibition strength.')
-	parser.add_argument('--inhib_schedule', type=str, default='linear', help='How to update the strength of inhibition as the training progresses.')
+														remove lateral inhibition during the training phase.')
+	parser.add_argument('--test_no_inhibition', type=str, default='False', help='Whether or not to \
+														remove lateral inhibition during the test phase.')
+	parser.add_argument('--test_max_inhibition', type=str, default='False', help='Whether or not to \
+														use ETH-style inhibition during the test phase.')
+	parser.add_argument('--start_inhib', type=float, default=0.1, help='The beginning value \
+														of inhibiton for the increasing scheme.')
+	parser.add_argument('--max_inhib', type=float, default=17.4, help='The maximum synapse \
+											weight for inhibitory to excitatory connections.')
+	parser.add_argument('--reset_state_vars', type=str, default='False', help='Whether to \
+							reset neuron / synapse state variables or run a "reset" period.')
+	parser.add_argument('--inhib_update_interval', type=int, default=250, \
+							help='How often to increase the inhibition strength.')
+	parser.add_argument('--inhib_schedule', type=str, default='linear', help='How to \
+							update the strength of inhibition as the training progresses.')
 
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
@@ -1017,7 +1045,8 @@ if __name__ == '__main__':
 
 	print '\n'
 
-	for var in [ 'do_plot', 'plot_all_deltas', 'reset_state_vars', 'save_weights', 'save_best_model', 'test_remove_inhibition' ]:
+	for var in [ 'do_plot', 'plot_all_deltas', 'reset_state_vars', 'test_max_inhibition', \
+						'save_weights', 'save_best_model', 'test_no_inhibition' ]:
 		if locals()[var] == 'True':
 			locals()[var] = True
 		elif locals()[var] == 'False':
@@ -1039,9 +1068,9 @@ if __name__ == '__main__':
 		data_size = 60000
 
 	if inhib_schedule == 'linear':
-		inhib_increase = ((max_inhib - start_inhib) / float(num_train) * inhibition_update_interval)
+		inhib_increase = ((max_inhib - start_inhib) / float(num_train) * inhib_update_interval)
 	elif inhib_schedule == 'log':
-		num_updates = num_train / inhibition_update_interval
+		num_updates = num_train / inhib_update_interval
 		c = max_inhib / log(1 + num_updates)
 		inhib_increase = [ c * np.log(1 + t) for t in xrange(num_updates) ]
 	else:
@@ -1186,6 +1215,10 @@ if __name__ == '__main__':
 
 	# set ending of filename saves
 	ending = '_'.join([ str(conv_size), str(conv_stride), str(conv_features), str(n_e), str(num_train), str(random_seed) ])
+
+	if test_mode:
+		test_ending = '_'.join([ str(conv_size), str(conv_stride), str(conv_features), str(n_e), \
+					str(num_train), str(random_seed), str(test_no_inhibition), str(test_max_inhibition) ])
 
 	b.ion()
 	fig_num = 1
