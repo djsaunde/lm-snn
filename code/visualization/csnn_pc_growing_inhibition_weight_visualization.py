@@ -111,9 +111,23 @@ def plot_2d_input_weights(title):
 
 	plt.title(title)
 
+	plt.tick_params(
+	    axis='x',          # changes apply to the x-axis
+	    which='both',      # both major and minor ticks are affected
+	    bottom='off',      # ticks along the bottom edge are off
+	    top='off',         # ticks along the top edge are off
+	    labelbottom='off') # labels along the bottom edge are off
+
+	plt.tick_params(
+	    axis='y',          # changes apply to the x-axis
+	    which='both',      # both major and minor ticks are affected
+	    left='off',      # ticks along the bottom edge are off
+	    right='off',         # ticks along the top edge are off
+	    labelleft='off') # labels along the bottom edge are off
+
 	ax = plt.gca()
 
-	im = ax.imshow(weights, interpolation='nearest', vmin=0, vmax=wmax_ee, cmap=cmap.get_cmap('hot_r'))
+	im = ax.imshow(weights, interpolation='nearest', vmin=0, vmax=wmax_ee, cmap=cmap.get_cmap('binary'))
 	
 	divider = make_axes_locatable(ax)
 	cax = divider.append_axes("right", size="5%", pad=0.1)

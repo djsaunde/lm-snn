@@ -57,30 +57,6 @@ for d in [ performance_dir, activity_dir, weights_dir, deltas_dir, misc_dir, bes
 		os.makedirs(d)
 
 
-def set_weights_most_fired(current_spike_count):
-	'''
-	For each convolutional patch, set the weights to those of the neuron which
-	fired the most in the last iteration.
-	'''
-	for conn_name in input_connections:
-		for feature in xrange(conv_features):
-			# count up the spikes for the neurons in this convolution patch
-			column_sums = np.sum(current_spike_count[feature : feature + 1, :], axis=0)
-
-			# find the excitatory neuron which spiked the most
-			most_spiked = np.argmax(column_sums)
-
-			# create a "dense" version of the most spiked excitatory neuron's weight
-			most_spiked_dense = input_connections[conn_name][:, feature * n_e + most_spiked].todense()
-
-			# set all other neurons' (in the same convolution patch) weights the same as the most-spiked neuron in the patch
-			for n in xrange(n_e):
-				if n != most_spiked:
-					other_dense = input_connections[conn_name][:, feature * n_e + n].todense()
-					other_dense[convolution_locations[n]] = most_spiked_dense[convolution_locations[most_spiked]]
-					input_connections[conn_name][:, feature * n_e + n] = other_dense
-
-
 def normalize_weights():
 	'''
 	Squash the input to excitatory synaptic weights to sum to a prespecified number.
@@ -233,51 +209,6 @@ def update_2d_input_weights(im, fig):
 	im.set_array(weights)
 	fig.canvas.draw()
 	return im
-
-
-def plot_neuron_votes(assignments, spike_rates):
-	'''
-	Plot the votes of the neurons per label.
-	'''
-	all_summed_rates = [0] * 10
-	num_assignments = [0] * 10
-
-	for i in xrange(10):
-		num_assignments[i] = len(np.where(assignments == i)[0])
-		if num_assignments[i] > 0:
-			all_summed_rates[i] = np.sum(spike_rates[:, assignments == i]) / num_assignments[i]
-
-	fig = plt.figure(fig_num, figsize=(6, 4))
-	rects = plt.bar(xrange(10), [ 0.1 ] * 10, align='center')
-	
-	plt.ylim([0, 1])
-	plt.xticks(xrange(10))
-	plt.title('Percentage votes per label')
-	
-	fig.canvas.draw()
-	return rects, fig
-
-
-def update_neuron_votes(rects, fig, spike_rates):
-	'''
-	Update the plot of the votes of the neurons by label.
-	'''
-	all_summed_rates = [0] * 10
-	num_assignments = [0] * 10
-
-	for i in xrange(10):
-		num_assignments[i] = len(np.where(assignments == i)[0])
-		if num_assignments[i] > 0:
-			all_summed_rates[i] = np.sum(spike_rates[:, assignments == i]) / num_assignments[i]
-
-	total_votes = np.sum(all_summed_rates)
-
-	if total_votes != 0:
-		for rect, h in zip(rects, all_summed_rates):
-			rect.set_height(h / float(total_votes))
-
-	fig.canvas.draw()
-	return rects
 
 
 def get_current_performance(performances, current_example_num):
@@ -694,7 +625,7 @@ def run_train():
 	num_evaluations = int(num_examples / update_interval) + 1
 	performances = { voting_scheme : np.zeros(num_evaluations) for voting_scheme in voting_schemes }
 	num_weight_updates = int(num_examples / weight_update_interval)
-	all_deltas = np.zeros((num_weight_updates, (conv_size ** 2) * n_e_total))
+	all_deltas = np.zeros((num_weight_updates, n_e_total))
 	deltas = np.zeros(num_weight_updates)
 
 	if do_plot:
