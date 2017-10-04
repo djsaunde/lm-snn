@@ -14,8 +14,8 @@ random_seed=${5:-42}
 
 cd ../train/
 
-echo "csnn_pc_growing_inhibition_job.sh"
+echo "csnn_growing_inhibition_job.sh"
 
-python csnn_pc_growing_inhibition.py --mode=test --num_test=10000 --conv_size=$conv_size --conv_stride=$conv_stride --conv_features=$conv_features --num_train=$num_train --random_seed=$random_seed
+python csnn_growing_inhibition.py --mode=test --num_test=10000 --conv_size=$conv_size --conv_stride=$conv_stride --conv_features=$conv_features --num_train=$num_train --random_seed=$random_seed
 
 exit
