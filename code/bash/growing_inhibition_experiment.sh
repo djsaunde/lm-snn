@@ -1,8 +1,6 @@
 # Grid search over hyperparameters for experiments with new inhibition schemes.
 
-num_train=30000
-reduced_dataset="False"
-inhib_scheme="strengthen"
+num_train=60000
 
 for random_seed in 1 2 3 
 do
