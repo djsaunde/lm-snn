@@ -40,19 +40,24 @@ results_path = os.path.join(top_level_path, 'results', model_name)
 
 performance_dir = os.path.join(top_level_path, 'performance', model_name)
 activity_dir = os.path.join(top_level_path, 'activity', model_name)
-weights_dir = os.path.join(top_level_path, 'weights', model_name)
 deltas_dir = os.path.join(top_level_path, 'deltas', model_name)
+spikes_dir = os.path.join(top_level_path, 'spikes', model_name)
+
+weights_dir = os.path.join(top_level_path, 'weights', model_name)
 best_weights_dir = os.path.join(weights_dir, 'best')
 end_weights_dir = os.path.join(weights_dir, 'end')
+
 assignments_dir = os.path.join(top_level_path, 'assignments', model_name)
 best_assignments_dir = os.path.join(assignments_dir, 'best')
 end_assignments_dir = os.path.join(assignments_dir, 'end')
+
 misc_dir = os.path.join(top_level_path, 'misc', model_name)
 best_misc_dir = os.path.join(misc_dir, 'best')
 end_misc_dir = os.path.join(misc_dir, 'end')
 
-for d in [ performance_dir, activity_dir, weights_dir, deltas_dir, misc_dir, best_misc_dir, assignments_dir, best_assignments_dir, \
-		MNIST_data_path, results_path, best_weights_dir, end_weights_dir, end_misc_dir, end_assignments_dir ]:
+for d in [ performance_dir, activity_dir, weights_dir, deltas_dir, misc_dir, best_misc_dir,
+				assignments_dir, best_assignments_dir, MNIST_data_path, results_path, 
+			best_weights_dir, end_weights_dir, end_misc_dir, end_assignments_dir, spikes_dir ]:
 	if not os.path.isdir(d):
 		os.makedirs(d)
 
@@ -535,7 +540,7 @@ def build_network():
 		spike_counters[name + 'e'] = b.SpikeCounter(neuron_groups[name + 'e'])
 
 		# record neuron population spikes if specified
-		if record_spikes:
+		if record_spikes and do_plot:
 			spike_monitors[name + 'e'] = b.SpikeMonitor(neuron_groups[name + 'e'])
 			spike_monitors[name + 'i'] = b.SpikeMonitor(neuron_groups[name + 'i'])
 
@@ -729,7 +734,7 @@ def run_train():
 				elif inhib_schedule == 'log':
 					current_inhib = inhib_increase[j // inhib_update_interval]
 
-				print '\nCurrent inhibition level:', curret_inhib
+				print '\nCurrent inhibition level:', current_inhib
 
 				for feature in xrange(conv_features):
 					for other_feature in xrange(conv_features):
@@ -750,6 +755,26 @@ def run_train():
 			
 			# get true label of last input example
 			input_numbers[j] = data['y'][j % data_size][0]
+
+			activity = result_monitor[j % update_interval, :] / np.sum(result_monitor[j % update_interval, :])
+
+			if do_plot and save_spikes:
+				fig = plt.figure(9, figsize = (8, 8))
+				plt.imshow(rates.reshape((28, 28)), interpolation='nearest', vmin=0, vmax=64, cmap='binary')
+				plt.title(str(data['y'][j % data_size][0]) + ' : ' + ', '.join( \
+					[str(int(output_numbers[scheme][j, 0])) for scheme in voting_schemes]))
+				fig = plt.figure(10, figsize = (7, 7))
+				plt.xticks(xrange(features_sqrt))
+				plt.yticks(xrange(features_sqrt))
+				plt.title('Activity heatmap (total spikes = ' + str(np.sum(result_monitor[j % update_interval, :])) + ')')
+				plt.imshow(activity.reshape((features_sqrt, features_sqrt)).T, interpolation='nearest', cmap='binary')
+				plt.grid(True)
+				
+				fig.canvas.draw()
+
+			if save_spikes:
+				np.save(os.path.join(spikes_dir, '_'.join([ending, 'spike_counts', str(j)])), current_spike_count)
+				np.save(os.path.join(spikes_dir, '_'.join([ending, 'rates', str(j)])), rates)
 			
 			# get the output classifications of the network
 			for scheme, outputs in predict_label(assignments, result_monitor[j % update_interval, :], accumulated_rates, spike_proportions).items():
@@ -1033,6 +1058,8 @@ if __name__ == '__main__':
 							help='How often to increase the inhibition strength.')
 	parser.add_argument('--inhib_schedule', type=str, default='linear', help='How to \
 							update the strength of inhibition as the training progresses.')
+	parser.add_argument('--save_spikes', type=str, default='False', help='Whether or not to \
+							save 2D graphs of spikes to later use to make an activity time-lapse.')
 
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
@@ -1046,7 +1073,7 @@ if __name__ == '__main__':
 	print '\n'
 
 	for var in [ 'do_plot', 'plot_all_deltas', 'reset_state_vars', 'test_max_inhibition', \
-						'save_weights', 'save_best_model', 'test_no_inhibition' ]:
+						'save_weights', 'save_best_model', 'test_no_inhibition', 'save_spikes' ]:
 		if locals()[var] == 'True':
 			locals()[var] = True
 		elif locals()[var] == 'False':
