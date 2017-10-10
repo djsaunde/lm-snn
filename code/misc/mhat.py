@@ -15,10 +15,10 @@ def mhat(t, sigma=1.0, scale=1.0, shift=0.0, max_excite=np.inf, max_inhib=-np.in
 	See https://en.wikipedia.org/wiki/Mexican_hat_wavelet for more details and references.
 	'''
 
-	if np.abs(t) <= 1.0:
-		return 0.0
-	else:
-		return np.maximum(np.minimum(scale * np.divide(2, np.sqrt(3 * sigma) * (np.pi ** 0.25)) * (1.0 - np.square(np.divide(t, sigma))) * np.exp(-np.divide(np.square(t), 2 * np.square(sigma))) + shift, max_excite), max_inhib)
+	# if np.abs(t) <= 1.0:
+	#	return 0.0
+	#else:
+	return np.maximum(np.minimum(scale * np.divide(2, np.sqrt(3 * sigma) * (np.pi ** 0.25)) * (1.0 - np.square(np.divide(t, sigma))) * np.exp(-np.divide(np.square(t), 2 * np.square(sigma))) + shift, max_excite), max_inhib)
 
 
 if __name__ == '__main__':
@@ -32,7 +32,7 @@ if __name__ == '__main__':
 	
 	sigma, scale, shift, max_excite, max_inhib = args.sigma, args.scale, args.shift, args.max_excite, args.max_inhib
 
-	x = np.linspace(-10, 10, 10000)
+	x = np.linspace(-5, 5, 10000)
 	y = np.array([ mhat(x_i, sigma=sigma, scale=scale, shift=shift, max_excite=max_excite, max_inhib=max_inhib) for x_i in x ])
 
 	plt.plot(x, y, 'r'); plt.axhline(0, color='k', linestyle='-.'); plt.axvline(-1, color='b', linestyle=':')

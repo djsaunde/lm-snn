@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as manimation
 
 from tqdm import tqdm
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--n_files', type=int, default=-1)
@@ -41,8 +43,13 @@ fig, (ax1, ax2) = plt.subplots(1, 2)
 image1 = ax1.imshow(np.zeros([ conv_features_sqrt, conv_features_sqrt ]), cmap='binary', vmin=0, vmax=1, interpolation='nearest')
 image2 = ax2.imshow(np.zeros([ n_input_sqrt, n_input_sqrt ]), cmap='binary', vmin=0, vmax=64, interpolation='nearest')
 
-fig.colorbar(image1, ax=ax1)
-fig.colorbar(image2, ax=ax2)
+divider1 = make_axes_locatable(ax1)
+divider2 = make_axes_locatable(ax2)
+cax1 = divider1.append_axes("right", size="5%", pad=0.05)
+cax2 = divider2.append_axes("right", size="5%", pad=0.05)
+
+fig.colorbar(image1, cax=cax1)
+fig.colorbar(image2, cax=cax2)
 
 with writer.saving(fig, os.path.join('movies', '_'.join([ model, str(n_files) ]) + '.mp4'), len(activity_files)):
 	if n_files == -1:
