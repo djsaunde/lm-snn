@@ -4,21 +4,27 @@ Supporting functions for use in training scripts.
 
 import cPickle as p
 import numpy as np
-import os
+import os, sys
+
 from struct import unpack
+from sklearn.preprocessing import normalize
 
 top_level_path = os.path.join('..', '..')
 MNIST_data_path = os.path.join(top_level_path, 'data')
 CIFAR10_data_path = os.path.join(top_level_path, 'data', 'cifar-10-batches-py')
 
 
-def get_labeled_data(pickle_name, train=True, reduced_dataset=False, classes=range(10), examples_per_class=100):
+def get_labeled_data(pickle_name, train=True, reduced_dataset=False, \
+			classes=range(10), examples_per_class=100, normalized_inputs=False):
 	'''
 	Read input-vector (image) and target class (label, 0-9) and return it as 
 	a list of tuples.
 	'''
 	if reduced_dataset:
-		pickle_name = '_'.join([pickle_name, 'reduced', '_'.join([ str(class_) for class_ in classes ]), str(examples_per_class)])
+		pickle_name = '_'.join([pickle_name, 'reduced', '_'.join([ str(class_) for \
+										class_ in classes ]), str(examples_per_class)])
+	elif normalized_inputs:
+		pickle_name = '_'.join([pickle_name, 'normalized_inputs'])
 
 	if os.path.isfile('%s.pickle' % pickle_name):
 		data = p.load(open('%s.pickle' % pickle_name))
@@ -81,6 +87,16 @@ def get_labeled_data(pickle_name, train=True, reduced_dataset=False, classes=ran
 
 			# Set data to reduced data
 			x, y = reduced_x, reduced_y
+
+		if normalized_inputs:
+			x = x.reshape([x.shape[0], rows * cols])
+			x = np.asarray(x, dtype=np.float64)
+			x_mean = np.sum(x) / (x.shape[0])
+
+			for i in xrange(x.shape[0]):
+				x[i, :] *= x_mean / np.sum(x[i, :]) 
+
+			x = x.reshape([x.shape[0], rows, cols])
 
 		data = {'x': x, 'y': y, 'rows': rows, 'cols': cols}
 
