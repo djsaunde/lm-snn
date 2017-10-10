@@ -620,6 +620,9 @@ def run_train():
 		assignments_image = plot_assignments(assignments)
 		fig_num += 1
 
+		input_image_monitor, input_image = plot_input(rates)
+		fig_num += 1
+
 		if not test_mode:
 			input_weight_monitor, fig_weights = plot_2d_input_weights()
 			fig_num += 1
@@ -660,6 +663,10 @@ def run_train():
 		
 		# sets the input firing rates
 		input_groups['Xe'].rate = rates.reshape(n_input)
+
+		# plot the input at this step
+		if do_plot:
+			input_image_monitor = update_input(rates, input_image_monitor, input_image)
 
 		# get weights before running the network for a single iteration
 		previous_weights = input_connections['XeAe'][:].todense()
@@ -1060,6 +1067,8 @@ if __name__ == '__main__':
 							update the strength of inhibition as the training progresses.')
 	parser.add_argument('--save_spikes', type=str, default='False', help='Whether or not to \
 							save 2D graphs of spikes to later use to make an activity time-lapse.')
+	parser.add_argument('--normalize_inputs', type=str, default='False', help='Whether or not \
+											to ensure all inputs contain the same amount of "ink".')
 
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
@@ -1072,7 +1081,7 @@ if __name__ == '__main__':
 
 	print '\n'
 
-	for var in [ 'do_plot', 'plot_all_deltas', 'reset_state_vars', 'test_max_inhibition', \
+	for var in [ 'do_plot', 'plot_all_deltas', 'reset_state_vars', 'test_max_inhibition', 'normalize_inputs', \
 						'save_weights', 'save_best_model', 'test_no_inhibition', 'save_spikes' ]:
 		if locals()[var] == 'True':
 			locals()[var] = True
@@ -1113,7 +1122,7 @@ if __name__ == '__main__':
 
 	start = timeit.default_timer()
 	data = get_labeled_data(os.path.join(MNIST_data_path, 'testing' if test_mode else 'training'), 
-												not test_mode, False, xrange(10), 1000)
+												not test_mode, False, xrange(10), 1000, normalize_inputs)
 	
 	print 'Time needed to load data:', timeit.default_timer() - start
 
@@ -1241,7 +1250,8 @@ if __name__ == '__main__':
 	print '\n'
 
 	# set ending of filename saves
-	ending = '_'.join([ str(conv_size), str(conv_stride), str(conv_features), str(n_e), str(num_train), str(random_seed) ])
+	ending = '_'.join([ str(conv_size), str(conv_stride), str(conv_features), \
+							str(n_e), str(num_train), str(random_seed), str(normalize_inputs) ])
 
 	if test_mode:
 		test_ending = '_'.join([ str(conv_size), str(conv_stride), str(conv_features), str(n_e), \
