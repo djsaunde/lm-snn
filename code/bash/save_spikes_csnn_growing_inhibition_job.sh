@@ -21,4 +21,8 @@ python csnn_growing_inhibition.py --mode=train --num_train=$num_train --conv_siz
 
 python csnn_growing_inhibition.py --mode=test --num_test=10000 --conv_size=$conv_size --conv_stride=$conv_stride --conv_features=$conv_features --num_train=$num_train --random_seed=$random_seed
 
+cd ../visualization/
+
+python csnn_growing_inhibition_activity_over_time.py --conv_size $conv_size --conv_stride $conv_stride --conv_features $conv_features --random_seed $random_seed --num_train $num_train
+
 exit
