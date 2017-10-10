@@ -26,3 +26,4 @@ data/cifar-10-batches-py/*
 code/bash/job_reports/*
 *.out
 code/visualization/movies/*
+spikes/*
