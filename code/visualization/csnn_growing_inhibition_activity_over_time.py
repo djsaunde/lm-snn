@@ -10,25 +10,29 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--n_files', type=int, default=-1)
+parser.add_argument('--conv_features', type=int, default=400)
+parser.add_argument('--conv_stride', type=int, default=0)
+parser.add_argument('--conv_size', type=int, default=28)
+parser.add_argument('--num_train', type=int, default=10000)
+parser.add_argument('--random_seed', type=int, default=42)
+
 args = parser.parse_args()
-n_files = args.n_files
+args = vars(args)
+locals().update(args)
+
+if conv_size == 28 and conv_stride == 0:
+	n_e = 1
+else:
+	n_e = ((n_input_sqrt - conv_size) / conv_stride + 1) ** 2
 
 model_name = 'csnn_growing_inhibition'
 
 top_level_path = os.path.join('..', '..')
 spikes_dir = os.path.join(top_level_path, 'spikes', model_name)
 
-files = sorted([ file for file in os.listdir(spikes_dir) if '_0.npy' in file and 'spike_counts' in file ])
-
-print '\n'
-print '\n'.join([ str(idx + 1) + ' - ' + file[:file.index('_spike_counts')] for idx, file in enumerate(files) ])
-print '\n'
-
-model_idx = int(raw_input('Enter the index of the model to plot activity over time for: ')) - 1
-model = files[model_idx][:file.index('_spike_counts')]
+model = '_'.join(map(str, [ conv_size, conv_stride, conv_features, n_e, num_train, random_seed ]))
 
 n_input_sqrt = 28
-conv_features = int(model.split('_')[2])
 conv_features_sqrt = int(np.sqrt(conv_features))
 
 activity_files = sorted([ file for file in os.listdir(spikes_dir) \
