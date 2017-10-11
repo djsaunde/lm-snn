@@ -611,7 +611,7 @@ def build_network():
 					for n in xrange(n_e):
 						connections[conn_name][feature * n_e + n, feature * n_e + n] = 10.4
 
-			elif conn_type == 'ie' and not (test_remove_inhibition and test_mode):
+			elif conn_type == 'ie' and not ((test_remove_inhibition and test_mode) or train_remove_inhibition):
 				# create connection name (composed of population and connection types)
 				conn_name = name + conn_type[0] + name + conn_type[1]
 				# create a connection from the first group in conn_name with the second group
@@ -676,13 +676,17 @@ def build_network():
 				# define the actual synaptic connections and strengths
 				for feature in xrange(conv_features):
 					if excite_scheme == 'near':
-						for other_feature in neighbor_mapping[feature]:
+						for other_feature in exc_neighbor_mapping[feature]:
 							for n in xrange(n_e):
 								if test_mode:
 									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = \
 																weight_matrix[feature * n_e + n, other_feature * n_e + n]
 								else:
 									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = b.random() + 0.01 * 0.1 * wmax_exc
+
+					elif excite_scheme == 'small_world':
+						connections[conn_name].connect_random(neuron_groups[conn_name[0:2]], 
+											neuron_groups[conn_name[2:4]], p=0.05)
 
 					elif excite_scheme == 'all':
 						for other_feature in xrange(conv_features):
@@ -776,7 +780,12 @@ def build_network():
 	weight['ee_recurr'] = (num_lattice_connections / conv_features) * 0.15
 
 	if exc_stdp:
-		weight['ee_recurr'] = (conv_features - 1) * 0.15 * wmax_exc
+		if excite_scheme == 'all':
+			weight['ee_recurr'] = (conv_features - 1) * 0.15 * wmax_exc
+		elif excite_scheme == 'near':
+			weight['ee_recurr'] = 8 * 0.15 * wmax_exc
+		elif excite_scheme == 'small_world':
+			weight['ee_recurr'] = (conv_features - 1) * 0.15 * 0.15 * wmax_exc
 
 	# creating Poission spike train from input image (784 vector, 28x28 image)
 	for name in input_population_names:
@@ -1256,7 +1265,7 @@ if __name__ == '__main__':
 	parser.add_argument('--classes', type=int, default=range(10), nargs='+', help='List of classes to use in reduced dataset.')
 	parser.add_argument('--examples_per_class', type=int, default=1000, help='Number of examples per class to use in reduced dataset.')
 	parser.add_argument('--neighborhood', type=str, default='8', help='The structure of neighborhood not to inhibit on firing. One of "4", "8".')
-	parser.add_argument('--inhib_scheme', type=str, default='strengthen', help='The scheme with which one excitatory neuron\'s firing activity \
+	parser.add_argument('--inhib_scheme', type=str, default='increasing', help='The scheme with which one excitatory neuron\'s firing activity \
 																			inhibits others. One of "far", "increasing".')
 	parser.add_argument('--inhib_const', type=float, default=2.5, help='A constant which controls how quickly inhibition strengthens \
 																			between two neurons as their relative distance increases.')
@@ -1282,7 +1291,7 @@ if __name__ == '__main__':
 	parser.add_argument('--test_remove_inhibition', type=str, default='False', help='Whether or not to \
 																			remove lateral inhibition during the test phase.')
 	parser.add_argument('--exc_stdp', type=str, default='False', help='Whether to use STDP synapses between neurons in the excitatory layer.')
-	parser.add_argument('--excite_scheme', type=str, default='all', help='The scheme with which one excitatory neuron excites other excitatory neurons.')
+	parser.add_argument('--excite_scheme', type=str, default='near', help='The scheme with which one excitatory neuron excites other excitatory neurons.')
 	parser.add_argument('--wmax_exc', type=float, default=10.0, help='The max weight on synapses between any two connected excitatory neurons.')
 	parser.add_argument('--max_inhib', type=float, default=17.4, help='The maximum synapse weight for inhibitory to excitatory connections.')
 	parser.add_argument('--reset_state_vars', type=str, default='False', help='Whether to reset neuron / synapse state variables or run a "reset" period.')
@@ -1298,7 +1307,7 @@ if __name__ == '__main__':
 
 	print '\n'
 
-	for var in [ 'do_plot', 'sort_euclidean', 'reduced_dataset', 'noise', 'plot_all_deltas', 'exc_stdp', 'reset_state_vars', \
+	for var in [ 'do_plot', 'sort_euclidean', 'reduced_dataset', 'noise', 'plot_all_deltas', 'exc_stdp', 'reset_state_vars', 'train_remove_inhibition', \
 					'save_weights', 'homeostasis', 'save_best_model', 'accumulate_votes', 'test_remove_inhibition', 'load_best_model' ]:
 		if locals()[var] == 'True':
 			locals()[var] = True
@@ -1399,7 +1408,7 @@ if __name__ == '__main__':
 	# time constants, learning rates, max weights, weight dependence, etc.
 	tc_pre_ee, tc_post_ee = 20 * b.ms, 20 * b.ms
 	nu_ee_pre, nu_ee_post = 0.0001, 0.01
-	nu_AeAe_pre, nu_Ae_Ae_post = 0.1, 0.5
+	nu_AeAe_pre, nu_Ae_Ae_post = 0.001, 0.005
 	wmax_ee = 1.0
 	exp_ee_post = exp_ee_pre = 0.2
 	w_mu_pre, w_mu_post = 0.2, 0.2
@@ -1460,9 +1469,11 @@ if __name__ == '__main__':
 	print '\n'
 
 	# set ending of filename saves
-	ending = '_'.join([ connectivity, str(conv_size), str(conv_stride), str(conv_features), str(n_e), str(reduced_dataset), \
-						'_'.join([ str(class_) for class_ in classes ]), str(examples_per_class), neighborhood, inhib_scheme, \
-			str(inhib_const), str(strengthen_const), str(num_train), str(random_seed), str(accumulate_votes), str(accumulation_decay) ])
+	ending = '_'.join([ connectivity, str(conv_size), str(conv_stride), str(conv_features), \
+					str(n_e), str(reduced_dataset), '_'.join([ str(class_) for class_ in classes ]), \
+					str(examples_per_class), neighborhood, inhib_scheme, str(inhib_const), \
+					str(strengthen_const), str(num_train), str(random_seed), str(accumulate_votes), \
+					str(accumulation_decay), excite_scheme, str(wmax_ee), str(exc_stdp) ])
 
 	b.ion()
 	fig_num = 1
@@ -1517,6 +1528,30 @@ if __name__ == '__main__':
 
 			else:
 				raise Exception('Expecting one of "far", "increasing", or "strengthen" for argument "inhib_scheme".')
+
+	exc_neighbor_mapping = {}
+	for feature in xrange(conv_features):
+		exc_neighbor_mapping[feature] = range(conv_features)
+		for other_feature in xrange(conv_features):
+			if n_e == 1:
+				x, y = feature // np.sqrt(n_e_total), feature % np.sqrt(n_e_total)
+				x_, y_ = other_feature // np.sqrt(n_e_total), other_feature % np.sqrt(n_e_total)
+			else:
+				x, y = feature // np.sqrt(conv_features), feature % np.sqrt(conv_features)
+				x_, y_ = other_feature // np.sqrt(conv_features), other_feature % np.sqrt(conv_features)
+			
+			if excite_scheme == 'all':
+				pass
+
+			elif excite_scheme == 'near':
+				if neighborhood == '8':
+					if feature != other_feature and euclidean([x, y], [x_, y_]) >= 2.0:
+						exc_neighbor_mapping[feature].remove(other_feature)
+				elif neighborhood == '4':
+					if feature != other_feature and euclidean([x, y], [x_, y_]) > 1.0:
+						exc_neighbor_mapping[feature].remove(other_feature)
+				else:
+					raise Exception('Expecting one of "8" or "4" for argument "neighborhood".')
 
 	# build the spiking neural network
 	build_network()

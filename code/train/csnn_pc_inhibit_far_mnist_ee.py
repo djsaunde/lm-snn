@@ -1327,6 +1327,7 @@ if __name__ == '__main__':
 		weight['ee_input'] = (conv_size ** 2) * 0.15
 	else:
 		weight['ee_input'] = (conv_size ** 2) * 0.1625
+	
 	delay['ee_input'] = (0 * b.ms, 10 * b.ms)
 	delay['ei_input'] = (0 * b.ms, 5 * b.ms)
 	input_intensity = start_input_intensity = 2.0
