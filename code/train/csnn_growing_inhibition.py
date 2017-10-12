@@ -1255,7 +1255,7 @@ if __name__ == '__main__':
 
 	if test_mode:
 		test_ending = '_'.join([ str(conv_size), str(conv_stride), str(conv_features), str(n_e), str(num_train), \
-					str(random_seed), str(test_no_inhibition), str(normalize_inputs), str(test_max_inhibition) ])
+					str(random_seed), str(normalize_inputs), str(test_no_inhibition), str(test_max_inhibition) ])
 
 	b.ion()
 	fig_num = 1

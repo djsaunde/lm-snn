@@ -1,6 +1,7 @@
 import os
 import argparse
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.animation as manimation
 
