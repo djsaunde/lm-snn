@@ -1007,7 +1007,7 @@ def evaluate_results():
 	for scheme in voting_schemes:
 		print '\n-', scheme, 'accuracy:', accuracies[scheme]
 
-	results = pd.DataFrame([ [ test_ending ] + accuracies.values() ], columns=[ 'Model' ] + accuracies.keys())
+	results = pd.DataFrame([ [ ending ] + accuracies.values() ], columns=[ 'Model' ] + accuracies.keys())
 	if not 'results.csv' in os.listdir(results_path):
 		results.to_csv(os.path.join(results_path, 'results.csv'), index=False)
 	else:
@@ -1069,6 +1069,8 @@ if __name__ == '__main__':
 							save 2D graphs of spikes to later use to make an activity time-lapse.')
 	parser.add_argument('--normalize_inputs', type=str, default='False', help='Whether or not \
 											to ensure all inputs contain the same amount of "ink".')
+	parser.add_argument('--proportion_grow', type=float, default=1.0, help='What proportion of \
+								the training to grow the inhibition from "start_inhib" to "max_inhib".')
 
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
@@ -1104,7 +1106,7 @@ if __name__ == '__main__':
 		data_size = 60000
 
 	if inhib_schedule == 'linear':
-		inhib_increase = ((max_inhib - start_inhib) / float(num_train) * inhib_update_interval)
+		inhib_increase = ((max_inhib - start_inhib) / float(num_train * proportion_grow) * inhib_update_interval)
 	elif inhib_schedule == 'log':
 		num_updates = num_train / inhib_update_interval
 		c = max_inhib / log(1 + num_updates)
@@ -1250,12 +1252,8 @@ if __name__ == '__main__':
 	print '\n'
 
 	# set ending of filename saves
-	ending = '_'.join([ str(conv_size), str(conv_stride), str(conv_features), \
-							str(n_e), str(num_train), str(random_seed), str(normalize_inputs) ])
-
-	if test_mode:
-		test_ending = '_'.join([ str(conv_size), str(conv_stride), str(conv_features), str(n_e), str(num_train), \
-					str(random_seed), str(normalize_inputs), str(test_no_inhibition), str(test_max_inhibition) ])
+	ending = '_'.join([ str(conv_size), str(conv_stride), str(conv_features), str(n_e), \
+						str(num_train), str(random_seed), str(normalize_inputs), str(proportion_grow) ])
 
 	b.ion()
 	fig_num = 1

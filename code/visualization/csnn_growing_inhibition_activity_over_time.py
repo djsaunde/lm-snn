@@ -42,7 +42,7 @@ rates_files = sorted([ file for file in os.listdir(spikes_dir) \
 			if 'rates' in file and model in file ], key=lambda x: int(x.split('_')[-1][:-4]))
 
 FFMpegWriter = manimation.writers['ffmpeg']
-writer = FFMpegWriter(fps=5)
+writer = FFMpegWriter(fps=5, bitrate=-1)
 
 fig, (ax1, ax2) = plt.subplots(1, 2)
 image1 = ax1.imshow(np.zeros([ conv_features_sqrt, conv_features_sqrt ]), cmap='binary', vmin=0, vmax=1, interpolation='nearest')
@@ -56,16 +56,25 @@ cax2 = divider2.append_axes("right", size="5%", pad=0.05)
 fig.colorbar(image1, cax=cax1)
 fig.colorbar(image2, cax=cax2)
 
-with writer.saving(fig, os.path.join('movies', '_'.join([ model, str(n_files) ]) + '.mp4'), len(activity_files)):
+with writer.saving(fig, os.path.join('movies', '_'.join([ model, str(n_files) ]) + '.mp4'), \
+						len(activity_files[:n_files])):
 	if n_files == -1:
 		for activity_file, rates_file in tqdm(zip(activity_files, rates_files)):
+			print activity_file, rates_file
+
 			activity = np.load(os.path.join(spikes_dir, activity_file))
+
+			print activity.shape
+
 			activity = activity / float(np.sum(activity))
 
 			rates = np.load(os.path.join(spikes_dir, rates_file))
 
+			print rates.shape
+
 			image1.set_data(activity.reshape([conv_features_sqrt, conv_features_sqrt]))
 			image2.set_data(rates)
+
 			writer.grab_frame()
 	else:
 		for activity_file, rates_file in tqdm(zip(activity_files[:n_files], rates_files[:n_files])):
@@ -76,4 +85,5 @@ with writer.saving(fig, os.path.join('movies', '_'.join([ model, str(n_files) ])
 
 			image1.set_data(activity.reshape([conv_features_sqrt, conv_features_sqrt]))
 			image2.set_data(rates)
+
 			writer.grab_frame()
