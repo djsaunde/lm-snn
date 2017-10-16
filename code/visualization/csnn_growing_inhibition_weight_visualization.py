@@ -22,7 +22,7 @@ directory = args.directory
 fig_num = 0
 
 top_level_path = os.path.join('..', '..')
-model_name = 'csnn_pc_growing_inhibition'
+model_name = 'csnn_growing_inhibition'
 weight_dir = os.path.join(top_level_path, 'weights', model_name, directory)
 plots_dir = os.path.join(top_level_path, 'plots', model_name)
 

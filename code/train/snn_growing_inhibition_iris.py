@@ -1,0 +1,1169 @@
+'''
+Convolutional spiking neural network training, testing, and evaluation script. Evaluation can be done outside of this script; however, it is most straightforward to call this 
+script with mode=train, then mode=test on HPC systems, where in the test mode, the network evaluation is written to disk.
+'''
+
+import warnings
+warnings.filterwarnings('ignore')
+
+import matplotlib.cm as cmap
+import brian_no_units
+import networkx as nx
+import cPickle as p
+import pandas as pd
+import numpy as np
+import brian as b
+import argparse
+import random
+import timeit
+import time
+import math
+import os
+
+from scipy.spatial.distance import euclidean
+from sklearn.metrics import confusion_matrix
+from sklearn.datasets import load_iris
+from struct import unpack
+from brian import *
+
+from util import *
+
+np.set_printoptions(threshold=np.nan, linewidth=200)
+
+# only show log messages of level ERROR or higher
+b.log_level_error()
+
+# set these appropriate to your directory structure
+top_level_path = os.path.join('..', '..')
+MNIST_data_path = os.path.join(top_level_path, 'data')
+model_name = 'snn_growing_inhibition'
+results_path = os.path.join(top_level_path, 'results', model_name)
+
+performance_dir = os.path.join(top_level_path, 'performance', model_name)
+activity_dir = os.path.join(top_level_path, 'activity', model_name)
+deltas_dir = os.path.join(top_level_path, 'deltas', model_name)
+spikes_dir = os.path.join(top_level_path, 'spikes', model_name)
+
+weights_dir = os.path.join(top_level_path, 'weights', model_name)
+best_weights_dir = os.path.join(weights_dir, 'best')
+end_weights_dir = os.path.join(weights_dir, 'end')
+
+assignments_dir = os.path.join(top_level_path, 'assignments', model_name)
+best_assignments_dir = os.path.join(assignments_dir, 'best')
+end_assignments_dir = os.path.join(assignments_dir, 'end')
+
+misc_dir = os.path.join(top_level_path, 'misc', model_name)
+best_misc_dir = os.path.join(misc_dir, 'best')
+end_misc_dir = os.path.join(misc_dir, 'end')
+
+for d in [ performance_dir, activity_dir, weights_dir, deltas_dir, misc_dir, best_misc_dir,
+				assignments_dir, best_assignments_dir, MNIST_data_path, results_path, 
+			best_weights_dir, end_weights_dir, end_misc_dir, end_assignments_dir, spikes_dir ]:
+	if not os.path.isdir(d):
+		os.makedirs(d)
+
+
+def normalize_weights():
+	'''
+	Squash the input to excitatory synaptic weights to sum to a prespecified number.
+	'''
+	for conn_name in input_connections:
+		connection = input_connections[conn_name][:]
+        temp_conn = np.copy(connection)
+        colSums = np.sum(temp_conn, axis=0)
+        colFactors = weight['ee_input'] / colSums
+        for j in xrange(n_e):
+            connection[:, j] *= colFactors[j]
+
+		# connection = input_connections[conn_name][:]
+		# column_sums = np.sum(np.asarray(connection), axis=0)
+		# column_factors = weight['ee_input'] / column_sums
+		# for n in xrange(n_e):
+		# 	input_connections[conn_name][:, n] *= column_factors[n]
+
+
+def plot_input(rates):
+	'''
+	Plot the current input example during the training procedure.
+	'''
+	fig = plt.figure(fig_num, figsize = (5, 5))
+	im = plt.imshow(rates.reshape((n_input_sqrt, n_input_sqrt)), interpolation='nearest', vmin=0, vmax=10, cmap='binary')
+	plt.colorbar(im)
+	plt.title('Current input example')
+	fig.canvas.draw()
+	return im, fig
+
+
+def update_input(rates, im, fig):
+	'''
+	Update the input image to use for input plotting.
+	'''
+	im.set_array(rates.reshape((n_input_sqrt, n_input_sqrt)))
+	fig.canvas.draw()
+	return im
+
+
+def plot_assignments(assignments):
+	cmap = plt.get_cmap('RdBu', 11)
+	im = plt.matshow(assignments.reshape([n_e_sqrt, n_e_sqrt]).T, cmap=cmap, vmin=-1.5, vmax=9.5)
+	plt.colorbar(im, ticks=np.arange(-1, 10))
+	plt.title('Neuron labels')
+	return im
+
+
+def update_assignments_plot(assignments, im):
+	im.set_array(assignments.reshape([n_e_sqrt, n_e_sqrt]).T)
+	return im
+
+
+def get_2d_input_weights():
+	'''
+	Get the weights from the input to excitatory layer and reshape it to be two
+	dimensional and square.
+	'''
+	rearranged_weights = np.zeros([n_e_sqrt * n_input_sqrt, n_e_sqrt * n_input_sqrt])
+	weight_matrix = np.copy(input_connections['XeAe'][:])
+
+	for i in xrange(n_e_sqrt):
+		for j in xrange(n_e_sqrt):
+			rearranged_weights[i * n_input_sqrt : (i + 1) * n_input_sqrt, j * n_input_sqrt : (j + 1) * n_input_sqrt] = \
+							weight_matrix[:, i + j * n_e_sqrt].reshape((n_input_sqrt, n_input_sqrt))
+
+	return rearranged_weights
+
+
+def plot_2d_input_weights():
+	'''
+	Plot the weights from input to excitatory layer to view during training.
+	'''
+	weights = get_2d_input_weights()
+	fig = plt.figure(fig_num, figsize=(9, 9))
+	im = plt.imshow(weights, interpolation='nearest', vmin=0, vmax=wmax_ee, cmap=cmap.get_cmap('hot_r'))
+	plt.colorbar(im, fraction=0.06)
+	plt.title(ending.replace('_', ' '))
+	fig.canvas.draw()
+	return im, fig
+
+
+def update_2d_input_weights(im, fig):
+	'''
+	Update the plot of the weights from input to excitatory layer to view during training.
+	'''
+	weights = get_2d_input_weights()
+	im.set_array(weights)
+	fig.canvas.draw()
+	return im
+
+
+def get_current_performance(performances, current_example_num):
+	'''
+	Evaluate the performance of the network on the past 'update_interval' training
+	examples.
+	'''
+	global input_numbers
+
+	current_evaluation = int(current_example_num / update_interval)
+	if current_example_num == num_examples -1:
+		current_evaluation+=1
+	start_num = current_example_num - update_interval
+	end_num = current_example_num
+
+	wrong_idxs = {}
+	wrong_labels = {}
+
+	for scheme in performances.keys():
+		difference = output_numbers[scheme][start_num : end_num, 0] - input_numbers[start_num : end_num]
+		correct = len(np.where(difference == 0)[0])
+
+		wrong_idxs[scheme] = np.where(difference != 0)[0]
+		wrong_labels[scheme] = output_numbers[scheme][start_num : end_num, 0][np.where(difference != 0)[0]]
+		performances[scheme][current_evaluation] = correct / float(update_interval) * 100
+
+
+	return performances, wrong_idxs, wrong_labels
+
+
+def plot_performance(fig_num, performances, num_evaluations):
+	'''
+	Set up the performance plot for the beginning of the simulation.
+	'''
+	time_steps = range(0, num_evaluations)
+
+	fig = plt.figure(fig_num, figsize = (12, 4))
+	fig_num += 1
+
+	for performance in performances:
+		plt.plot(time_steps[:np.size(np.nonzero(performances[performance]))], \
+									np.extract(np.nonzero(performances[performance]), performances[performance]), label=performance)
+
+	lines = plt.gca().lines
+
+	plt.ylim(ymax=100)
+	plt.xticks(xrange(0, num_evaluations + 10, 10), xrange(0, ((num_evaluations + 10) * update_interval), 10))
+	plt.legend()
+	plt.grid(True)
+	plt.title('Classification performance per update interval')
+	
+	fig.canvas.draw()
+
+	return lines, fig_num, fig
+
+
+def update_performance_plot(lines, performances, current_example_num, fig):
+	'''
+	Update the plot of the performance based on results thus far.
+	'''
+	performances, wrong_idxs, wrong_labels = get_current_performance(performances, current_example_num)
+	
+	for line, performance in zip(lines, performances):
+		line.set_xdata(range((current_example_num / update_interval) + 1))
+		line.set_ydata(performances[performance][:(current_example_num / update_interval) + 1])
+
+	fig.canvas.draw()
+
+	return lines, performances, wrong_idxs, wrong_labels
+
+
+def plot_deltas(fig_num, deltas, num_weight_updates):
+	'''
+	Set up the performance plot for the beginning of the simulation.
+	'''
+	time_steps = range(0, num_weight_updates)
+
+	fig = plt.figure(fig_num, figsize = (12, 4))
+	fig_num += 1
+
+	plt.plot([], [], label='Absolute difference in weights')
+
+	lines = plt.gca().lines
+
+	plt.ylim(ymin=0, ymax=n_e)
+	plt.xticks(xrange(0, num_weight_updates + weight_update_interval, 100), \
+			xrange(0, ((num_weight_updates + weight_update_interval) * weight_update_interval), 100))
+	plt.legend()
+	plt.grid(True)
+	plt.title('Absolute difference in weights per weight update interval')
+	
+	fig.canvas.draw()
+
+	return lines[0], fig_num, fig
+
+
+def update_deltas_plot(line, deltas, current_example_num, fig):
+	'''
+	Update the plot of the performance based on results thus far.
+	'''
+	delta = deltas[int(current_example_num / weight_update_interval)]
+	
+	line.set_xdata(range(int(current_example_num / weight_update_interval) + 1))
+	ydata = list(line.get_ydata())
+	ydata.append(delta)
+	line.set_ydata(ydata)
+
+	fig.canvas.draw()
+
+	return line, deltas
+
+
+def plot_all_deltas(fig_num, all_deltas, num_weight_updates):
+	'''
+	Set up the performance plot for the beginning of the simulation.
+	'''
+	time_steps = range(0, num_weight_updates)
+
+	fig = plt.figure(fig_num, figsize = (12, 4))
+	fig_num += 1
+
+	for idx in xrange(all_deltas.shape[1]):
+		plt.plot([], [])
+
+	lines = plt.gca().lines
+
+	plt.ylim(ymin=-1, ymax=1)
+	plt.xticks(xrange(0, num_weight_updates + weight_update_interval, 100), \
+			xrange(0, ((num_weight_updates + weight_update_interval) * weight_update_interval), 100))
+	plt.legend()
+	plt.grid(True)
+	plt.title('Differences per synapse weight per weight update interval')
+	
+	fig.canvas.draw()
+
+	return lines, fig_num, fig
+
+
+def update_all_deltas_plot(lines, all_deltas, current_example_num, fig):
+	'''
+	Update the plot of the performance based on results thus far.
+	'''
+	deltas = all_deltas[int(current_example_num / weight_update_interval)]
+	
+	for idx, line in enumerate(lines):
+		line.set_xdata(range(int(current_example_num / weight_update_interval) + 1))
+		ydata = list(line.get_ydata())
+		ydata.append(deltas[idx])
+		line.set_ydata(ydata)
+
+	fig.canvas.draw()
+
+	return lines, deltas
+
+
+def predict_label(assignments, spike_rates, accumulated_rates, spike_proportions):
+	'''
+	Given the label assignments of the excitatory layer and their spike rates over
+	the past 'update_interval', get the ranking of each of the categories of input.
+	'''
+	output_numbers = {}
+
+	for scheme in voting_schemes:
+		summed_rates = [0] * 10
+		num_assignments = [0] * 10
+
+		if scheme == 'all':
+			for i in xrange(10):
+				num_assignments[i] = len(np.where(assignments == i)[0])
+				if num_assignments[i] > 0:
+					summed_rates[i] = np.sum(spike_rates[assignments == i]) / num_assignments[i]
+
+		elif scheme == 'confidence_weighting':
+			for i in xrange(10):
+				num_assignments[i] = np.count_nonzero(assignments == i)
+				if num_assignments[i] > 0:
+					summed_rates[i] = np.sum(spike_rates[assignments == i] * spike_proportions[(assignments == i).ravel(), i]) / num_assignments[i]
+		
+		output_numbers[scheme] = np.argsort(summed_rates)[::-1]
+	
+	return output_numbers
+
+
+def assign_labels(result_monitor, input_numbers, accumulated_rates, accumulated_inputs):
+	'''
+	Based on the results from the previous 'update_interval', assign labels to the
+	excitatory neurons.
+	'''
+	for j in xrange(10):
+		num_assignments = len(np.where(input_numbers == j)[0])
+		if num_assignments > 0:
+			accumulated_inputs[j] += num_assignments
+			accumulated_rates[:, j] = accumulated_rates[:, j] * 0.9 + \
+					np.ravel(np.sum(result_monitor[input_numbers == j], axis=0) / num_assignments)
+	
+	assignments = np.argmax(accumulated_rates, axis=1)
+
+	spike_proportions = np.divide(accumulated_rates, np.sum(accumulated_rates, axis=0))
+
+	return assignments, accumulated_rates, spike_proportions
+
+
+def build_network():
+	global fig_num
+
+	neuron_groups['e'] = b.NeuronGroup(n_e, neuron_eqs_e, threshold=v_thresh_e, refractory=refrac_e, reset=scr_e, compile=True, freeze=True)
+	neuron_groups['i'] = b.NeuronGroup(n_e, neuron_eqs_i, threshold=v_thresh_i, refractory=refrac_i, reset=v_reset_i, compile=True, freeze=True)
+
+	for name in population_names:
+		print '...Creating neuron group:', name
+
+		# get a subgroup of size 'n_e' from all exc
+		neuron_groups[name + 'e'] = neuron_groups['e'].subgroup(n_e)
+		# get a subgroup of size 'n_i' from the inhibitory layer
+		neuron_groups[name + 'i'] = neuron_groups['i'].subgroup(n_e)
+
+		# start the membrane potentials of these groups 40mV below their resting potentials
+		neuron_groups[name + 'e'].v = v_rest_e - 40. * b.mV
+		neuron_groups[name + 'i'].v = v_rest_i - 40. * b.mV
+
+	print '...Creating recurrent connections'
+
+	for name in population_names:
+		# if we're in test mode / using some stored weights
+		if test_mode:
+			# load up adaptive threshold parameters
+			if save_best_model:
+				neuron_groups['e'].theta = np.load(os.path.join(best_weights_dir, '_'.join(['theta_A', ending +'_best.npy'])))
+			else:
+				neuron_groups['e'].theta = np.load(os.path.join(end_weights_dir, '_'.join(['theta_A', ending +'_end.npy'])))
+		else:
+			# otherwise, set the adaptive additive threshold parameter at 20mV
+			neuron_groups['e'].theta = np.ones(n_e) * 20.0 * b.mV
+		
+		for conn_type in recurrent_conn_names:
+			if conn_type == 'ei':
+				# create connection name (composed of population and connection types)
+				conn_name = name + conn_type[0] + name + conn_type[1]
+				# create a connection from the first group in conn_name with the second group
+				connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
+				# instantiate the created connection
+				for n in xrange(n_e):
+					connections[conn_name][n, n] = 10.4
+
+			elif conn_type == 'ie' and not (test_no_inhibition and test_mode):
+				# create connection name (composed of population and connection types)
+				conn_name = name + conn_type[0] + name + conn_type[1]
+				
+				# get weight matrix depending on training or test phase
+				if test_mode:
+					if save_best_model and not test_max_inhibition:
+						weight_matrix = np.load(os.path.join(best_weights_dir, '_'.join([conn_name, ending + '_best.npy'])))
+					elif test_max_inhibition:
+						weight_matrix = max_inhib * np.ones((n_e, n_e))
+					else:
+						weight_matrix = np.load(os.path.join(end_weights_dir, '_'.join([conn_name, ending + '_end.npy'])))
+				
+				# create a connection from the first group in conn_name with the second group
+				connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
+				
+				# define the actual synaptic connections and strengths
+				for n in xrange(n_e):
+					for other_n in xrange(n_e):
+						if n != other_n:
+							x, y = n // np.sqrt(n_e), n % np.sqrt(n_e)
+							x_, y_ = other_n // np.sqrt(n_e), other_n % np.sqrt(n_e)
+
+							if test_mode:
+								connections[conn_name][n, other_n] = weight_matrix[n, other_n]
+							else:
+								connections[conn_name][n, other_n] = min(max_inhib, start_inhib * np.sqrt(euclidean([x, y], [x_, y_])))
+
+		print '...Creating monitors for:', name
+
+		# spike rate monitors for excitatory and inhibitory neuron populations
+		rate_monitors[name + 'e'] = b.PopulationRateMonitor(neuron_groups[name + 'e'], bin=(single_example_time + resting_time) / b.second)
+		rate_monitors[name + 'i'] = b.PopulationRateMonitor(neuron_groups[name + 'i'], bin=(single_example_time + resting_time) / b.second)
+		spike_counters[name + 'e'] = b.SpikeCounter(neuron_groups[name + 'e'])
+
+		# record neuron population spikes if specified
+		if record_spikes and do_plot:
+			spike_monitors[name + 'e'] = b.SpikeMonitor(neuron_groups[name + 'e'])
+			spike_monitors[name + 'i'] = b.SpikeMonitor(neuron_groups[name + 'i'])
+
+	if record_spikes and do_plot:
+		b.figure(fig_num, figsize=(8, 6))
+		
+		fig_num += 1
+		
+		b.ion()
+		b.subplot(211)
+		b.raster_plot(spike_monitors['Ae'], refresh=1000 * b.ms, showlast=1000 * b.ms, title='Excitatory spikes per neuron')
+		b.subplot(212)
+		b.raster_plot(spike_monitors['Ai'], refresh=1000 * b.ms, showlast=1000 * b.ms, title='Inhibitory spikes per neuron')
+		b.tight_layout()
+
+	# creating Poission spike train from input image (784 vector, 28x28 image)
+	for name in input_population_names:
+		input_groups[name + 'e'] = b.PoissonGroup(n_input, 0)
+		rate_monitors[name + 'e'] = b.PopulationRateMonitor(input_groups[name + 'e'], bin=(single_example_time + resting_time) / b.second)
+
+	# creating connections from input Poisson spike train to excitatory neuron population(s)
+	for name in input_connection_names:
+		print '\n...Creating connections between', name[0], 'and', name[1]
+		
+		# for each of the input connection types (in this case, excitatory -> excitatory)
+		for conn_type in input_conn_names:
+			# saved connection name
+			conn_name = name[0] + conn_type[0] + name[1] + conn_type[1]
+
+			# get weight matrix depending on training or test phase
+			if test_mode:
+				if save_best_model:
+					weight_matrix = np.load(os.path.join(best_weights_dir, '_'.join([conn_name, ending + '_best.npy'])))
+				else:
+					weight_matrix = np.load(os.path.join(end_weights_dir, '_'.join([conn_name, ending + '_end.npy'])))
+
+			# create connections from the windows of the input group to the neuron population
+			input_connections[conn_name] = b.Connection(input_groups['Xe'], neuron_groups[name[1] + conn_type[1]], \
+									structure='dense', state='g' + conn_type[0], delay=True, max_delay=delay[conn_type][1])
+			
+			if test_mode:
+				input_connections[conn_name].connect(input_groups['Xe'], neuron_groups[name[1] + \
+												conn_type[1]], weight_matrix, delay=delay[conn_type])
+			else:
+				weight_matrix = np.random.rand(n_e) * 0.3
+				input_connections[conn_name].connect(input_groups['Xe'], neuron_groups[name[1] + \
+												conn_type[1]], weight_matrix, delay=delay[conn_type])
+
+			if test_mode:
+				if do_plot:
+					plot_2d_input_weights()
+					fig_num += 1
+
+		# if excitatory -> excitatory STDP is specified, add it here (input to excitatory populations)
+		if not test_mode:
+			print '...Creating STDP for connection', name
+			
+			# STDP connection name
+			conn_name = name[0] + conn_type[0] + name[1] + conn_type[1]
+			# create the STDP object
+			stdp_methods[conn_name] = b.STDP(input_connections[conn_name], eqs=eqs_stdp_ee, \
+							pre=eqs_stdp_pre_ee, post=eqs_stdp_post_ee, wmin=0., wmax=wmax_ee)
+
+	print '\n'
+
+
+def run_train():
+	global fig_num, input_intensity, previous_spike_count, rates, assignments, clusters, cluster_assignments, \
+				simple_clusters, simple_cluster_assignments, index_matrix, accumulated_rates, \
+				accumulated_inputs, spike_proportions
+
+	if do_plot:
+		assignments_image = plot_assignments(assignments)
+		fig_num += 1
+
+		if do_plot:
+			input_image, input_figure = plot_input(rates)
+			fig_num += 1
+
+		if not test_mode:
+			input_weight_monitor, fig_weights = plot_2d_input_weights()
+			fig_num += 1
+
+	# set up performance recording and plotting
+	num_evaluations = int(num_examples / update_interval) + 1
+	performances = { voting_scheme : np.zeros(num_evaluations) for voting_scheme in voting_schemes }
+	num_weight_updates = int(num_examples / weight_update_interval)
+	all_deltas = np.zeros((num_weight_updates, n_e))
+	deltas = np.zeros(num_weight_updates)
+
+	if do_plot:
+		performance_monitor, fig_num, fig_performance = plot_performance(fig_num, performances, num_evaluations)
+		line, fig_num, deltas_figure = plot_deltas(fig_num, deltas, num_weight_updates)
+		if plot_all_deltas:
+			lines, fig_num, all_deltas_figure = plot_all_deltas(fig_num, all_deltas, num_weight_updates)
+	else:
+		performances, wrong_idxs, wrong_labels = get_current_performance(performances, 0)
+
+	# initialize network
+	j = 0
+	num_retries = 0
+	b.run(0)
+
+	if save_best_model:
+		best_performance = 0.0
+
+	# start recording time
+	start_time = timeit.default_timer()
+
+	last_weights = input_connections['XeAe'][:].todense()
+
+	current_inhib = start_inhib
+
+	while j < num_examples:
+		# get the firing rates of the next input example
+		rates = (data['data'][j % data_size, :] / 8.0) * input_intensity
+
+		if do_plot:
+			input_image = update_input(rates, input_image, input_figure)
+
+		# sets the input firing rates
+		input_groups['Xe'].rate = rates.reshape(n_input)
+
+		# get weights before running the network for a single iteration
+		previous_weights = input_connections['XeAe'][:].todense()
+		
+		# run the network for a single example time
+		b.run(single_example_time)
+
+		# get difference between weights from before and after running a single iteration
+		new_weights = input_connections['XeAe'][:].todense() - previous_weights
+
+		# get new neuron label assignments every 'update_interval'
+		if j % update_interval == 0 and j > 0:
+			assignments, accumulated_rates, spike_proportions = assign_labels(result_monitor, input_numbers[j - update_interval : j], accumulated_rates, accumulated_inputs)
+
+		# get count of spikes over the past iteration
+		current_spike_count = np.copy(spike_counters['Ae'].count[:]) - previous_spike_count
+		previous_spike_count = np.copy(spike_counters['Ae'].count[:])
+
+		# make sure synapse weights don't grow too large
+		normalize_weights()
+
+		if not j % weight_update_interval == 0 and save_weights:
+			save_connections(weights_dir, connections, input_connections, ending, j)
+			save_theta(weights_dir, population_names, neuron_groups, ending, j)
+
+			np.save(os.path.join(assignments_dir, '_'.join(['assignments', ending, str(j)])), assignments)
+			np.save(os.path.join(misc_dir, '_'.join(['accumulated_rates', ending, str(j)])), accumulated_rates)
+			np.save(os.path.join(misc_dir, '_'.join(['spike_proportions', ending, str(j)])), spike_proportions)
+			
+		if j % weight_update_interval == 0:
+			deltas[j / weight_update_interval] = np.sum(np.abs((input_connections['XeAe'][:].todense() - last_weights)))
+			if plot_all_deltas:
+				all_deltas[j / weight_update_interval, :] = np.ravel(input_connections['XeAe'][:].todense() - last_weights)
+			last_weights = input_connections['XeAe'][:].todense()
+
+			# pickling performance recording and iteration number
+			p.dump((j, deltas), open(os.path.join(deltas_dir, ending + '.p'), 'wb'))
+
+		# update weights every 'weight_update_interval'
+		if j % weight_update_interval == 0 and do_plot:
+			update_2d_input_weights(input_weight_monitor, fig_weights)
+		
+		if do_plot:
+			assignments_image = update_assignments_plot(assignments, assignments_image)
+
+		# if the neurons in the network didn't spike more than four times
+		if np.sum(current_spike_count) < 5 and num_retries < 3:
+			# increase the intensity of input
+			input_intensity += 2
+			num_retries += 1
+			
+			# set all network firing rates to zero
+			for name in input_population_names:
+				input_groups[name + 'e'].rate = 0
+
+			# let the network relax back to equilibrium
+			if not reset_state_vars:
+				b.run(resting_time)
+			else:
+				for neuron_group in neuron_groups:
+					neuron_groups[neuron_group].v = v_reset_e
+					neuron_groups[neuron_group].ge = 0
+					neuron_groups[neuron_group].gi = 0
+
+		# otherwise, record results and continue simulation
+		else:			
+			num_retries = 0
+
+			if j > 0 and j % inhib_update_interval == 0:
+				if inhib_schedule == 'linear':
+					current_inhib = current_inhib + inhib_increase
+				elif inhib_schedule == 'log':
+					current_inhib = inhib_increase[j // inhib_update_interval]
+
+				print '\nCurrent inhibition level:', current_inhib
+
+				for n in xrange(n_e):
+					for other_n in xrange(n_e):
+						if n != other_n:
+							x, y = n // n_e_sqrt, n % n_e_sqrt
+							x_, y_ = other_n // n_e_sqrt, other_n % n_e_swrt
+
+							connections['AiAe'][n, other_n] = min(max_inhib, \
+									current_inhib * np.sqrt(euclidean([x, y], [x_, y_])))
+
+			# record the current number of spikes
+			result_monitor[j % update_interval, :] = current_spike_count
+			
+			# get true label of last input example
+			input_numbers[j] = data['target'][j % data_size]
+
+			activity = result_monitor[j % update_interval, :] / np.sum(result_monitor[j % update_interval, :])
+
+			if do_plot and save_spikes:
+				fig = plt.figure(9, figsize = (8, 8))
+				plt.imshow(rates.reshape((28, 28)), interpolation='nearest', vmin=0, vmax=64, cmap='binary')
+				plt.title(str(data['target'][j % data_size][0]) + ' : ' + ', '.join( \
+					[str(int(output_numbers[scheme][j, 0])) for scheme in voting_schemes]))
+				fig = plt.figure(10, figsize = (7, 7))
+				plt.xticks(xrange(features_sqrt))
+				plt.yticks(xrange(features_sqrt))
+				plt.title('Activity heatmap (total spikes = ' + str(np.sum(result_monitor[j % update_interval, :])) + ')')
+				plt.imshow(activity.reshape((features_sqrt, features_sqrt)).T, interpolation='nearest', cmap='binary')
+				plt.grid(True)
+				
+				fig.canvas.draw()
+
+			if save_spikes:
+				np.save(os.path.join(spikes_dir, '_'.join([ending, 'spike_counts', str(j)])), current_spike_count)
+				np.save(os.path.join(spikes_dir, '_'.join([ending, 'rates', str(j)])), rates)
+			
+			# get the output classifications of the network
+			for scheme, outputs in predict_label(assignments, result_monitor[j % update_interval, :], accumulated_rates, spike_proportions).items():
+				output_numbers[scheme][j, :] = outputs
+
+			# print progress
+			if j % print_progress_interval == 0 and j > 0:
+				print 'runs done:', j, 'of', int(num_examples), '(time taken for past', print_progress_interval, 'runs:', str(timeit.default_timer() - start_time) + ')'
+				start_time = timeit.default_timer()
+
+			if j % weight_update_interval == 0 and do_plot:
+				update_deltas_plot(line, deltas, j, deltas_figure)
+				if plot_all_deltas:
+					update_all_deltas_plot(lines, all_deltas, j, all_deltas_figure)
+			
+			# plot performance if appropriate
+			if (j % update_interval == 0 or j == num_examples - 1) and j > 0:
+				if do_plot:
+					# updating the performance plot
+					perf_plot, performances, wrong_idxs, wrong_labels = update_performance_plot(performance_monitor, performances, j, fig_performance)
+				else:
+					performances, wrong_idxs, wrong_labels = get_current_performance(performances, j)
+
+				# pickling performance recording and iteration number
+				p.dump((j, performances), open(os.path.join(performance_dir, ending + '.p'), 'wb'))
+
+				# Save the best model's weights and theta parameters (if so specified)
+				if save_best_model:
+					for performance in performances:
+						if performances[performance][int(j / float(update_interval))] > best_performance:
+							print '\n', 'Best model thus far! Voting scheme:', performance, '\n'
+
+							best_performance = performances[performance][int(j / float(update_interval))]
+							save_connections(best_weights_dir, connections, input_connections, ending, 'best')
+							save_theta(best_weights_dir, population_names, neuron_groups, ending, 'best')
+
+							np.save(os.path.join(best_assignments_dir, '_'.join(['assignments', ending, 'best'])), assignments)
+							np.save(os.path.join(best_misc_dir, '_'.join(['accumulated_rates', ending, 'best'])), accumulated_rates)
+							np.save(os.path.join(best_misc_dir, '_'.join(['spike_proportions', ending, 'best'])), spike_proportions)
+
+				# Print out performance progress intermittently
+				for performance in performances:
+					print '\nClassification performance (' + performance + ')', performances[performance][1:int(j / float(update_interval)) + 1], \
+								'\nAverage performance:', sum(performances[performance][1:int(j / float(update_interval)) + 1]) / \
+									float(len(performances[performance][1:int(j / float(update_interval)) + 1])), \
+									'\nBest performance:', max(performances[performance][1:int(j / float(update_interval)) + 1]), '\n'
+						
+			# set input firing rates back to zero
+			for name in input_population_names:
+				input_groups[name + 'e'].rate = 0
+			
+			# run the network for 'resting_time' to relax back to rest potentials
+			if not reset_state_vars:
+				b.run(resting_time)
+			else:
+				for neuron_group in neuron_groups:
+					neuron_groups[neuron_group].v = v_reset_e
+					neuron_groups[neuron_group].ge = 0
+					neuron_groups[neuron_group].gi = 0
+
+			# bookkeeping
+			input_intensity = start_input_intensity
+			j += 1
+
+	# ensure weights don't grow without bound
+	normalize_weights()
+
+	print '\n'
+
+
+def run_test():
+	global fig_num, input_intensity, previous_spike_count, rates, assignments, clusters, cluster_assignments, \
+				simple_clusters, simple_cluster_assignments, index_matrix, accumulated_rates, \
+				accumulated_inputs, spike_proportions
+
+	if do_plot:
+		assignments_image = plot_assignments(assignments)
+		fig_num += 1
+
+	# set up performance recording and plotting
+	num_evaluations = int(num_examples / update_interval) + 1
+	performances = { voting_scheme : np.zeros(num_evaluations) for voting_scheme in voting_schemes }
+	num_weight_updates = int(num_examples / weight_update_interval)
+	all_deltas = np.zeros((num_weight_updates, n_input * n_e))
+	deltas = np.zeros(num_weight_updates)
+
+	# initialize network
+	j = 0
+	num_retries = 0
+	b.run(0)
+
+	# start recording time
+	start_time = timeit.default_timer()
+
+	while j < num_examples:
+		# get the firing rates of the next input example
+		rates = (data['data'][j % data_size, :] / 8.0) * input_intensity
+		
+		# sets the input firing rates
+		input_groups['Xe'].rate = rates.reshape(n_input)
+
+		# run the network for a single example time
+		b.run(single_example_time)
+
+		# get count of spikes over the past iteration
+		current_spike_count = np.copy(spike_counters['Ae'].count[:]) - previous_spike_count
+		previous_spike_count = np.copy(spike_counters['Ae'].count[:])
+
+		# if the neurons in the network didn't spike more than four times
+		if np.sum(current_spike_count) < 5 and num_retries < 3:
+			# increase the intensity of input
+			input_intensity += 2
+			num_retries += 1
+			
+			# set all network firing rates to zero
+			for name in input_population_names:
+				input_groups[name + 'e'].rate = 0
+
+			# let the network relax back to equilibrium
+			if not reset_state_vars:
+				b.run(resting_time)
+			else:
+				for neuron_group in neuron_groups:
+					neuron_groups[neuron_group].v = v_reset_e
+					neuron_groups[neuron_group].ge = 0
+					neuron_groups[neuron_group].gi = 0
+
+		# otherwise, record results and continue simulation
+		else:			
+			num_retries = 0
+
+			# record the current number of spikes
+			result_monitor[j % update_interval, :] = current_spike_count
+			
+			# get true label of the past input example
+			input_numbers[j] = data['target'][j % data_size][0]
+			
+			# get the output classifications of the network
+			for scheme, outputs in predict_label(assignments, result_monitor[j % update_interval, :], accumulated_rates, spike_proportions).items():
+				output_numbers[scheme][j, :] = outputs
+
+			# print progress
+			if j % print_progress_interval == 0 and j > 0:
+				print 'runs done:', j, 'of', int(num_examples), \
+						'(time taken for past', print_progress_interval, \
+						'runs:', str(timeit.default_timer() - start_time) + ')'
+				start_time = timeit.default_timer()
+						
+			# set input firing rates back to zero
+			for name in input_population_names:
+				input_groups[name + 'e'].rate = 0
+			
+			# run the network for 'resting_time' to relax back to rest potentials
+			if not reset_state_vars:
+				b.run(resting_time)
+			else:
+				for neuron_group in neuron_groups:
+					neuron_groups[neuron_group].v = v_reset_e
+					neuron_groups[neuron_group].ge = 0
+					neuron_groups[neuron_group].gi = 0
+
+			# bookkeeping
+			input_intensity = start_input_intensity
+			j += 1
+
+	print '\n'
+
+
+def save_results():
+	'''
+	Save results of simulation (train or test)
+	'''
+	print '...Saving results'
+
+	if not test_mode:
+		save_connections(end_weights_dir, connections, input_connections, ending, 'end')
+		save_theta(end_weights_dir, population_names, neuron_groups, ending, 'end')
+
+		np.save(os.path.join(end_assignments_dir, '_'.join(['assignments', ending, 'end'])), assignments)
+		np.save(os.path.join(end_misc_dir, '_'.join(['accumulated_rates', ending, 'end'])), accumulated_rates)
+		np.save(os.path.join(end_misc_dir, '_'.join(['spike_proportions', ending, 'end'])), spike_proportions)
+	else:
+		np.save(os.path.join(activity_dir, '_'.join(['results', str(num_examples), ending])), result_monitor)
+		np.save(os.path.join(activity_dir, '_'.join(['input_numbers', str(num_examples), ending])), input_numbers)
+
+	print '\n'
+
+
+def evaluate_results():
+	'''
+	Evalute the network using the various voting schemes in test mode
+	'''
+	global update_interval
+
+	test_results = {}
+	for scheme in voting_schemes:
+		test_results[scheme] = np.zeros((10, num_examples))
+
+	print '\n...Calculating accuracy per voting scheme'
+
+	# for idx in xrange(end_time_testing - end_time_training):
+	for idx in xrange(num_examples):
+		label_rankings = predict_label(assignments, result_monitor[idx, :], accumulated_rates, spike_proportions)
+		for scheme in voting_schemes:
+			test_results[scheme][:, idx] = label_rankings[scheme]
+
+	differences = { scheme : test_results[scheme][0, :] - input_numbers for scheme in voting_schemes }
+	correct = { scheme : len(np.where(differences[scheme] == 0)[0]) for scheme in voting_schemes }
+	incorrect = { scheme : len(np.where(differences[scheme] != 0)[0]) for scheme in voting_schemes }
+	accuracies = { scheme : correct[scheme] / float(num_examples) * 100 for scheme in voting_schemes }
+
+	conf_matrix = confusion_matrix(test_results[scheme][0, :], input_numbers)
+
+	print '\nConfusion matrix:\n\n', conf_matrix
+
+	if do_plot:
+		fig = plt.figure(fig_num, figsize=(5, 5))
+		im = plt.matshow(conf_matrix)
+		plt.colorbar(im)
+		plt.title('Confusion matrix')
+		fig.canvas.draw()
+
+		time.sleep(10)
+
+	for scheme in voting_schemes:
+		print '\n-', scheme, 'accuracy:', accuracies[scheme]
+
+	results = pd.DataFrame([ [ test_ending ] + accuracies.values() ], columns=[ 'Model' ] + accuracies.keys())
+	if not 'results.csv' in os.listdir(results_path):
+		results.to_csv(os.path.join(results_path, 'results.csv'), index=False)
+	else:
+		all_results = pd.read_csv(os.path.join(results_path, 'results.csv'))
+		all_results = pd.concat([all_results, results], ignore_index=True)
+		all_results.to_csv(os.path.join(results_path, 'results.csv'), index=False)
+
+	print '\n'
+
+
+if __name__ == '__main__':
+	parser = argparse.ArgumentParser()
+
+	parser.add_argument('--mode', default='train', help='Network operating mode: \
+							"train" mode learns the synaptic weights of the network, and \
+							"test" mode holds the weights fixed / evaluates accuracy on test data.')
+	parser.add_argument('--n_e', type=int, default=100, help='Number of excitatory \
+												and inhibitory neurons used in the network.')
+	parser.add_argument('--do_plot', type=str, default='False', help='Whether or not to display plots during network \
+													training / testing. Defaults to False, as this makes the \
+												network operation speedier, and possible to run on HPC resources.')
+	parser.add_argument('--num_train', type=int, default=10000, help='The number of \
+											examples for which to train the network on.')
+	parser.add_argument('--num_test', type=int, default=10000, help='The number of \
+											examples for which to test the network on.')
+	parser.add_argument('--random_seed', type=int, default=42, help='The random seed \
+									(any integer) from which to generate random numbers.')
+	parser.add_argument('--save_weights', type=str, default='False', help='Whether or not to \
+									save the weights of the model every `weight_update_interval`.')
+	parser.add_argument('--weight_update_interval', type=int, default=10, help='How often \
+												to update the plot of network filter weights.')
+	parser.add_argument('--save_best_model', type=str, default='True', help='Whether \
+										to save the current best version of the model.')
+	parser.add_argument('--update_interval', type=int, default=250, help='How often \
+										to update neuron labels and classify new inputs.')
+	parser.add_argument('--plot_all_deltas', type=str, default='False', help='Whether or not to \
+								plot weight changes for all neurons from input to excitatory layer.')
+	parser.add_argument('--train_remove_inhibition', type=str, default='False', help='Whether or not to \
+														remove lateral inhibition during the training phase.')
+	parser.add_argument('--test_no_inhibition', type=str, default='False', help='Whether or not to \
+														remove lateral inhibition during the test phase.')
+	parser.add_argument('--test_max_inhibition', type=str, default='False', help='Whether or not to \
+														use ETH-style inhibition during the test phase.')
+	parser.add_argument('--start_inhib', type=float, default=0.1, help='The beginning value \
+														of inhibiton for the increasing scheme.')
+	parser.add_argument('--max_inhib', type=float, default=17.4, help='The maximum synapse \
+											weight for inhibitory to excitatory connections.')
+	parser.add_argument('--reset_state_vars', type=str, default='False', help='Whether to \
+							reset neuron / synapse state variables or run a "reset" period.')
+	parser.add_argument('--inhib_update_interval', type=int, default=250, \
+							help='How often to increase the inhibition strength.')
+	parser.add_argument('--inhib_schedule', type=str, default='linear', help='How to \
+							update the strength of inhibition as the training progresses.')
+	parser.add_argument('--save_spikes', type=str, default='False', help='Whether or not to \
+							save 2D graphs of spikes to later use to make an activity time-lapse.')
+
+	# parse arguments and place them in local scope
+	args = parser.parse_args()
+	args = vars(args)
+	locals().update(args)
+
+	print '\nOptional argument values:'
+	for key, value in args.items():
+		print '-', key, ':', value
+
+	print '\n'
+
+	for var in [ 'do_plot', 'plot_all_deltas', 'reset_state_vars', 'test_max_inhibition', \
+						'save_weights', 'save_best_model', 'test_no_inhibition', 'save_spikes' ]:
+		if locals()[var] == 'True':
+			locals()[var] = True
+		elif locals()[var] == 'False':
+			locals()[var] = False
+		else:
+			raise Exception('Expecting True or False-valued command line argument "' + var + '".')
+
+	# test or training mode
+	test_mode = mode == 'test'
+
+	if test_mode:
+		num_examples = num_test
+	else:
+		num_examples = num_train
+
+	if test_mode:
+		data_size = 150
+	else:
+		data_size = 150
+
+	if inhib_schedule == 'linear':
+		inhib_increase = ((max_inhib - start_inhib) / float(num_train) * inhib_update_interval)
+	elif inhib_schedule == 'log':
+		num_updates = num_train / inhib_update_interval
+		c = max_inhib / log(1 + num_updates)
+		inhib_increase = [ c * np.log(1 + t) for t in xrange(num_updates) ]
+	else:
+		raise Exception('Exception one of "linear" or "log" for argument "inhib_schedule".')
+
+	# set brian global preferences
+	b.set_global_preferences(defaultclock = b.Clock(dt=0.5*b.ms), useweave = True, gcc_options = ['-ffast-math -march=native'], usecodegen = True,
+		usecodegenweave = True, usecodegenstateupdate = True, usecodegenthreshold = False, usenewpropagate = True, usecstdp = True, openmp = False,
+		magic_useframes = False, useweave_linear_diffeq = True)
+
+	# for reproducibility's sake
+	np.random.seed(random_seed)
+
+	start = timeit.default_timer()
+	data = load_iris()
+	
+	print 'Time needed to load data:', timeit.default_timer() - start
+
+	# set parameters for simulation based on train / test mode
+	record_spikes = True
+
+	# number of inputs to the network
+	n_input = 4
+	n_input_sqrt = int(math.sqrt(n_input))
+	n_e_sqrt = int(math.sqrt(n_e))
+	n_i = n_e
+
+	# time (in seconds) per data example presentation and rest period in between
+	single_example_time = 0.35 * b.second
+	resting_time = 0.15 * b.second
+
+	# set the update interval
+	if test_mode:
+		update_interval = num_examples
+
+	# weight updates and progress printing intervals
+	print_progress_interval = 10
+
+	# rest potential parameters, reset potential parameters, threshold potential parameters, and refractory periods
+	v_rest_e, v_rest_i = -65. * b.mV, -60. * b.mV
+	v_reset_e, v_reset_i = -65. * b.mV, -45. * b.mV
+	v_thresh_e, v_thresh_i = -64.99 * b.mV, -44.99 * b.mV
+	refrac_e, refrac_i = 5. * b.ms, 2. * b.ms
+
+	# dictionaries for weights and delays
+	weight, delay = {}, {}
+
+	# populations, connections, saved connections, etc.
+	input_population_names = [ 'X' ]
+	population_names = [ 'A' ]
+	input_connection_names = [ 'XA' ]
+	save_conns = [ 'XeAe', 'AeAe' ]
+
+	# weird and bad names for variables, I think
+	input_conn_names = [ 'ee_input' ]
+	recurrent_conn_names = [ 'ei', 'ie', 'ee' ]
+	
+	# setting weight, delay, and intensity parameters
+	weight['ee_input'] = n_input * 0.15
+	delay['ee_input'] = (0 * b.ms, 10 * b.ms)
+	delay['ei_input'] = (0 * b.ms, 5 * b.ms)
+	input_intensity = start_input_intensity = 10.0
+	current_inhibition = 1.0
+
+	# time constants, learning rates, max weights, weight dependence, etc.
+	tc_pre_ee, tc_post_ee = 20 * b.ms, 20 * b.ms
+	nu_ee_pre, nu_ee_post = 0.0001, 0.01
+	nu_AeAe_pre, nu_Ae_Ae_post = 0.1, 0.5
+	wmax_ee = 1.0
+	exp_ee_post = exp_ee_pre = 0.2
+	w_mu_pre, w_mu_post = 0.2, 0.2
+
+	# setting up differential equations (depending on train / test mode)
+	if test_mode:
+		scr_e = 'v = v_reset_e; timer = 0*ms'
+	else:
+		tc_theta = 1e7 * b.ms
+		theta_plus_e = 0.05 * b.mV
+		scr_e = 'v = v_reset_e; theta += theta_plus_e; timer = 0*ms'
+
+	offset = 20.0 * b.mV
+	v_thresh_e = '(v>(theta - offset + ' + str(v_thresh_e) + ')) * (timer>refrac_e)'
+
+	# equations for neurons
+	neuron_eqs_e = '''
+			dv/dt = ((v_rest_e - v) + (I_synE + I_synI) / nS) / (100 * ms)  : volt
+			I_synE = ge * nS *         -v                           : amp
+			I_synI = gi * nS * (-100.*mV-v)                          : amp
+			dge/dt = -ge/(1.0*ms)                                   : 1
+			dgi/dt = -gi/(2.0*ms)                                  : 1
+			'''
+			
+	if test_mode:
+		neuron_eqs_e += '\n  theta      :volt'
+	else:
+		neuron_eqs_e += '\n  dtheta/dt = -theta / (tc_theta)  : volt'
+
+	neuron_eqs_e += '\n  dtimer/dt = 100.0 : ms'
+
+	neuron_eqs_i = '''
+			dv/dt = ((v_rest_i - v) + (I_synE + I_synI) / nS) / (10*ms)  : volt
+			I_synE = ge * nS *         -v                           : amp
+			I_synI = gi * nS * (-85.*mV-v)                          : amp
+			dge/dt = -ge/(1.0*ms)                                   : 1
+			dgi/dt = -gi/(2.0*ms)                                  : 1
+			'''
+
+	# STDP synaptic traces
+	eqs_stdp_ee = '''
+				dpre/dt = -pre / tc_pre_ee : 1.0
+				dpost/dt = -post / tc_post_ee : 1.0
+				'''
+
+	eqs_stdp_AeAe = '''
+				dpre/dt = -pre / tc_pre_ee : 1.0
+				dpost/dt = -post / tc_post_ee : 1.0
+				'''
+
+	# STDP rule (post-pre, no weight dependence)
+	eqs_stdp_pre_ee = 'pre = 1.; w -= nu_ee_pre * post'
+	eqs_stdp_post_ee = 'w += nu_ee_post * pre; post = 1.'
+
+	eqs_stdp_pre_AeAe = 'pre += 1.; w -= nu_AeAe_pre * post'
+	eqs_stdp_post_AeAe = 'w += nu_AeAe_post * pre; post += 1.'
+
+	print '\n'
+
+	# set ending of filename saves
+	ending = '_'.join([ str(n_e), str(num_train), str(random_seed) ])
+
+	if test_mode:
+		test_ending = '_'.join([ str(n_e), str(num_train), str(random_seed), str(test_no_inhibition), str(test_max_inhibition) ])
+
+	b.ion()
+	fig_num = 1
+	
+	# creating dictionaries for various objects
+	neuron_groups, input_groups, connections, input_connections, stdp_methods, \
+		rate_monitors, spike_monitors, spike_counters, output_numbers = {}, {}, {}, {}, {}, {}, {}, {}, {}
+
+	# instantiating neuron "vote" monitor
+	result_monitor = np.zeros((update_interval, n_e))
+
+	# build the spiking neural network
+	build_network()
+
+	# bookkeeping variables
+	previous_spike_count = np.zeros(n_e)
+	input_numbers = np.zeros(num_examples)
+	rates = np.zeros((n_input_sqrt, n_input_sqrt))
+
+	if test_mode:
+		assignments = np.load(os.path.join(best_assignments_dir, '_'.join(['assignments', ending, 'best.npy'])))
+		accumulated_rates = np.load(os.path.join(best_misc_dir, '_'.join(['accumulated_rates', ending, 'best.npy'])))
+		spike_proportions = np.load(os.path.join(best_misc_dir, '_'.join(['spike_proportions', ending, 'best.npy'])))
+	else:
+		assignments = -1 * np.ones(n_e)
+
+	voting_schemes = ['all', 'confidence_weighting']
+
+	for scheme in voting_schemes:
+		output_numbers[scheme] = np.zeros((num_examples, 10))
+
+	if not test_mode:
+		accumulated_rates = np.zeros((n_e, 10))
+		accumulated_inputs = np.zeros(10)
+		spike_proportions = np.zeros((n_e, 10))
+	
+	# run the simulation of the network
+	if test_mode:
+		run_test()
+	else:
+		run_train()
+
+	# save and plot results
+	save_results()
+
+	# evaluate results
+	if test_mode:
+		evaluate_results()
