@@ -659,7 +659,8 @@ def run_train():
 
 	while j < num_examples:
 		# get the firing rates of the next input example
-		rates = (data['x'][j % data_size, :, :] / 8.0) * input_intensity
+		rates = (data['x'][j % data_size, :, :] / 8.0) * input_intensity * \
+			((noise_const * np.random.randn(n_input_sqrt, n_input_sqrt)) + 1.0)
 		
 		# sets the input firing rates
 		input_groups['Xe'].rate = rates.reshape(n_input)
@@ -1071,6 +1072,8 @@ if __name__ == '__main__':
 											to ensure all inputs contain the same amount of "ink".')
 	parser.add_argument('--proportion_grow', type=float, default=1.0, help='What proportion of \
 								the training to grow the inhibition from "start_inhib" to "max_inhib".')
+	parser.add_argument('--noise_const', type=float, default=0.0, help='The scale of the \
+															noise added to input examples.')
 
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
