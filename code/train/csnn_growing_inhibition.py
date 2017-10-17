@@ -1256,7 +1256,8 @@ if __name__ == '__main__':
 
 	# set ending of filename saves
 	ending = '_'.join([ str(conv_size), str(conv_stride), str(conv_features), str(n_e), \
-						str(num_train), str(random_seed), str(normalize_inputs), str(proportion_grow) ])
+						str(num_train), str(random_seed), str(normalize_inputs), 
+						str(proportion_grow), str(noise_const) ])
 
 	b.ion()
 	fig_num = 1
