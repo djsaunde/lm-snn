@@ -13,6 +13,7 @@ do
 					for noise_const in 0.1 0.25 0.5 0.75 1.0
 					do
 						sbatch csnn_growing_inhibition_job.sh 28 0 $conv_features $num_train $random_seed $normalized_inputs $proportion_grow $noise_const
+					done
 				done
 			done
 		done
