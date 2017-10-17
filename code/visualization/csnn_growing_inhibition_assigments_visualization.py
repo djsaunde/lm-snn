@@ -5,9 +5,12 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 top_level_path = os.path.join('..', '..')
-model_name = 'csnn_pc_growing_inhibition'
+model_name = 'csnn_growing_inhibition'
 best_misc_dir = os.path.join(top_level_path, 'assignments', model_name, 'best')
 plots_dir = os.path.join(top_level_path, 'plots', model_name)
+
+if not os.path.isdir(plots_dir):
+	os.makedirs(plots_dir)
 
 fig_num = 1
 
@@ -29,14 +32,15 @@ def plot_labels(labels):
 
 	fig.canvas.draw()
 
-	plt.savefig(os.path.join(plots_dir, '_'.join(file_name.split('_')[2:])[:-4] + '.png'))
+	plt.savefig(os.path.join(plots_dir, '_'.join(file_name.split('_')[1:])[:-4] + '.png'))
 
 	plt.show()
 
 	return im, fig
 
 print '\n'
-print '\n'.join([ str(idx) + ' | ' + file_name for idx, file_name in enumerate([ file_name for file_name in sorted(os.listdir(best_misc_dir))]) ])
+print '\n'.join([ str(idx) + ' | ' + file_name for idx, file_name in \
+	enumerate([ file_name for file_name in sorted(os.listdir(best_misc_dir))]) ])
 print '\n'
 
 to_plot = raw_input('Enter the index of the file from above which you\'d like to visualize: ')

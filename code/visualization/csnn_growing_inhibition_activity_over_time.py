@@ -70,6 +70,7 @@ if n_files == -1:
 	with writer.saving(fig, os.path.join('movies', '_'.join([ model, str(n_files) ]) + '.mp4'), 100):
 		for activity_file, rates_file in tqdm(zip(activity_files, rates_files)):
 			activity = np.load(os.path.join(spikes_dir, activity_file))
+			activity = activity / float(np.sum(activity))
 
 			rates = np.load(os.path.join(spikes_dir, rates_file))
 
