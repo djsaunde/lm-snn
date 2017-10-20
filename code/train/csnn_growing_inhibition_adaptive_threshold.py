@@ -35,7 +35,7 @@ b.log_level_error()
 # set these appropriate to your directory structure
 top_level_path = os.path.join('..', '..')
 MNIST_data_path = os.path.join(top_level_path, 'data')
-model_name = 'csnn_growing_inhibition'
+model_name = 'csnn_growing_inhibition_adaptive_threshold'
 results_path = os.path.join(top_level_path, 'results', model_name)
 
 performance_dir = os.path.join(top_level_path, 'performance', model_name)
@@ -673,21 +673,10 @@ def run_train():
 			theta_fig.colorbar(cax)
 			theta_fig.suptitle('Theta values on the 2D grid')
 			theta_fig.canvas.draw()
-
-			voltage_fig = plt.figure(11)
-			voltage_axes = plt.gca()
-			cax = theta_axes.imshow(neuron_groups['e'].v.reshape([features_sqrt, \
-						features_sqrt]), interpolation='nearest', vmin=-.66, vmax=-.50)
-			voltage_fig.colorbar(cax)
-			voltage_fig.suptitle('Voltage of neurons on the 2D grid')
-			voltage_fig.canvas.draw()
 		elif do_plot:
 			cax = theta_axes.imshow(neuron_groups['e'].theta.reshape([features_sqrt, \
 						features_sqrt]), interpolation='nearest', vmin=0, vmax=0.1)
 			theta_fig.canvas.draw()
-			cax = voltage_axes.imshow(neuron_groups['e'].v.reshape([features_sqrt, \
-						features_sqrt]), interpolation='nearest') # , vmin=-.66, vmax=-.50)
-			voltage_fig.canvas.draw()
 
 		# plot the input at this step
 		if do_plot:
@@ -1017,7 +1006,6 @@ def evaluate_results():
 	accuracies = { scheme : correct[scheme] / float(num_examples) * 100 for scheme in voting_schemes }
 
 	conf_matrix = confusion_matrix(test_results[scheme][0, :], input_numbers)
-	np.save(os.path.join(results_path, '_'.join('confusion_matrix', ending) + '.npy'))
 
 	print '\nConfusion matrix:\n\n', conf_matrix
 
@@ -1099,6 +1087,10 @@ if __name__ == '__main__':
 								the training to grow the inhibition from "start_inhib" to "max_inhib".')
 	parser.add_argument('--noise_const', type=float, default=0.0, help='The scale of the \
 															noise added to input examples.')
+	parser.add_argument('--tc_theta', type=float, default=1e7, help='Time constant for \
+														adaptive threshold parameters.')
+	parser.add_argument('--theta_plus_e', type=float, default=0.05, help='The amount by which \
+												the threshold increases on any given iteration.')
 
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
@@ -1228,8 +1220,8 @@ if __name__ == '__main__':
 	if test_mode:
 		scr_e = 'v = v_reset_e; timer = 0*ms'
 	else:
-		tc_theta = 1e7 * b.ms
-		theta_plus_e = 0.05 * b.mV
+		tc_theta = tc_theta * b.ms
+		theta_plus_e = theta_plus_e * b.mV
 		scr_e = 'v = v_reset_e; theta += theta_plus_e; timer = 0*ms'
 
 	offset = 20.0 * b.mV

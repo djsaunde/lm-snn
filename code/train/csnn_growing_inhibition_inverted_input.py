@@ -35,7 +35,7 @@ b.log_level_error()
 # set these appropriate to your directory structure
 top_level_path = os.path.join('..', '..')
 MNIST_data_path = os.path.join(top_level_path, 'data')
-model_name = 'csnn_growing_inhibition'
+model_name = 'csnn_growing_inhibition_inverted_input'
 results_path = os.path.join(top_level_path, 'results', model_name)
 
 performance_dir = os.path.join(top_level_path, 'performance', model_name)
@@ -659,7 +659,7 @@ def run_train():
 
 	while j < num_examples:
 		# get the firing rates of the next input example
-		rates = (data['x'][j % data_size, :, :] / 8.0) * input_intensity * \
+		rates = ((255 - data['x'][j % data_size, :, :]) / intensity_denom) * input_intensity * \
 			((noise_const * np.random.randn(n_input_sqrt, n_input_sqrt)) + 1.0)
 		
 		# sets the input firing rates
@@ -903,7 +903,7 @@ def run_test():
 
 	while j < num_examples:
 		# get the firing rates of the next input example
-		rates = (data['x'][j % data_size, :, :] / 8.0) * input_intensity
+		rates = (255 - data['x'][j % data_size, :, :] / intensity_denom) * input_intensity
 		
 		# sets the input firing rates
 		input_groups['Xe'].rate = rates.reshape(n_input)
@@ -1099,6 +1099,8 @@ if __name__ == '__main__':
 								the training to grow the inhibition from "start_inhib" to "max_inhib".')
 	parser.add_argument('--noise_const', type=float, default=0.0, help='The scale of the \
 															noise added to input examples.')
+	parser.add_argument('--intensity_denom', type=float, default=8.0, help='How much to divide \
+												the input average firing rates by to begin with.')
 
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
@@ -1282,7 +1284,7 @@ if __name__ == '__main__':
 	# set ending of filename saves
 	ending = '_'.join([ str(conv_size), str(conv_stride), str(conv_features), str(n_e), \
 						str(num_train), str(random_seed), str(normalize_inputs), 
-						str(proportion_grow), str(noise_const) ])
+						str(proportion_grow), str(noise_const), str(intensity_denom) ])
 
 	b.ion()
 	fig_num = 1
