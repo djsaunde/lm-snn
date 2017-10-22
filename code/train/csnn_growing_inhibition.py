@@ -1017,7 +1017,7 @@ def evaluate_results():
 	accuracies = { scheme : correct[scheme] / float(num_examples) * 100 for scheme in voting_schemes }
 
 	conf_matrix = confusion_matrix(test_results[scheme][0, :], input_numbers)
-	np.save(os.path.join(results_path, '_'.join('confusion_matrix', ending) + '.npy'))
+	np.save(os.path.join(results_path, '_'.join(['confusion_matrix', ending]) + '.npy'))
 
 	print '\nConfusion matrix:\n\n', conf_matrix
 
