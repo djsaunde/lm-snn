@@ -18,6 +18,7 @@ import random
 import timeit
 import time
 import math
+import sys
 import os
 
 from scipy.spatial.distance import euclidean
@@ -60,23 +61,6 @@ for d in [ performance_dir, activity_dir, weights_dir, deltas_dir, misc_dir, bes
 			best_weights_dir, end_weights_dir, end_misc_dir, end_assignments_dir, spikes_dir ]:
 	if not os.path.isdir(d):
 		os.makedirs(d)
-
-
-def normalize_weights():
-	'''
-	Squash the input to excitatory synaptic weights to sum to a prespecified number.
-	'''
-	for conn_name in input_connections:
-		connection = input_connections[conn_name][:].todense()
-		for feature in xrange(conv_features):
-			feature_connection = connection[:, feature * n_e : (feature + 1) * n_e]
-			column_sums = np.sum(np.asarray(feature_connection), axis=0)
-			column_factors = weight['ee_input'] / column_sums
-
-			for n in xrange(n_e):
-				dense_weights = input_connections[conn_name][:, feature * n_e + n].todense()
-				dense_weights[convolution_locations[n]] *= column_factors[n]
-				input_connections[conn_name][:, feature * n_e + n] = dense_weights
 
 
 def plot_input(rates):
@@ -497,7 +481,7 @@ def build_network():
 					for n in xrange(n_e):
 						connections[conn_name][feature * n_e + n, feature * n_e + n] = 10.4
 
-			elif conn_type == 'ie' and not (test_no_inhibition and test_mode):
+			elif conn_type == 'ie' and not (test_no_inhibition and test_mode) and inhibition:
 				# create connection name (composed of population and connection types)
 				conn_name = name + conn_type[0] + name + conn_type[1]
 				
@@ -529,19 +513,8 @@ def build_network():
 									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = \
 													weight_matrix[feature * n_e + n, other_feature * n_e + n]
 								else:
-									if inhib_scheme == 'increasing':
-										connections[conn_name][feature * n_e + n, other_feature * n_e + n] = \
-																				min(max_inhib, start_inhib * \
-																			np.sqrt(euclidean([x, y], [x_, y_])))
-									elif inhib_scheme == 'eth':
-										connections[conn_name][feature * n_e + n, \
-													other_feature * n_e + n] = max_inhib
-									elif inhib_scheme == 'mhat':
-										connections[conn_name][feature * n_e + n, \
-														other_feature * n_e + n] = \
-														min(max_inhib, start_inhib * \
-														mhat(np.sqrt(euclidean([x, y], [x_, y_])), \
-														sigma=1.0, scale=1.0, shift=0.0))
+									connections[conn_name][feature * n_e + n, other_feature * n_e + n] = \
+													min(max_inhib, start_inhib * np.sqrt(euclidean([x, y], [x_, y_])))
 
 		print '...Creating monitors for:', name
 
@@ -710,19 +683,20 @@ def run_train():
 		# run the network for a single example time
 		b.run(single_example_time)
 
+		threshold_matrix = np.vstack([ neuron_groups['e'].theta - 0.02 for idx in xrange(n_input)]).ravel()
+		input_connections['XeAe'].W.alldata[:] -= input_connections['XeAe'].W.alldata[:] * threshold_matrix * 2
+
 		# get difference between weights from before and after running a single iteration
 		new_weights = input_connections['XeAe'][:].todense() - previous_weights
 
 		# get new neuron label assignments every 'update_interval'
 		if j % update_interval == 0 and j > 0:
-			assignments, accumulated_rates, spike_proportions = assign_labels(result_monitor, input_numbers[j - update_interval : j], accumulated_rates, accumulated_inputs)
+			assignments, accumulated_rates, spike_proportions = assign_labels(result_monitor, \
+					input_numbers[j - update_interval : j], accumulated_rates, accumulated_inputs)
 
 		# get count of spikes over the past iteration
 		current_spike_count = np.copy(spike_counters['Ae'].count[:]).reshape((conv_features, n_e)) - previous_spike_count
 		previous_spike_count = np.copy(spike_counters['Ae'].count[:]).reshape((conv_features, n_e))
-
-		# make sure synapse weights don't grow too large
-		normalize_weights()
 
 		if not j % weight_update_interval == 0 and save_weights:
 			save_connections(weights_dir, connections, input_connections, ending, j)
@@ -881,9 +855,6 @@ def run_train():
 			# bookkeeping
 			input_intensity = start_input_intensity
 			j += 1
-
-	# ensure weights don't grow without bound
-	normalize_weights()
 
 	print '\n'
 
@@ -1110,8 +1081,8 @@ if __name__ == '__main__':
 								the training to grow the inhibition from "start_inhib" to "max_inhib".')
 	parser.add_argument('--noise_const', type=float, default=0.0, help='The scale of the \
 															noise added to input examples.')
-	parser.add_argument('--inhib_scheme', type=str, default='increasing', help='How inhibition from \
-															inhibitory to excitatory neurons is handled.')
+	parser.add_argument('--inhibition', type=str, default='True', help='Whether or not to use connections \
+															from the inhibitory to excitatory populations.')
 
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
@@ -1125,7 +1096,7 @@ if __name__ == '__main__':
 	print '\n'
 
 	for var in [ 'do_plot', 'plot_all_deltas', 'reset_state_vars', 'test_max_inhibition', 'normalize_inputs', \
-						'save_weights', 'save_best_model', 'test_no_inhibition', 'save_spikes' ]:
+						'save_weights', 'save_best_model', 'test_no_inhibition', 'save_spikes', 'inhibition' ]:
 		if locals()[var] == 'True':
 			locals()[var] = True
 		elif locals()[var] == 'False':

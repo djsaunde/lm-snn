@@ -14,6 +14,25 @@ MNIST_data_path = os.path.join(top_level_path, 'data')
 CIFAR10_data_path = os.path.join(top_level_path, 'data', 'cifar-10-batches-py')
 
 
+def mhat(t, sigma=1.0, scale=1.0, shift=0.0, max_excite=np.inf, max_inhib=-np.inf):
+	'''
+	Truly, this is the Ricker wavelet, which is the negative normalized second derivative
+	of a Gaussian function; i.e., up to scale and normalization, the second Hermite function.
+	It is frequently employed to model seismic data, or is used as a broad spectrum source
+	term in computational electrodynamics.
+
+	It is only referred to as the Mexican hat wavelet in the Americas due to its taking the
+	shape of a sombrero when used as a 2D image processing kernel.
+
+	See https://en.wikipedia.org/wiki/Mexican_hat_wavelet for more details and references.
+	'''
+	return -np.maximum(np.minimum(scale * np.divide(2, np.sqrt(3 * \
+								sigma) * (np.pi ** 0.25)) * (1.0 - \
+								np.square(np.divide(t, sigma))) * \
+								np.exp(-np.divide(np.square(t), 2 * \
+								np.square(sigma))) + shift, max_excite), max_inhib)
+
+
 def get_labeled_data(pickle_name, train=True, reduced_dataset=False, \
 			classes=range(10), examples_per_class=100, normalized_inputs=False):
 	'''

@@ -14,11 +14,11 @@ def mhat(t, sigma=1.0, scale=1.0, shift=0.0, max_excite=np.inf, max_inhib=-np.in
 
 	See https://en.wikipedia.org/wiki/Mexican_hat_wavelet for more details and references.
 	'''
-
-	# if np.abs(t) <= 1.0:
-	#	return 0.0
-	#else:
-	return np.maximum(np.minimum(scale * np.divide(2, np.sqrt(3 * sigma) * (np.pi ** 0.25)) * (1.0 - np.square(np.divide(t, sigma))) * np.exp(-np.divide(np.square(t), 2 * np.square(sigma))) + shift, max_excite), max_inhib)
+	return np.maximum(np.minimum(scale * np.divide(2, np.sqrt(3 * \
+								sigma) * (np.pi ** 0.25)) * (1.0 - \
+								np.square(np.divide(t, sigma))) * \
+								np.exp(-np.divide(np.square(t), 2 * \
+								np.square(sigma))) + shift, max_excite), max_inhib)
 
 
 if __name__ == '__main__':

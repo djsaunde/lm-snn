@@ -183,7 +183,7 @@ def plot_2d_input_weights():
 	else:
 		fig = plt.figure(fig_num, figsize=(9, 9))
 
-	im = plt.imshow(weights, interpolation='nearest', vmin=0, vmax=wmax_ee, cmap=cmap.get_cmap('hot_r'))
+	im = plt.imshow(wmax_ee - weights, interpolation='nearest', vmin=0, vmax=wmax_ee, cmap=cmap.get_cmap('hot_r'))
 	
 	if n_e != 1:
 		plt.colorbar(im, fraction=0.06)
@@ -193,14 +193,19 @@ def plot_2d_input_weights():
 	plt.title(ending.replace('_', ' '))
 
 	if n_e != 1:
-		plt.xticks(xrange(conv_size, conv_size * n_e_sqrt * features_sqrt + 1, conv_size), xrange(1, conv_size * n_e_sqrt * features_sqrt + 1))
-		plt.yticks(xrange(conv_size, conv_size * n_e_sqrt * features_sqrt + 1, conv_size), xrange(1, conv_size * n_e_sqrt * features_sqrt + 1))
-		for pos in xrange(conv_size * features_sqrt, conv_size * features_sqrt * n_e_sqrt, conv_size * features_sqrt):
+		plt.xticks(xrange(conv_size, conv_size * n_e_sqrt * features_sqrt + 1, conv_size), \
+											xrange(1, conv_size * n_e_sqrt * features_sqrt + 1))
+		plt.yticks(xrange(conv_size, conv_size * n_e_sqrt * features_sqrt + 1, conv_size), \
+											xrange(1, conv_size * n_e_sqrt * features_sqrt + 1))
+		for pos in xrange(conv_size * features_sqrt, conv_size * \
+				features_sqrt * n_e_sqrt, conv_size * features_sqrt):
 			plt.axhline(pos)
 			plt.axvline(pos)
 	else:
-		plt.xticks(xrange(conv_size, conv_size * (int(np.sqrt(conv_features)) + 1), conv_size), xrange(1, int(np.sqrt(conv_features)) + 1))
-		plt.yticks(xrange(conv_size, conv_size * (int(np.sqrt(conv_features)) + 1), conv_size), xrange(1, int(np.sqrt(conv_features)) + 1))
+		plt.xticks(xrange(conv_size, conv_size * (int(np.sqrt(conv_features)) + 1), \
+								conv_size), xrange(1, int(np.sqrt(conv_features)) + 1))
+		plt.yticks(xrange(conv_size, conv_size * (int(np.sqrt(conv_features)) + 1), \
+								conv_size), xrange(1, int(np.sqrt(conv_features)) + 1))
 	
 	fig.canvas.draw()
 	return im, fig
@@ -211,7 +216,7 @@ def update_2d_input_weights(im, fig):
 	Update the plot of the weights from input to excitatory layer to view during training.
 	'''
 	weights = get_2d_input_weights()
-	im.set_array(weights)
+	im.set_array(wmax_ee - weights)
 	fig.canvas.draw()
 	return im
 
@@ -591,7 +596,7 @@ def build_network():
 				for feature in xrange(conv_features):
 					for n in xrange(n_e):
 						for idx in xrange(conv_size ** 2):
-							input_connections[conn_name][convolution_locations[n][idx], feature * n_e + n] = (b.random() + 0.01) * 0.3
+							input_connections[conn_name][convolution_locations[n][idx], feature * n_e + n] = (b.random() + 0.01) * 0.01
 
 			if test_mode:
 				if do_plot:
@@ -1208,7 +1213,7 @@ if __name__ == '__main__':
 	
 	# setting weight, delay, and intensity parameters
 	if conv_size == 28 and conv_stride == 0:
-		weight['ee_input'] = (conv_size ** 2) * 0.1
+		weight['ee_input'] = (conv_size ** 2) * 0.0125
 	else:
 		weight['ee_input'] = (conv_size ** 2) * 0.1625
 
@@ -1220,9 +1225,9 @@ if __name__ == '__main__':
 
 	# time constants, learning rates, max weights, weight dependence, etc.
 	tc_pre_ee, tc_post_ee = 20 * b.ms, 20 * b.ms
-	nu_ee_pre, nu_ee_post = 0.0001, 0.01
+	nu_ee_pre, nu_ee_post = 0.00001, 0.001
 	nu_AeAe_pre, nu_Ae_Ae_post = 0.1, 0.5
-	wmax_ee = 1.0
+	wmax_ee = 0.1
 	exp_ee_post = exp_ee_pre = 0.2
 	w_mu_pre, w_mu_post = 0.2, 0.2
 
@@ -1230,7 +1235,7 @@ if __name__ == '__main__':
 	if test_mode:
 		scr_e = 'v = v_reset_e; timer = 0*ms'
 	else:
-		tc_theta = 1e7 * b.ms
+		tc_theta = 1e8 * b.ms
 		theta_plus_e = 0.05 * b.mV
 		scr_e = 'v = v_reset_e; theta += theta_plus_e; timer = 0*ms'
 
