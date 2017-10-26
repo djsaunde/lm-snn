@@ -649,29 +649,29 @@ def run_train():
 		# sets the input firing rates
 		input_groups['Xe'].rate = rates.reshape(n_input)
 
-		if do_plot and j == 0:
-			theta_fig = plt.figure(10)
-			theta_axes = plt.gca()
-			cax = theta_axes.imshow(neuron_groups['e'].theta.reshape([features_sqrt, \
-						features_sqrt]), interpolation='nearest', vmin=0, vmax=0.1)
-			theta_fig.colorbar(cax)
-			theta_fig.suptitle('Theta values on the 2D grid')
-			theta_fig.canvas.draw()
+		# if do_plot and j == 0:
+		# 	theta_fig = plt.figure(10)
+		# 	theta_axes = plt.gca()
+		# 	cax = theta_axes.imshow(neuron_groups['e'].theta.reshape([features_sqrt, \
+		# 				features_sqrt]), interpolation='nearest', vmin=0, vmax=0.1)
+		# 	theta_fig.colorbar(cax)
+		# 	theta_fig.suptitle('Theta values on the 2D grid')
+		# 	theta_fig.canvas.draw()
 
-			voltage_fig = plt.figure(11)
-			voltage_axes = plt.gca()
-			cax = theta_axes.imshow(neuron_groups['e'].v.reshape([features_sqrt, \
-						features_sqrt]), interpolation='nearest', vmin=-.66, vmax=-.50)
-			voltage_fig.colorbar(cax)
-			voltage_fig.suptitle('Voltage of neurons on the 2D grid')
-			voltage_fig.canvas.draw()
-		elif do_plot:
-			cax = theta_axes.imshow(neuron_groups['e'].theta.reshape([features_sqrt, \
-						features_sqrt]), interpolation='nearest', vmin=0, vmax=0.1)
-			theta_fig.canvas.draw()
-			cax = voltage_axes.imshow(neuron_groups['e'].v.reshape([features_sqrt, \
-						features_sqrt]), interpolation='nearest') # , vmin=-.66, vmax=-.50)
-			voltage_fig.canvas.draw()
+		# 	voltage_fig = plt.figure(11)
+		# 	voltage_axes = plt.gca()
+		# 	cax = theta_axes.imshow(neuron_groups['e'].v.reshape([features_sqrt, \
+		# 				features_sqrt]), interpolation='nearest', vmin=-.66, vmax=-.50)
+		# 	voltage_fig.colorbar(cax)
+		# 	voltage_fig.suptitle('Voltage of neurons on the 2D grid')
+		# 	voltage_fig.canvas.draw()
+		# elif do_plot:
+		# 	cax = theta_axes.imshow(neuron_groups['e'].theta.reshape([features_sqrt, \
+		# 				features_sqrt]), interpolation='nearest', vmin=0, vmax=0.1)
+		# 	theta_fig.canvas.draw()
+		# 	cax = voltage_axes.imshow(neuron_groups['e'].v.reshape([features_sqrt, \
+		# 				features_sqrt]), interpolation='nearest') # , vmin=-.66, vmax=-.50)
+		# 	voltage_fig.canvas.draw()
 
 		# plot the input at this step
 		if do_plot:
@@ -684,7 +684,7 @@ def run_train():
 		b.run(single_example_time)
 
 		threshold_matrix = np.vstack([ neuron_groups['e'].theta - 0.02 for idx in xrange(n_input)]).ravel()
-		input_connections['XeAe'].W.alldata[:] -= input_connections['XeAe'].W.alldata[:] * threshold_matrix * 2
+		input_connections['XeAe'].W.alldata[:] -= (1 + wmax_ee - input_connections['XeAe'].W.alldata[:]) * 0.05 * threshold_matrix
 
 		# get difference between weights from before and after running a single iteration
 		new_weights = input_connections['XeAe'][:].todense() - previous_weights
@@ -745,13 +745,13 @@ def run_train():
 		else:			
 			num_retries = 0
 
-			if j > 0 and j % inhib_update_interval == 0:
+			if j > 0 and j % inhib_update_interval == 0 and inhibition:
 				if inhib_schedule == 'linear':
 					current_inhib = current_inhib + inhib_increase
 				elif inhib_schedule == 'log':
 					current_inhib = inhib_increase[j // inhib_update_interval]
 
-				print '\nCurrent inhibition level:', current_inhib
+				print '\nCurrent inhibition level:', min(max_inhib, current_inhib)
 
 				for feature in xrange(conv_features):
 					for other_feature in xrange(conv_features):
@@ -1202,7 +1202,7 @@ if __name__ == '__main__':
 
 	# time constants, learning rates, max weights, weight dependence, etc.
 	tc_pre_ee, tc_post_ee = 20 * b.ms, 20 * b.ms
-	nu_ee_pre, nu_ee_post = 0.0001, 0.01
+	nu_ee_pre, nu_ee_post = 0.0001, 0.001
 	nu_AeAe_pre, nu_Ae_Ae_post = 0.1, 0.5
 	wmax_ee = 1.0
 	exp_ee_post = exp_ee_pre = 0.2
@@ -1212,7 +1212,7 @@ if __name__ == '__main__':
 	if test_mode:
 		scr_e = 'v = v_reset_e; timer = 0*ms'
 	else:
-		tc_theta = 1e7 * b.ms
+		tc_theta = 1e5 * b.ms
 		theta_plus_e = 0.05 * b.mV
 		scr_e = 'v = v_reset_e; theta += theta_plus_e; timer = 0*ms'
 

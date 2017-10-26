@@ -676,29 +676,29 @@ def run_train():
 		# sets the input firing rates
 		input_groups['Xe'].rate = rates.reshape(n_input)
 
-		if do_plot and j == 0:
-			theta_fig = plt.figure(10)
-			theta_axes = plt.gca()
-			cax = theta_axes.imshow(neuron_groups['e'].theta.reshape([features_sqrt, \
-						features_sqrt]), interpolation='nearest', vmin=0, vmax=0.1)
-			theta_fig.colorbar(cax)
-			theta_fig.suptitle('Theta values on the 2D grid')
-			theta_fig.canvas.draw()
+		# if do_plot and j == 0:
+		# 	theta_fig = plt.figure(10)
+		# 	theta_axes = plt.gca()
+		# 	cax = theta_axes.imshow(neuron_groups['e'].theta.reshape([features_sqrt, \
+		# 				features_sqrt]).T, interpolation='nearest', vmin=0, vmax=0.1)
+		# 	theta_fig.colorbar(cax)
+		# 	theta_fig.suptitle('Theta values on the 2D grid')
+		# 	theta_fig.canvas.draw()
 
-			voltage_fig = plt.figure(11)
-			voltage_axes = plt.gca()
-			cax = theta_axes.imshow(neuron_groups['e'].v.reshape([features_sqrt, \
-						features_sqrt]), interpolation='nearest', vmin=-.66, vmax=-.50)
-			voltage_fig.colorbar(cax)
-			voltage_fig.suptitle('Voltage of neurons on the 2D grid')
-			voltage_fig.canvas.draw()
-		elif do_plot:
-			cax = theta_axes.imshow(neuron_groups['e'].theta.reshape([features_sqrt, \
-						features_sqrt]), interpolation='nearest', vmin=0, vmax=0.1)
-			theta_fig.canvas.draw()
-			cax = voltage_axes.imshow(neuron_groups['e'].v.reshape([features_sqrt, \
-						features_sqrt]), interpolation='nearest') # , vmin=-.66, vmax=-.50)
-			voltage_fig.canvas.draw()
+		# 	voltage_fig = plt.figure(11)
+		# 	voltage_axes = plt.gca()
+		# 	cax = theta_axes.imshow(neuron_groups['e'].v.reshape([features_sqrt, \
+		# 				features_sqrt]).T, interpolation='nearest', vmin=-.66, vmax=-.50)
+		# 	voltage_fig.colorbar(cax)
+		# 	voltage_fig.suptitle('Voltage of neurons on the 2D grid')
+		# 	voltage_fig.canvas.draw()
+		# elif do_plot:
+		# 	cax = theta_axes.imshow(neuron_groups['e'].theta.reshape([features_sqrt, \
+		# 				features_sqrt]).T, interpolation='nearest', vmin=0, vmax=0.1)
+		# 	theta_fig.canvas.draw()
+		# 	cax = voltage_axes.imshow(neuron_groups['e'].v.reshape([features_sqrt, \
+		# 				features_sqrt]).T, interpolation='nearest') # , vmin=-.66, vmax=-.50)
+		# 	voltage_fig.canvas.draw()
 
 		# plot the input at this step
 		if do_plot:
@@ -777,7 +777,7 @@ def run_train():
 				elif inhib_schedule == 'log':
 					current_inhib = inhib_increase[j // inhib_update_interval]
 
-				print '\nCurrent inhibition level:', current_inhib
+				print '\nCurrent inhibition level:', min(max_inhib, current_inhib)
 
 				for feature in xrange(conv_features):
 					for other_feature in xrange(conv_features):
@@ -1092,13 +1092,13 @@ if __name__ == '__main__':
 														remove lateral inhibition during the test phase.')
 	parser.add_argument('--test_max_inhibition', type=str, default='False', help='Whether or not to \
 														use ETH-style inhibition during the test phase.')
-	parser.add_argument('--start_inhib', type=float, default=0.1, help='The beginning value \
+	parser.add_argument('--start_inhib', type=float, default=0.01, help='The beginning value \
 														of inhibiton for the increasing scheme.')
 	parser.add_argument('--max_inhib', type=float, default=17.4, help='The maximum synapse \
 											weight for inhibitory to excitatory connections.')
 	parser.add_argument('--reset_state_vars', type=str, default='False', help='Whether to \
 							reset neuron / synapse state variables or run a "reset" period.')
-	parser.add_argument('--inhib_update_interval', type=int, default=250, \
+	parser.add_argument('--inhib_update_interval', type=int, default=100, \
 							help='How often to increase the inhibition strength.')
 	parser.add_argument('--inhib_schedule', type=str, default='linear', help='How to \
 							update the strength of inhibition as the training progresses.')
