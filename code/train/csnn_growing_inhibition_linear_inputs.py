@@ -35,7 +35,7 @@ b.log_level_error()
 # set these appropriate to your directory structure
 top_level_path = os.path.join('..', '..')
 MNIST_data_path = os.path.join(top_level_path, 'data')
-model_name = 'csnn_growing_inhibition'
+model_name = 'csnn_growing_inhibition_linear_inputs'
 results_path = os.path.join(top_level_path, 'results', model_name)
 
 performance_dir = os.path.join(top_level_path, 'performance', model_name)
@@ -60,6 +60,20 @@ for d in [ performance_dir, activity_dir, weights_dir, deltas_dir, misc_dir, bes
 			best_weights_dir, end_weights_dir, end_misc_dir, end_assignments_dir, spikes_dir ]:
 	if not os.path.isdir(d):
 		os.makedirs(d)
+
+
+def calculate_spike_times(input_example, iteration):
+	'''
+	Takes in an input example and produces a deterministic (instead of Poisson) spiking
+	pattern for neurons in the input population.
+	'''
+	output = []
+	for n in xrange(n_input):
+		if input_example[n] > 0:
+			for spiketime in np.linspace(0, train_time, input_example[n] * train_time):
+				output.append((n, (iteration * (train_time + train_rest)) + spiketime * b.second))
+
+	return output
 
 
 def normalize_weights():
@@ -565,11 +579,20 @@ def build_network():
 		b.raster_plot(spike_monitors['Ae'], refresh=1000 * b.ms, showlast=1000 * b.ms, title='Excitatory spikes per neuron')
 		b.subplot(212)
 		b.raster_plot(spike_monitors['Ai'], refresh=1000 * b.ms, showlast=1000 * b.ms, title='Inhibitory spikes per neuron')
+		
 		b.tight_layout()
 
 	# creating Poission spike train from input image (784 vector, 28x28 image)
 	for name in input_population_names:
-		input_groups[name + 'e'] = b.PoissonGroup(n_input, 0)
+		if linear_train_input and not test_mode:
+			input_groups[name + 'e'] = b.SpikeGeneratorGroup(n_input, [])
+		if not linear_train_input and not test_mode:
+			input_groups[name + 'e'] = b.PoissonGroup(n_input, 0)
+		if linear_test_input and test_mode:
+			input_groups[name + 'e'] = b.SpikeGeneratorGroup(n_input, [])
+		if not linear_test_input and test_mode:
+			input_groups[name + 'e'] = b.PoissonGroup(n_input, 0)
+
 		rate_monitors[name + 'e'] = b.PopulationRateMonitor(input_groups[name + 'e'], bin=(single_example_time + resting_time) / b.second)
 
 	# creating connections from input Poisson spike train to excitatory neuron population(s)
@@ -618,6 +641,17 @@ def build_network():
 			# create the STDP object
 			stdp_methods[conn_name] = b.STDP(input_connections[conn_name], eqs=eqs_stdp_ee, \
 							pre=eqs_stdp_pre_ee, post=eqs_stdp_post_ee, wmin=0., wmax=wmax_ee)
+
+		# record neuron population spikes if specified
+		if record_spikes and do_plot:
+			spike_monitors['Xe'] = b.SpikeMonitor(input_groups['Xe'])
+
+		if record_spikes and do_plot:
+			b.figure(fig_num, figsize=(8, 6))			
+			b.ion()
+			b.raster_plot(spike_monitors['Xe'], refresh=1000 * b.ms, showlast=1000 * b.ms, title='Spikes per input neuron')
+			b.tight_layout()
+			fig_num += 1
 
 	print '\n'
 
@@ -670,11 +704,17 @@ def run_train():
 
 	while j < num_examples:
 		# get the firing rates of the next input example
-		rates = (data['x'][j % data_size, :, :] / 8.0) * input_intensity * \
-			((noise_const * np.random.randn(n_input_sqrt, n_input_sqrt)) + 1.0)
-		
-		# sets the input firing rates
-		input_groups['Xe'].rate = rates.reshape(n_input)
+		if linear_train_input:
+			spiketimes = calculate_spike_times(((data['x'][j % data_size, :, :] / 8.0) * input_intensity).reshape(n_input), j)
+
+			# sets the input firing times
+			input_groups['Xe'].spiketimes = spiketimes
+		else:
+			rates = (data['x'][j % data_size, :, :] / 8.0) * input_intensity * \
+				((noise_const * np.random.randn(n_input_sqrt, n_input_sqrt)) + 1.0)
+
+			# sets the input firing rates
+			input_groups['Xe'].rate = rates.reshape(n_input)
 
 		# plot the input at this step
 		if do_plot:
@@ -723,14 +763,17 @@ def run_train():
 			assignments_image = update_assignments_plot(assignments, assignments_image)
 
 		# if the neurons in the network didn't spike more than four times
-		if np.sum(current_spike_count) < 5 and num_retries < 3:
+		if np.sum(current_spike_count) < 5 and num_retries < 0:
 			# increase the intensity of input
 			input_intensity += 2
 			num_retries += 1
 			
 			# set all network firing rates to zero
 			for name in input_population_names:
-				input_groups[name + 'e'].rate = 0
+				if linear_train_input:
+					input_groups[name + 'e'].spiketimes = []
+				else:
+					input_groups[name + 'e'].rate = 0
 
 			# let the network relax back to equilibrium
 			if not reset_state_vars:
@@ -742,7 +785,7 @@ def run_train():
 					neuron_groups[neuron_group].gi = 0
 
 		# otherwise, record results and continue simulation
-		else:			
+		else:
 			num_retries = 0
 
 			if j > 0 and j % inhib_update_interval == 0:
@@ -792,19 +835,11 @@ def run_train():
 			if save_spikes:
 				np.save(os.path.join(spikes_dir, '_'.join([ending, 'spike_counts', str(j)])), current_spike_count)
 				np.save(os.path.join(spikes_dir, '_'.join([ending, 'rates', str(j)])), rates)
-
-			# get network filter weights
-			filters = input_connections['XeAe'][:].todense()
 			
 			# get the output classifications of the network
 			for scheme, outputs in predict_label(assignments, result_monitor[j % update_interval, :], \
 															accumulated_rates, spike_proportions).items():
-				if scheme != 'distance':
-					output_numbers[scheme][j, :] = outputs
-				elif scheme == 'distance':
-					current_input = (rates * (weight['ee_input'] / np.sum(rates))).ravel()
-					output_numbers[scheme][j, 0] = assignments[np.argmin([ euclidean(current_input, \
-													filters[:, i]) for i in xrange(conv_features) ])]
+				output_numbers[scheme][j, :] = outputs
 
 			# print progress
 			if j % print_progress_interval == 0 and j > 0:
@@ -949,6 +984,9 @@ def run_test():
 					current_input = (rates * (weight['ee_input'] / np.sum(rates))).ravel()
 					output_numbers[scheme][j, 0] = assignments[np.argmin([ euclidean(current_input, \
 													filters[:, i]) for i in xrange(conv_features) ])]
+				print output_numbers[scheme][j, 0],
+
+			print '\n'
 
 			# print progress
 			if j % print_progress_interval == 0 and j > 0:
@@ -1124,6 +1162,10 @@ if __name__ == '__main__':
 												inputs are presented to the network.')
 	parser.add_argument('--test_rest', type=float, default=0.15, help='How long the network is allowed \
 												to settle back to equilibrium between test examples.')
+	parser.add_argument('--linear_train_input', type=str, default='False', help='Whether to use Poisson \
+								inputs (default) or deterministic (linear) inputs during the training phase.')
+	parser.add_argument('--linear_test_input', type=str, default='False', help='Whether to use Poisson \
+								inputs (default) or deterministic (linear) inputs during the testing phase.')
 
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
@@ -1138,7 +1180,8 @@ if __name__ == '__main__':
 
 	for var in [ 'do_plot', 'plot_all_deltas', 'reset_state_vars', 'test_max_inhibition', \
 					'normalize_inputs', 'save_weights', 'save_best_model', 'test_no_inhibition', \
-					'save_spikes', 'weights_noise', 'test_adaptive_threshold' ]:
+					'linear_test_input', 'save_spikes', 'weights_noise', 'test_adaptive_threshold', \
+					'linear_train_input' ]:
 		if locals()[var] == 'True':
 			locals()[var] = True
 		elif locals()[var] == 'False':
@@ -1310,9 +1353,9 @@ if __name__ == '__main__':
 	print '\n'
 
 	# set ending of filename saves
-	ending = '_'.join([ str(conv_size), str(conv_stride), str(conv_features), str(n_e), \
-						str(num_train), str(random_seed), str(normalize_inputs), 
-						str(proportion_grow), str(noise_const) ])
+	ending = '_'.join([ str(conv_size), str(conv_stride), str(conv_features), str(n_e),
+						str(num_train), str(random_seed), str(normalize_inputs), str(proportion_grow),
+						str(noise_const), str(linear_train_input), str(linear_test_input) ])
 
 	b.ion()
 	fig_num = 1
@@ -1345,10 +1388,7 @@ if __name__ == '__main__':
 	else:
 		assignments = -1 * np.ones((conv_features, n_e))
 
-	if test_mode:
-		voting_schemes = ['all', 'most_spiked_patch', 'most_spiked_location', 'confidence_weighting', 'distance']
-	else:
-		voting_schemse = ['all', 'most_spiked_patch', 'most_spiked_location', 'confidence_weighting']
+	voting_schemes = ['all', 'most_spiked_patch', 'most_spiked_location', 'confidence_weighting', 'distance']
 
 	for scheme in voting_schemes:
 		output_numbers[scheme] = np.zeros((num_examples, 10))
