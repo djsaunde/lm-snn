@@ -570,12 +570,13 @@ def build_network():
 					for n in xrange(n_e):
 						for idx in xrange(conv_size ** 2):
 							input_connections[conn_name][convolution_locations[n][idx], feature * n_e + n] = \
-															weight_matrix[convolution_locations[n][idx], feature * n_e + n]
+												weight_matrix[convolution_locations[n][idx], feature * n_e + n]
 			else:
 				for feature in xrange(conv_features):
 					for n in xrange(n_e):
 						for idx in xrange(conv_size ** 2):
-							input_connections[conn_name][convolution_locations[n][idx], feature * n_e + n] = (b.random() + 0.01) * 0.3
+							input_connections[conn_name][convolution_locations[n][idx], feature * n_e + n] = \
+											(b.random() + 0.01) * 2.0 * (weight['ee_input'] / (conv_size ** 2))
 
 			if test_mode:
 				if do_plot:
@@ -649,30 +650,6 @@ def run_train():
 		# sets the input firing rates
 		input_groups['Xe'].rate = rates.reshape(n_input)
 
-		# if do_plot and j == 0:
-		# 	theta_fig = plt.figure(10)
-		# 	theta_axes = plt.gca()
-		# 	cax = theta_axes.imshow(neuron_groups['e'].theta.reshape([features_sqrt, \
-		# 				features_sqrt]), interpolation='nearest', vmin=0, vmax=0.1)
-		# 	theta_fig.colorbar(cax)
-		# 	theta_fig.suptitle('Theta values on the 2D grid')
-		# 	theta_fig.canvas.draw()
-
-		# 	voltage_fig = plt.figure(11)
-		# 	voltage_axes = plt.gca()
-		# 	cax = theta_axes.imshow(neuron_groups['e'].v.reshape([features_sqrt, \
-		# 				features_sqrt]), interpolation='nearest', vmin=-.66, vmax=-.50)
-		# 	voltage_fig.colorbar(cax)
-		# 	voltage_fig.suptitle('Voltage of neurons on the 2D grid')
-		# 	voltage_fig.canvas.draw()
-		# elif do_plot:
-		# 	cax = theta_axes.imshow(neuron_groups['e'].theta.reshape([features_sqrt, \
-		# 				features_sqrt]), interpolation='nearest', vmin=0, vmax=0.1)
-		# 	theta_fig.canvas.draw()
-		# 	cax = voltage_axes.imshow(neuron_groups['e'].v.reshape([features_sqrt, \
-		# 				features_sqrt]), interpolation='nearest') # , vmin=-.66, vmax=-.50)
-		# 	voltage_fig.canvas.draw()
-
 		# plot the input at this step
 		if do_plot:
 			input_image_monitor = update_input(rates, input_image_monitor, input_image)
@@ -683,8 +660,24 @@ def run_train():
 		# run the network for a single example time
 		b.run(single_example_time)
 
-		threshold_matrix = np.vstack([ neuron_groups['e'].theta - 0.02 for idx in xrange(n_input)]).ravel()
-		input_connections['XeAe'].W.alldata[:] -= (1 + wmax_ee - input_connections['XeAe'].W.alldata[:]) * 0.05 * threshold_matrix
+		threshold_matrix = np.vstack([ neuron_groups['e'].theta - 0.02 for idx in xrange(n_input) ]).ravel()
+
+		if weight_habituation == 'constant':
+			input_connections['XeAe'].W.alldata[:] -= weight_habit_constant
+		elif weight_habituation == 'proportional':
+			input_connections['XeAe'].W.alldata[:] -= (1 + wmax_ee - \
+				input_connections['XeAe'].W.alldata[:]) * 0.05 * threshold_matrix
+		elif weight_habituation == 'filters':
+			diff = np.sum((input_connections['XeAe'][:].todense() - previous_weights), axis=0)
+			for idx in xrange(conv_features):
+				input_connections['XeAe'].W[:, idx] -= diff[idx] / n_input
+		elif weight_habituation == 'contributions':
+			diff = np.sum((input_connections['XeAe'][:].todense() - previous_weights), axis=0)
+			for idx in xrange(conv_features):
+				if diff[idx] != 0:
+					contributions = input_connections['XeAe'].W[:, idx] * (diff[idx] / n_input)
+					if np.sum(contributions) != 0:
+						input_connections['XeAe'].W[:, idx] -= (contributions * diff[idx]) / np.sum(contributions)
 
 		# get difference between weights from before and after running a single iteration
 		new_weights = input_connections['XeAe'][:].todense() - previous_weights
@@ -1083,6 +1076,9 @@ if __name__ == '__main__':
 															noise added to input examples.')
 	parser.add_argument('--inhibition', type=str, default='True', help='Whether or not to use connections \
 															from the inhibitory to excitatory populations.')
+	parser.add_argument('--weight_habituation', type=str, default='constant')
+	parser.add_argument('--weight_habit_constant', type=float, default=1e-4, help='The constant amount by \
+													which to decrement each weight value by each iteration.')
 
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
@@ -1202,7 +1198,7 @@ if __name__ == '__main__':
 
 	# time constants, learning rates, max weights, weight dependence, etc.
 	tc_pre_ee, tc_post_ee = 20 * b.ms, 20 * b.ms
-	nu_ee_pre, nu_ee_post = 0.0001, 0.001
+	nu_ee_pre, nu_ee_post = 0.0001, 0.01
 	nu_AeAe_pre, nu_Ae_Ae_post = 0.1, 0.5
 	wmax_ee = 1.0
 	exp_ee_post = exp_ee_pre = 0.2

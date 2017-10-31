@@ -590,7 +590,7 @@ def build_network():
 
 			# create connections from the windows of the input group to the neuron population
 			input_connections[conn_name] = b.Connection(input_groups['Xe'], neuron_groups[name[1] + conn_type[1]], \
-									structure='sparse', state='g' + conn_type[0], delay=True, max_delay=delay[conn_type][1])
+							structure='sparse', state='g' + conn_type[0], delay=True, max_delay=delay[conn_type][1])
 			
 			if test_mode:
 				for feature in xrange(conv_features):
@@ -676,42 +676,16 @@ def run_train():
 		# sets the input firing rates
 		input_groups['Xe'].rate = rates.reshape(n_input)
 
-		# if do_plot and j == 0:
-		# 	theta_fig = plt.figure(10)
-		# 	theta_axes = plt.gca()
-		# 	cax = theta_axes.imshow(neuron_groups['e'].theta.reshape([features_sqrt, \
-		# 				features_sqrt]).T, interpolation='nearest', vmin=0, vmax=0.1)
-		# 	theta_fig.colorbar(cax)
-		# 	theta_fig.suptitle('Theta values on the 2D grid')
-		# 	theta_fig.canvas.draw()
-
-		# 	voltage_fig = plt.figure(11)
-		# 	voltage_axes = plt.gca()
-		# 	cax = theta_axes.imshow(neuron_groups['e'].v.reshape([features_sqrt, \
-		# 				features_sqrt]).T, interpolation='nearest', vmin=-.66, vmax=-.50)
-		# 	voltage_fig.colorbar(cax)
-		# 	voltage_fig.suptitle('Voltage of neurons on the 2D grid')
-		# 	voltage_fig.canvas.draw()
-		# elif do_plot:
-		# 	cax = theta_axes.imshow(neuron_groups['e'].theta.reshape([features_sqrt, \
-		# 				features_sqrt]).T, interpolation='nearest', vmin=0, vmax=0.1)
-		# 	theta_fig.canvas.draw()
-		# 	cax = voltage_axes.imshow(neuron_groups['e'].v.reshape([features_sqrt, \
-		# 				features_sqrt]).T, interpolation='nearest') # , vmin=-.66, vmax=-.50)
-		# 	voltage_fig.canvas.draw()
-
 		# plot the input at this step
 		if do_plot:
 			input_image_monitor = update_input(rates, input_image_monitor, input_image)
 
-		# get weights before running the network for a single iteration
-		previous_weights = input_connections['XeAe'][:].todense()
-		
 		# run the network for a single example time
 		b.run(single_example_time)
 
-		# get difference between weights from before and after running a single iteration
-		new_weights = input_connections['XeAe'][:].todense() - previous_weights
+		# add Gaussian noise to weights after each iteration
+		if weights_noise:
+			input_connections['XeAe'].W.alldata[:] *= 1 + (np.random.randn(n_input * conv_features) * weights_noise_constant)
 
 		# get new neuron label assignments every 'update_interval'
 		if j % update_interval == 0 and j > 0:
@@ -820,7 +794,8 @@ def run_train():
 				np.save(os.path.join(spikes_dir, '_'.join([ending, 'rates', str(j)])), rates)
 			
 			# get the output classifications of the network
-			for scheme, outputs in predict_label(assignments, result_monitor[j % update_interval, :], accumulated_rates, spike_proportions).items():
+			for scheme, outputs in predict_label(assignments, result_monitor[j % update_interval, :], \
+															accumulated_rates, spike_proportions).items():
 				output_numbers[scheme][j, :] = outputs
 
 			# print progress
@@ -909,6 +884,9 @@ def run_test():
 	num_retries = 0
 	b.run(0)
 
+	# get network filter weights
+	filters = input_connections['XeAe'][:].todense()
+
 	# start recording time
 	start_time = timeit.default_timer()
 
@@ -957,7 +935,15 @@ def run_test():
 			
 			# get the output classifications of the network
 			for scheme, outputs in predict_label(assignments, result_monitor[j % update_interval, :], accumulated_rates, spike_proportions).items():
-				output_numbers[scheme][j, :] = outputs
+				if scheme != 'distance':
+					output_numbers[scheme][j, :] = outputs
+				elif scheme == 'distance':
+					current_input = (rates * (weight['ee_input'] / np.sum(rates))).ravel()
+					output_numbers[scheme][j, 0] = assignments[np.argmin([ euclidean(current_input, \
+													filters[:, i]) for i in xrange(conv_features) ])]
+				print output_numbers[scheme][j, 0],
+
+			print '\n'
 
 			# print progress
 			if j % print_progress_interval == 0 and j > 0:
@@ -1016,30 +1002,35 @@ def evaluate_results():
 
 	print '\n...Calculating accuracy per voting scheme'
 
+	# get network filter weights
+	filters = input_connections['XeAe'][:].todense()
+
 	# for idx in xrange(end_time_testing - end_time_training):
 	for idx in xrange(num_examples):
 		label_rankings = predict_label(assignments, result_monitor[idx, :], accumulated_rates, spike_proportions)
 		for scheme in voting_schemes:
-			test_results[scheme][:, idx] = label_rankings[scheme]
+			if scheme != 'distance':
+				test_results[scheme][:, idx] = label_rankings[scheme]
+			elif scheme == 'distance':
+				rates = (data['x'][idx % data_size, :, :] / 8.0) * input_intensity
+				current_input = (rates * (weight['ee_input'] / np.sum(rates))).ravel()
+				results = np.zeros(10)
+				results[0] = assignments[np.argmin([ euclidean(current_input, \
+								filters[:, i]) for i in xrange(conv_features) ])]
+				test_results[scheme][:, idx] = results
+
+	print test_results
 
 	differences = { scheme : test_results[scheme][0, :] - input_numbers for scheme in voting_schemes }
 	correct = { scheme : len(np.where(differences[scheme] == 0)[0]) for scheme in voting_schemes }
 	incorrect = { scheme : len(np.where(differences[scheme] != 0)[0]) for scheme in voting_schemes }
 	accuracies = { scheme : correct[scheme] / float(num_examples) * 100 for scheme in voting_schemes }
 
-	conf_matrix = confusion_matrix(test_results[scheme][0, :], input_numbers)
-	np.save(os.path.join(results_path, '_'.join(['confusion_matrix', ending]) + '.npy'))
+	conf_matrices = np.array([confusion_matrix(test_results[scheme][0, :], \
+								input_numbers) for scheme in voting_schemes])
+	np.save(os.path.join(results_path, '_'.join(['confusion_matrix', ending]) + '.npy'), conf_matrices)
 
-	print '\nConfusion matrix:\n\n', conf_matrix
-
-	if do_plot:
-		fig = plt.figure(fig_num, figsize=(5, 5))
-		im = plt.matshow(conf_matrix)
-		plt.colorbar(im)
-		plt.title('Confusion matrix')
-		fig.canvas.draw()
-
-		time.sleep(10)
+	print '\nConfusion matrix:\n\n', conf_matrices
 
 	for scheme in voting_schemes:
 		print '\n-', scheme, 'accuracy:', accuracies[scheme]
@@ -1059,8 +1050,8 @@ if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
 
 	parser.add_argument('--mode', default='train', help='Network operating mode: \
-							"train" mode learns the synaptic weights of the network, and \
-							"test" mode holds the weights fixed / evaluates accuracy on test data.')
+								"train" mode learns the synaptic weights of the network, and \
+								"test" mode holds the weights fixed / evaluates accuracy on test data.')
 	parser.add_argument('--conv_size', type=int, default=28, help='Side length of the square convolution \
 											window used by the input -> excitatory layer of the network.')
 	parser.add_argument('--conv_stride', type=int, default=0, help='Horizontal, vertical stride \
@@ -1112,6 +1103,22 @@ if __name__ == '__main__':
 															noise added to input examples.')
 	parser.add_argument('--inhib_scheme', type=str, default='increasing', help='How inhibition from \
 															inhibitory to excitatory neurons is handled.')
+	parser.add_argument('--weights_noise', type=str, default='False', help='Whether to use multiplicative \
+														Gaussian noise on synapse weights on each iteration.')
+	parser.add_argument('--weights_noise_constant', type=float, default=1e-2, help='The spread of the \
+																Gaussian noise used on synapse weights ')
+	parser.add_argument('--start_input_intensity', type=float, default=2.0, help='The intensity at which the \
+																input is (default) presented to the network.')
+	parser.add_argument('--test_adaptive_threshold', type=str, default='False', help='Whether or not to allow \
+															neuron thresholds to adapt during the test phase.')
+	parser.add_argument('--train_time', type=float, default=0.35, help='How long training \
+														inputs are presented to the network.')
+	parser.add_argument('--train_rest', type=float, default=0.15, help='How long the network is allowed \
+												to settle back to equilibrium between training examples.')
+	parser.add_argument('--test_time', type=float, default=0.35, help='How long test \
+												inputs are presented to the network.')
+	parser.add_argument('--test_rest', type=float, default=0.15, help='How long the network is allowed \
+												to settle back to equilibrium between test examples.')
 
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
@@ -1124,8 +1131,9 @@ if __name__ == '__main__':
 
 	print '\n'
 
-	for var in [ 'do_plot', 'plot_all_deltas', 'reset_state_vars', 'test_max_inhibition', 'normalize_inputs', \
-						'save_weights', 'save_best_model', 'test_no_inhibition', 'save_spikes' ]:
+	for var in [ 'do_plot', 'plot_all_deltas', 'reset_state_vars', 'test_max_inhibition', \
+					'normalize_inputs', 'save_weights', 'save_best_model', 'test_no_inhibition', \
+					'save_spikes', 'weights_noise', 'test_adaptive_threshold' ]:
 		if locals()[var] == 'True':
 			locals()[var] = True
 		elif locals()[var] == 'False':
@@ -1188,8 +1196,12 @@ if __name__ == '__main__':
 	features_sqrt = int(math.ceil(math.sqrt(conv_features)))
 
 	# time (in seconds) per data example presentation and rest period in between
-	single_example_time = 0.35 * b.second
-	resting_time = 0.15 * b.second
+	if not test_mode:
+		single_example_time = train_time * b.second
+		resting_time = train_rest * b.second
+	else:
+		single_example_time = test_time * b.second
+		resting_time = test_rest * b.second
 
 	# set the update interval
 	if test_mode:
@@ -1225,7 +1237,7 @@ if __name__ == '__main__':
 
 	delay['ee_input'] = (0 * b.ms, 10 * b.ms)
 	delay['ei_input'] = (0 * b.ms, 5 * b.ms)
-	input_intensity = start_input_intensity = 2.0
+	input_intensity = start_input_intensity
 
 	current_inhibition = 1.0
 
@@ -1238,7 +1250,7 @@ if __name__ == '__main__':
 	w_mu_pre, w_mu_post = 0.2, 0.2
 
 	# setting up differential equations (depending on train / test mode)
-	if test_mode:
+	if test_mode and not test_adaptive_threshold:
 		scr_e = 'v = v_reset_e; timer = 0*ms'
 	else:
 		tc_theta = 1e7 * b.ms
@@ -1328,7 +1340,7 @@ if __name__ == '__main__':
 	else:
 		assignments = -1 * np.ones((conv_features, n_e))
 
-	voting_schemes = ['all', 'most_spiked_patch', 'most_spiked_location', 'confidence_weighting']
+	voting_schemes = ['all', 'most_spiked_patch', 'most_spiked_location', 'confidence_weighting', 'distance']
 
 	for scheme in voting_schemes:
 		output_numbers[scheme] = np.zeros((num_examples, 10))
