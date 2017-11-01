@@ -1150,7 +1150,7 @@ if __name__ == '__main__':
 														Gaussian noise on synapse weights on each iteration.')
 	parser.add_argument('--weights_noise_constant', type=float, default=1e-2, help='The spread of the \
 																Gaussian noise used on synapse weights ')
-	parser.add_argument('--start_input_intensity', type=float, default=2.0, help='The intensity at which the \
+	parser.add_argument('--start_input_intensity', type=float, default=3.0, help='The intensity at which the \
 																input is (default) presented to the network.')
 	parser.add_argument('--test_adaptive_threshold', type=str, default='False', help='Whether or not to allow \
 															neuron thresholds to adapt during the test phase.')
@@ -1388,7 +1388,11 @@ if __name__ == '__main__':
 	else:
 		assignments = -1 * np.ones((conv_features, n_e))
 
-	voting_schemes = ['all', 'most_spiked_patch', 'most_spiked_location', 'confidence_weighting', 'distance']
+	if test_mode:
+		voting_schemes = ['all', 'most_spiked_patch', 'most_spiked_location', 'confidence_weighting', 'distance']
+	else:
+		voting_schemes = ['all', 'most_spiked_patch', 'most_spiked_location', 'confidence_weighting']
+
 
 	for scheme in voting_schemes:
 		output_numbers[scheme] = np.zeros((num_examples, 10))
