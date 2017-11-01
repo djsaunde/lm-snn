@@ -19,6 +19,8 @@ linear_test_input=${10:-False}
 
 cd ../train/
 
+echo $conv_size $conv_stride $conv_features $num_train $random_seed $normalize_inputs $proportion_grow $noise_const $linear_train_input $linear_test_input
+
 echo "csnn_growing_inhibition_linear_inputs_job.sh"
 
 python csnn_growing_inhibition_linear_inputs.py --mode=train --num_train=$num_train --conv_size=$conv_size --conv_stride=$conv_stride --noise_const=$noise_const \
