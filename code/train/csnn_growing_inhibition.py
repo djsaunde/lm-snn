@@ -1348,7 +1348,7 @@ if __name__ == '__main__':
 	if test_mode:
 		voting_schemes = ['all', 'most_spiked_patch', 'most_spiked_location', 'confidence_weighting', 'distance']
 	else:
-		voting_schemse = ['all', 'most_spiked_patch', 'most_spiked_location', 'confidence_weighting']
+		voting_schemes = ['all', 'most_spiked_patch', 'most_spiked_location', 'confidence_weighting']
 
 	for scheme in voting_schemes:
 		output_numbers[scheme] = np.zeros((num_examples, 10))
