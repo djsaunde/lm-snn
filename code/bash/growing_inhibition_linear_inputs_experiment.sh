@@ -16,7 +16,7 @@ do
 					for linear_test_input in True False
 					do
 						sbatch csnn_growing_inhibition_linear_inputs_job.sh 28 0 $conv_features $num_train $random_seed \
-								$normalized_inputs $proportion_grow $noise_const $linear_train_input $linear_test_input
+								$normalize_inputs $proportion_grow $noise_const $linear_train_input $linear_test_input
 					done
 				done
 			done

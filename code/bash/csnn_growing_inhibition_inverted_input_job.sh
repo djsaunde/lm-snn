@@ -20,12 +20,12 @@ cd ../train/
 
 echo "csnn_growing_inhibition_inverted_input_job.sh"
 
-python csnn_growing_inhibition.py --mode=train --num_train=$num_train --conv_size=$conv_size \
+python csnn_growing_inhibition_inverted_input.py --mode=train --num_train=$num_train --conv_size=$conv_size \
 		--conv_stride=$conv_stride --noise_const=$noise_const --conv_features=$conv_features \
 		--random_seed=$random_seed --normalize_inputs=$normalize_inputs \
 		--proportion_grow=$proportion_grow --intensity_denom=$intensity_denom
 
-python csnn_growing_inhibition.py --mode=test --num_test=10000 --conv_size=$conv_size \
+python csnn_growing_inhibition_inverted_input.py --mode=test --num_test=10000 --conv_size=$conv_size \
 		--conv_stride=$conv_stride --proportion_grow=$proportion_grow --conv_features=$conv_features \
 		--num_train=$num_train --random_seed=$random_seed --normalize_inputs=$normalize_inputs \
 		--noise_const=$noise_const --intensity_denom=$intensity_denom
