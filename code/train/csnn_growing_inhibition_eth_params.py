@@ -35,7 +35,7 @@ b.log_level_error()
 # set these appropriate to your directory structure
 top_level_path = os.path.join('..', '..')
 MNIST_data_path = os.path.join(top_level_path, 'data')
-model_name = 'csnn_growing_inhibition'
+model_name = 'csnn_growing_inhibition_eth_params'
 results_path = os.path.join(top_level_path, 'results', model_name)
 
 performance_dir = os.path.join(top_level_path, 'performance', model_name)
@@ -490,12 +490,20 @@ def build_network():
 				# create connection name (composed of population and connection types)
 				conn_name = name + conn_type[0] + name + conn_type[1]
 				# create a connection from the first group in conn_name with the second group
-				connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
+				if conv_size == 28 and conv_stride == 0:
+					connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], \
+																		structure='dense', state='g' + conn_type[0])
+					connections[conn_name].connect(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], 10.4 * np.eye(conv_features))
+				else:
+					connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], \
+																		structure='sparse', state='g' + conn_type[0])
+
+					# instantiate the created connection
+					for feature in xrange(conv_features):
+						for n in xrange(n_e):
+							connections[conn_name][feature * n_e + n, feature * n_e + n] = 10.4
 				
-				# instantiate the created connection
-				for feature in xrange(conv_features):
-					for n in xrange(n_e):
-						connections[conn_name][feature * n_e + n, feature * n_e + n] = 10.4
+				
 
 			elif conn_type == 'ie' and not (test_no_inhibition and test_mode):
 				# create connection name (composed of population and connection types)
@@ -589,20 +597,30 @@ def build_network():
 					weight_matrix = np.load(os.path.join(end_weights_dir, '_'.join([conn_name, ending + '_end.npy'])))
 
 			# create connections from the windows of the input group to the neuron population
-			input_connections[conn_name] = b.Connection(input_groups['Xe'], neuron_groups[name[1] + conn_type[1]], \
+			if conv_size == 28 and conv_stride == 0:
+				input_connections[conn_name] = b.Connection(input_groups['Xe'], neuron_groups[name[1] + conn_type[1]], \
+							structure='dense', state='g' + conn_type[0], delay=True, max_delay=delay[conn_type][1])
+
+				if test_mode:
+					input_connections[conn_name].connect(input_groups['Xe'], neuron_groups[name[1] + conn_type[1]], weight_matrix)
+				else:
+					input_connections[conn_name].connect(input_groups['Xe'], neuron_groups[name[1] + conn_type[1]], \
+																	(np.random.rand(n_input, conv_features) + 0.01) * 0.3)
+			else:
+				input_connections[conn_name] = b.Connection(input_groups['Xe'], neuron_groups[name[1] + conn_type[1]], \
 							structure='sparse', state='g' + conn_type[0], delay=True, max_delay=delay[conn_type][1])
 			
-			if test_mode:
-				for feature in xrange(conv_features):
-					for n in xrange(n_e):
-						for idx in xrange(conv_size ** 2):
-							input_connections[conn_name][convolution_locations[n][idx], feature * n_e + n] = \
-															weight_matrix[convolution_locations[n][idx], feature * n_e + n]
-			else:
-				for feature in xrange(conv_features):
-					for n in xrange(n_e):
-						for idx in xrange(conv_size ** 2):
-							input_connections[conn_name][convolution_locations[n][idx], feature * n_e + n] = (b.random() + 0.01) * 0.3
+				if test_mode:
+					for feature in xrange(conv_features):
+						for n in xrange(n_e):
+							for idx in xrange(conv_size ** 2):
+								input_connections[conn_name][convolution_locations[n][idx], feature * n_e + n] = \
+																weight_matrix[convolution_locations[n][idx], feature * n_e + n]
+				else:
+					for feature in xrange(conv_features):
+						for n in xrange(n_e):
+							for idx in xrange(conv_size ** 2):
+								input_connections[conn_name][convolution_locations[n][idx], feature * n_e + n] = (b.random() + 0.01) * 0.3
 
 			if test_mode:
 				if do_plot:
@@ -1094,7 +1112,7 @@ if __name__ == '__main__':
 											weight for inhibitory to excitatory connections.')
 	parser.add_argument('--reset_state_vars', type=str, default='False', help='Whether to \
 							reset neuron / synapse state variables or run a "reset" period.')
-	parser.add_argument('--inhib_update_interval', type=int, default=100, \
+	parser.add_argument('--inhib_update_interval', type=int, default=250, \
 							help='How often to increase the inhibition strength.')
 	parser.add_argument('--inhib_schedule', type=str, default='linear', help='How to \
 							update the strength of inhibition as the training progresses.')
@@ -1168,10 +1186,26 @@ if __name__ == '__main__':
 	else:
 		raise Exception('Exception one of "linear" or "log" for argument "inhib_schedule".')
 
+	# b.set_global_preferences( 
+ #                        defaultclock = b.Clock(dt=0.5*b.ms), # The default clock to use if none is provided or defined in any enclosing scope.
+ #                        useweave = True, # Defines whether or not functions should use inlined compiled C code where defined.
+ #                        gcc_options = ['-ffast-math -march=native'],  # Defines the compiler switches passed to the gcc compiler. 
+ #                        #For gcc versions 4.2+ we recommend using -march=native. By default, the -ffast-math optimizations are turned on 
+ #                        usecodegen = True,  # Whether or not to use experimental code generation support.
+ #                        usecodegenweave = True,  # Whether or not to use C with experimental code generation support.
+ #                        usecodegenstateupdate = True,  # Whether or not to use experimental code generation support on state updaters.
+ #                        usecodegenthreshold = False,  # Whether or not to use experimental code generation support on thresholds.
+ #                        usenewpropagate = True,  # Whether or not to use experimental new C propagation functions.
+ #                        usecstdp = True,  # Whether or not to use experimental new C STDP.
+ #                       ) 
+
 	# set brian global preferences
-	b.set_global_preferences(defaultclock = b.Clock(dt=0.5*b.ms), useweave = True, gcc_options = ['-ffast-math -march=native'], usecodegen = True,
-		usecodegenweave = True, usecodegenstateupdate = True, usecodegenthreshold = False, usenewpropagate = True, usecstdp = True, openmp = False,
-		magic_useframes = False, useweave_linear_diffeq = True)
+	b.set_global_preferences(defaultclock=b.Clock(dt=0.5*b.ms), useweave=True, 
+					gcc_options=['-ffast-math -march=native'], usecodegen=True,
+					usecodegenweave=True, usecodegenstateupdate=True, 
+					usecodegenthreshold=False, usenewpropagate=True, 
+					usecstdp=True, openmp=False, magic_useframes=False) 
+					#, magic_useframes = False, useweave_linear_diffeq = True)
 
 	# for reproducibility's sake
 	np.random.seed(random_seed)
