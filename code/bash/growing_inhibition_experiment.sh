@@ -3,9 +3,9 @@
 normalize_inputs='False'
 noise_const=0.0
 
-for num_train in 45000 60000
+for num_train in 60000
 do
-	for random_seed in 1 2 3
+	for random_seed in 4 5 6 7 8 9 10
 	do
 		for conv_features in 625
 		do
