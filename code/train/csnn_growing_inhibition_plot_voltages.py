@@ -66,45 +66,41 @@ for d in [ performance_dir, activity_dir, weights_dir, deltas_dir, misc_dir, bes
 
 
 def plot_labels_and_spikes(assignments, spike_counts, ending, j, image, predictions, true):
-	fig = plt.figure(15, figsize = (18, 12))
+	plt.ioff()
+
+	fig = plt.figure(16, figsize=(18, 12))
 	plt.gcf().clear()
-	plt.suptitle(', '.join([' : '.join([str(key), str(value)]) for (key, value) \
-		in predictions.items()]) + ', ' + ' : '.join(['True', str(true)]) + '\n' + \
-		'Inhibition strength : ' + str(np.max(connections['AiAe'][:].todense())), fontsize=22)
 	
-	ax1 = plt.subplot(131)	
-	ax1.imshow(image, cmap='gray')
-
-	ax2 = plt.subplot(132)
-	im = ax2.matshow(assignments.reshape([features_sqrt, features_sqrt]).T, \
-		cmap=plt.get_cmap('RdBu', 10), vmin=-0.5, vmax=9.5, alpha=0.65)
-	ax2.set_title('Total Spike Counts: %d' % sum(spike_counts))
-
-	divider = make_axes_locatable(ax2)
-	cax = divider.append_axes("right", size="5%", pad=0.1)
-
-	plt.colorbar(im, cax=cax, ticks=np.arange(0, 10))
-
-	spike_counts_reshaped = spike_counts.reshape([features_sqrt, features_sqrt])
-	for x in xrange(features_sqrt):
-		for y in xrange(features_sqrt):
-			c = spike_counts_reshaped[x, y]
-			if c > 0:
-				ax2.text(x, y, str(c), va='center', ha='center', weight='heavy')
-			else:
-				ax2.text(x, y, '', va='center', ha='center')
-
-	ax3 = plt.subplot(133)
-	ax3.matshow(get_2d_input_weights(), interpolation='nearest', vmin=0, vmax=wmax_ee, cmap=cmap.get_cmap('hot_r'))
-
-	plt.tight_layout()
+	ax1 = plt.subplot(231)
+	ax1.plot(voltage_monitors['Ae'].times, voltage_monitors['Ae'].values)
+	ax1.set_title('Excitatory neuron voltages')
+	
+	ax2 = plt.subplot(232)
+	ax2.plot(voltage_monitors['Ai'].times, voltage_monitors['Ai'].values)
+	ax2.set_title('Inhibitory neuron voltages')
+	
+	ax3 = plt.subplot(233)
+	ax3.plot(excitatory_conductance_monitors['Ae'].times, excitatory_conductance_monitors['Ae'].values)
+	ax3.set_title('Excitatory neuron excitatory synaptic conductance')
+	
+	ax4 = plt.subplot(234)
+	ax4.plot(excitatory_conductance_monitors['Ai'].times, excitatory_conductance_monitors['Ai'].values)
+	ax4.set_title('Inhibitory neuron excitatory synaptic conductance')
+	
+	ax5 = plt.subplot(235)
+	ax5.plot(inhibitory_conductance_monitors['Ae'].times, inhibitory_conductance_monitors['Ae'].values)
+	ax5.set_title('Excitatory neuron inhibitory synaptic conductance')
+	
+	ax6 = plt.subplot(236)
+	ax6.plot(inhibitory_conductance_monitors['Ai'].times, inhibitory_conductance_monitors['Ai'].values)
+	ax6.set_title('Inhibitory neuron inhibitory synaptic conductance')
+	
 	fig.canvas.draw()
+	mng = plt.get_current_fig_manager()
+	mng.full_screen_toggle()
+	plt.show()
 
-	if interactive_mode:
-		time.sleep(0.5)
-
-	plt.savefig(os.path.join(spike_activity_dir, ending, str(j) + '.png'))
-	
+	plt.ion()
 
 def plot_input(rates):
 	'''
@@ -293,10 +289,8 @@ def update_2d_input_weights(im, fig):
 def build_network():
 	global fig_num
 
-	neuron_groups['e'] = b.NeuronGroup(n_e_total, neuron_eqs_e, threshold=v_thresh_e, \
-							refractory=refrac_e, reset=scr_e, compile=True, freeze=True)
-	neuron_groups['i'] = b.NeuronGroup(n_e_total, neuron_eqs_i, threshold=v_thresh_i, \
-						refractory=refrac_i, reset=v_reset_i, compile=True, freeze=True)
+	neuron_groups['e'] = b.NeuronGroup(n_e_total, neuron_eqs_e, threshold=v_thresh_e, refractory=refrac_e, reset=scr_e, compile=True, freeze=True)
+	neuron_groups['i'] = b.NeuronGroup(n_e_total, neuron_eqs_i, threshold=v_thresh_i, refractory=refrac_i, reset=v_reset_i, compile=True, freeze=True)
 
 	for name in population_names:
 		print '...Creating neuron group:', name
@@ -309,6 +303,17 @@ def build_network():
 		# start the membrane potentials of these groups 40mV below their resting potentials
 		neuron_groups[name + 'e'].v = v_rest_e - 40. * b.mV
 		neuron_groups[name + 'i'].v = v_rest_i - 40. * b.mV
+
+		voltage_monitors[name + 'e'] = b.RecentStateMonitor(neuron_groups[name + 'e'], 'v', duration=500 * b.ms)
+		voltage_monitors[name + 'i'] = b.RecentStateMonitor(neuron_groups[name + 'i'], 'v', duration=500 * b.ms)
+		excitatory_conductance_monitors[name + 'e'] = b.RecentStateMonitor(neuron_groups[name + \
+																	'e'], 'ge', duration=500 * b.ms)
+		excitatory_conductance_monitors[name + 'i'] = b.RecentStateMonitor(neuron_groups[name + \
+																	'e'], 'ge', duration=500 * b.ms)
+		inhibitory_conductance_monitors[name + 'e'] = b.RecentStateMonitor(neuron_groups[name + \
+																	'e'], 'gi', duration=500 * b.ms)
+		inhibitory_conductance_monitors[name + 'i'] = b.RecentStateMonitor(neuron_groups[name + \
+																	'e'], 'gi', duration=500 * b.ms)
 
 	print '...Creating recurrent connections'
 
@@ -352,7 +357,7 @@ def build_network():
 		spike_counters[name + 'e'] = b.SpikeCounter(neuron_groups[name + 'e'])
 
 		# record neuron population spikes if specified
-		if record_spikes and do_plot:
+		if record_spikes:
 			spike_monitors[name + 'e'] = b.SpikeMonitor(neuron_groups[name + 'e'])
 			spike_monitors[name + 'i'] = b.SpikeMonitor(neuron_groups[name + 'i'])
 
@@ -751,7 +756,9 @@ if __name__ == '__main__':
 	
 	# creating dictionaries for various objects
 	neuron_groups, input_groups, connections, input_connections, stdp_methods, \
-		rate_monitors, spike_monitors, spike_counters, output_numbers = {}, {}, {}, {}, {}, {}, {}, {}, {}
+					rate_monitors, spike_monitors, spike_counters, output_numbers, \
+					voltage_monitors, excitatory_conductance_monitors, \
+					inhibitory_conductance_monitors = {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}
 
 	# creating convolution locations inside the input image
 	convolution_locations = {}

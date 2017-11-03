@@ -35,8 +35,8 @@ b.log_level_error()
 # set these appropriate to your directory structure
 top_level_path = os.path.join('..', '..')
 MNIST_data_path = os.path.join(top_level_path, 'data')
-model_name = 'csnn_growing_inhibition'
-results_path = os.path.join(top_level_path, 'results', model_name + '_multiple_test')
+model_name = 'csnn_growing_inhibition_decreasing_learning_rate'
+results_path = os.path.join(top_level_path, 'results', model_name)
 
 performance_dir = os.path.join(top_level_path, 'performance', model_name)
 activity_dir = os.path.join(top_level_path, 'activity', model_name)
@@ -745,7 +745,12 @@ def run_train():
 		else:			
 			num_retries = 0
 
-			if j > 0 and j % inhib_update_interval == 0:
+			print stdp_methods['XeAe'].nu_ee_post
+
+			stdp_methods['XeAe'].nu_ee_post = 0.0
+			stdp_methods['XeAe'].nu_ee_pre = 0.0
+
+			if j > 0 and j % inhib_update_interval == 0 and not current_inhib >= max_inhib:
 				if inhib_schedule == 'linear':
 					current_inhib = current_inhib + inhib_increase
 				elif inhib_schedule == 'log':
@@ -769,9 +774,7 @@ def run_train():
 
 			# record the current number of spikes
 			result_monitor[j % update_interval, :] = current_spike_count
-
-			print current_spike_amount		
-	
+			
 			# get true label of last input example
 			input_numbers[j] = data['y'][j % data_size][0]
 
@@ -801,12 +804,16 @@ def run_train():
 			# get the output classifications of the network
 			for scheme, outputs in predict_label(assignments, result_monitor[j % update_interval, :], \
 															accumulated_rates, spike_proportions).items():
-				output_numbers[scheme][j, :] = outputs
+				if scheme != 'distance':
+					output_numbers[scheme][j, :] = outputs
+				elif scheme == 'distance':
+					current_input = (rates * (weight['ee_input'] / np.sum(rates))).ravel()
+					output_numbers[scheme][j, 0] = assignments[np.argmin([ euclidean(current_input, \
+													filters[:, i]) for i in xrange(conv_features) ])]
 
 			# print progress
 			if j % print_progress_interval == 0 and j > 0:
-				print 'runs done:', j, 'of', int(num_examples * num_tests), '(time taken for past', print_progress_interval, \
-																		'runs:', str(timeit.default_timer() - start_time) + ')'
+				print 'runs done:', j, 'of', int(num_examples), '(time taken for past', print_progress_interval, 'runs:', str(timeit.default_timer() - start_time) + ')'
 				start_time = timeit.default_timer()
 
 			if j % weight_update_interval == 0 and do_plot:
@@ -896,19 +903,9 @@ def run_test():
 	# start recording time
 	start_time = timeit.default_timer()
 
-	votes = {}
-	for scheme in voting_schemes:
-		votes[scheme] = np.zeros(num_tests)
-
-	correct = {}
-	for scheme in voting_schemes:
-		correct[scheme] = np.zeros(1)
-
-	while j < num_examples * num_tests:
-		np.random.seed(random_seed + (j % num_tests))
-
+	while j < num_examples:
 		# get the firing rates of the next input example
-		rates = (data['x'][(j // num_tests) % data_size, :, :] / 8.0) * input_intensity
+		rates = (data['x'][j % data_size, :, :] / 8.0) * input_intensity
 		
 		# sets the input firing rates
 		input_groups['Xe'].rate = rates.reshape(n_input)
@@ -947,17 +944,20 @@ def run_test():
 			result_monitor[j % update_interval, :] = current_spike_count
 			
 			# get true label of the past input example
-			input_numbers[j // num_tests] = data['y'][(j // num_tests) % data_size][0]
+			input_numbers[j] = data['y'][j % data_size][0]
 			
 			# get the output classifications of the network
-			for scheme, outputs in predict_label(assignments, result_monitor[j % update_interval, :], \
-															accumulated_rates, spike_proportions).items():
-				votes[scheme][j % num_tests] = outputs[0]
+			for scheme, outputs in predict_label(assignments, result_monitor[j % update_interval, :], accumulated_rates, spike_proportions).items():
+				if scheme != 'distance':
+					output_numbers[scheme][j, :] = outputs
+				elif scheme == 'distance':
+					current_input = (rates * (weight['ee_input'] / np.sum(rates))).ravel()
+					output_numbers[scheme][j, 0] = assignments[np.argmin([ euclidean(current_input, \
+													filters[:, i]) for i in xrange(conv_features) ])]
 
 			# print progress
 			if j % print_progress_interval == 0 and j > 0:
-				print 'runs done:', j, 'of', int(num_examples * num_tests), '(time taken for past', print_progress_interval, \
-																		'runs:', str(timeit.default_timer() - start_time) + ')'
+				print 'runs done:', j, 'of', int(num_examples), '(time taken for past', print_progress_interval, 'runs:', str(timeit.default_timer() - start_time) + ')'
 				start_time = timeit.default_timer()
 						
 			# set input firing rates back to zero
@@ -973,30 +973,9 @@ def run_test():
 					neuron_groups[neuron_group].ge = 0
 					neuron_groups[neuron_group].gi = 0
 
-			if (j + 1) % num_tests == 0:
-				for scheme in voting_schemes:
-					output_numbers[scheme][j // num_tests, 0] = np.argmax(np.bincount(votes[scheme].astype(int), minlength=10))
-					# print np.argmax(np.bincount(votes[scheme].astype(int), minlength=10)), input_numbers[j // num_tests], scheme
-					# print output_numbers[scheme][j // num_tests]
-
-					if output_numbers[scheme][j // num_tests, 0] == input_numbers[j // num_tests]:
-						correct[scheme] += 1
-				
-				for scheme in voting_schemes:
-					votes[scheme] = np.zeros(num_tests)
-
 			# bookkeeping
 			input_intensity = start_input_intensity
 			j += 1
-
-	print '\nAccuracy:\n'
-
-	# print [ output_numbers[scheme][:, 0] for scheme in voting_schemes ]
-	# print [ correct[scheme] for scheme in voting_schemes ]
-	# print input_numbers
-
-	for scheme in voting_schemes:
-		print scheme, ':', (correct[scheme] / float(num_test)) * 100
 
 	print '\n'
 
@@ -1036,22 +1015,21 @@ def evaluate_results():
 	# get network filter weights
 	filters = input_connections['XeAe'][:].todense()
 
-	# get the output classifications of the network
-	votes = {}
-	for scheme in voting_schemes:
-		votes[scheme] = np.zeros(num_tests)
+	# for idx in xrange(end_time_testing - end_time_training):
+	for idx in xrange(num_examples):
+		label_rankings = predict_label(assignments, result_monitor[idx, :], accumulated_rates, spike_proportions)
+		for scheme in voting_schemes:
+			if scheme != 'distance':
+				test_results[scheme][:, idx] = label_rankings[scheme]
+			elif scheme == 'distance':
+				rates = (data['x'][idx % data_size, :, :] / 8.0) * input_intensity
+				current_input = (rates * (weight['ee_input'] / np.sum(rates))).ravel()
+				results = np.zeros(10)
+				results[0] = assignments[np.argmin([ euclidean(current_input, \
+								filters[:, i]) for i in xrange(conv_features) ])]
+				test_results[scheme][:, idx] = results
 
-	print result_monitor.shape
-
-	for idx in xrange(num_examples * num_tests):
-		for scheme, outputs in predict_label(assignments, result_monitor[idx, :], accumulated_rates, spike_proportions).items():
-			print scheme, outputs
-			votes[scheme][idx % num_tests] = outputs[0]
-		if (idx + 1) % num_tests == 0:
-			for scheme in voting_schemes:
-				print scheme, votes[scheme]
-				test_results[scheme][:, 0] = np.argmax(np.bincount(votes[scheme].astype(int), minlength=10))
-				votes[scheme] = np.zeros(num_tests)
+	print test_results
 
 	differences = { scheme : test_results[scheme][0, :] - input_numbers for scheme in voting_schemes }
 	correct = { scheme : len(np.where(differences[scheme] == 0)[0]) for scheme in voting_schemes }
@@ -1121,7 +1099,7 @@ if __name__ == '__main__':
 											weight for inhibitory to excitatory connections.')
 	parser.add_argument('--reset_state_vars', type=str, default='False', help='Whether to \
 							reset neuron / synapse state variables or run a "reset" period.')
-	parser.add_argument('--inhib_update_interval', type=int, default=100, \
+	parser.add_argument('--inhib_update_interval', type=int, default=250, \
 							help='How often to increase the inhibition strength.')
 	parser.add_argument('--inhib_schedule', type=str, default='linear', help='How to \
 							update the strength of inhibition as the training progresses.')
@@ -1147,11 +1125,10 @@ if __name__ == '__main__':
 														inputs are presented to the network.')
 	parser.add_argument('--train_rest', type=float, default=0.15, help='How long the network is allowed \
 												to settle back to equilibrium between training examples.')
-	parser.add_argument('--test_time', type=float, default=0.05, help='How long test \
+	parser.add_argument('--test_time', type=float, default=0.35, help='How long test \
 												inputs are presented to the network.')
-	parser.add_argument('--test_rest', type=float, default=0.05, help='How long the network is allowed \
+	parser.add_argument('--test_rest', type=float, default=0.15, help='How long the network is allowed \
 												to settle back to equilibrium between test examples.')
-	parser.add_argument('--num_tests', type=int, default=10, help='How many times to try to classify each input example.')
 
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
@@ -1238,7 +1215,7 @@ if __name__ == '__main__':
 
 	# set the update interval
 	if test_mode:
-		update_interval = num_examples * num_tests
+		update_interval = num_examples
 
 	# weight updates and progress printing intervals
 	print_progress_interval = 10
@@ -1272,7 +1249,7 @@ if __name__ == '__main__':
 
 	# time constants, learning rates, max weights, weight dependence, etc.
 	tc_pre_ee, tc_post_ee = 20 * b.ms, 20 * b.ms
-	nu_ee_pre, nu_ee_post = 0.0001, 0.01
+	# nu_ee_pre, nu_ee_post = 0.0001, 0.01
 	nu_AeAe_pre, nu_Ae_Ae_post = 0.1, 0.5
 	wmax_ee = 1.0
 	exp_ee_post = exp_ee_pre = 0.2
@@ -1317,6 +1294,8 @@ if __name__ == '__main__':
 	eqs_stdp_ee = '''
 				dpre/dt = -pre / tc_pre_ee : 1.0
 				dpost/dt = -post / tc_post_ee : 1.0
+				nu_ee_post = 0.01 : 1.0
+				nu_ee_pre = 0.0001 : 1.0
 				'''
 
 	eqs_stdp_AeAe = '''
@@ -1352,7 +1331,7 @@ if __name__ == '__main__':
 						conv_stride) + (x * n_input_sqrt) + y for y in xrange(conv_size) for x in xrange(conv_size) ]
 
 	# instantiating neuron "vote" monitor
-	result_monitor = np.zeros((update_interval * num_tests, conv_features, n_e))
+	result_monitor = np.zeros((update_interval, conv_features, n_e))
 
 	# build the spiking neural network
 	build_network()
@@ -1369,7 +1348,10 @@ if __name__ == '__main__':
 	else:
 		assignments = -1 * np.ones((conv_features, n_e))
 
-	voting_schemes = ['all', 'most_spiked_patch', 'most_spiked_location', 'confidence_weighting']
+	if test_mode:
+		voting_schemes = ['all', 'most_spiked_patch', 'most_spiked_location', 'confidence_weighting', 'distance']
+	else:
+		voting_schemes = ['all', 'most_spiked_patch', 'most_spiked_location', 'confidence_weighting']
 
 	for scheme in voting_schemes:
 		output_numbers[scheme] = np.zeros((num_examples, 10))
