@@ -35,7 +35,7 @@ b.log_level_error()
 # set these appropriate to your directory structure
 top_level_path = os.path.join('..', '..')
 MNIST_data_path = os.path.join(top_level_path, 'data')
-model_name = 'csnn_growing_inhibition'
+model_name = 'csnn_growing_inhibition_decreasing_learning_rate'
 results_path = os.path.join(top_level_path, 'results', model_name)
 
 performance_dir = os.path.join(top_level_path, 'performance', model_name)
@@ -745,6 +745,11 @@ def run_train():
 		else:			
 			num_retries = 0
 
+			print stdp_methods['XeAe'].nu_ee_post
+
+			stdp_methods['XeAe'].nu_ee_post = 0.0
+			stdp_methods['XeAe'].nu_ee_pre = 0.0
+
 			if j > 0 and j % inhib_update_interval == 0 and not current_inhib >= max_inhib:
 				if inhib_schedule == 'linear':
 					current_inhib = current_inhib + inhib_increase
@@ -1244,7 +1249,7 @@ if __name__ == '__main__':
 
 	# time constants, learning rates, max weights, weight dependence, etc.
 	tc_pre_ee, tc_post_ee = 20 * b.ms, 20 * b.ms
-	nu_ee_pre, nu_ee_post = 0.0001, 0.01
+	# nu_ee_pre, nu_ee_post = 0.0001, 0.01
 	nu_AeAe_pre, nu_Ae_Ae_post = 0.1, 0.5
 	wmax_ee = 1.0
 	exp_ee_post = exp_ee_pre = 0.2
@@ -1289,6 +1294,8 @@ if __name__ == '__main__':
 	eqs_stdp_ee = '''
 				dpre/dt = -pre / tc_pre_ee : 1.0
 				dpost/dt = -post / tc_post_ee : 1.0
+				nu_ee_post = 0.01 : 1.0
+				nu_ee_pre = 0.0001 : 1.0
 				'''
 
 	eqs_stdp_AeAe = '''

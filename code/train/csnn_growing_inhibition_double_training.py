@@ -627,9 +627,6 @@ def run_train(random_seed):
 				simple_clusters, simple_cluster_assignments, index_matrix, accumulated_rates, \
 				accumulated_inputs, spike_proportions
 
-	# Set the random seed at the beginning of the training phase.
-	np.random.seed(random_seed)
-
 	if do_plot:
 		assignments_image = plot_assignments(assignments)
 		fig_num += 1
@@ -672,6 +669,13 @@ def run_train(random_seed):
 	current_inhib = start_inhib
 
 	while j < num_examples:
+		if j == 0:
+			# Set the random seed at the beginning of the training phase.
+			np.random.seed(random_seed)
+		elif j == data_size and different_seed:
+			# Set a new random seed at the second half of the training phase.
+			np.random.seed(random_seed + 1)
+
 		# get the firing rates of the next input example
 		rates = (data['x'][j % data_size, :, :] / 8.0) * input_intensity * \
 			((noise_const * np.random.randn(n_input_sqrt, n_input_sqrt)) + 1.0)
@@ -749,10 +753,7 @@ def run_train(random_seed):
 			num_retries = 0
 
 			if j > 0 and j % inhib_update_interval == 0:
-				if inhib_schedule == 'linear':
-					current_inhib = current_inhib + inhib_increase
-				elif inhib_schedule == 'log':
-					current_inhib = inhib_increase[j // inhib_update_interval]
+				current_inhib = current_inhib + inhib_increase
 
 				print '\nCurrent inhibition level:', min(max_inhib, current_inhib)
 
@@ -1164,15 +1165,8 @@ if __name__ == '__main__':
 	else:
 		data_size = 60000
 
-	if inhib_schedule == 'linear':
-		inhib_increase = ((max_inhib - start_inhib) / float(num_train * proportion_grow) * inhib_update_interval)
-	elif inhib_schedule == 'log':
-		num_updates = num_train / inhib_update_interval
-		c = max_inhib / log(1 + num_updates)
-		inhib_increase = [ c * np.log(1 + t) for t in xrange(num_updates) ]
-	else:
-		raise Exception('Exception one of "linear" or "log" for argument "inhib_schedule".')
-
+	inhib_increase = ((max_inhib - start_inhib) / float(num_train * 2 * proportion_grow) * inhib_update_interval)
+	
 	# set brian global preferences
 	b.set_global_preferences(defaultclock = b.Clock(dt=0.5*b.ms), useweave = True, gcc_options = ['-ffast-math -march=native'], usecodegen = True,
 		usecodegenweave = True, usecodegenstateupdate = True, usecodegenthreshold = False, usenewpropagate = True, usecstdp = True, openmp = False,
@@ -1248,8 +1242,6 @@ if __name__ == '__main__':
 	delay['ee_input'] = (0 * b.ms, 10 * b.ms)
 	delay['ei_input'] = (0 * b.ms, 5 * b.ms)
 	input_intensity = start_input_intensity
-
-	current_inhibition = 1.0
 
 	# time constants, learning rates, max weights, weight dependence, etc.
 	tc_pre_ee, tc_post_ee = 20 * b.ms, 20 * b.ms
@@ -1368,11 +1360,6 @@ if __name__ == '__main__':
 		run_test()
 	else:
 		run_train(random_seed)
-
-		if different_seed:
-			run_train(random_seed + 1)
-		else:
-			run_train(random_seed)
 
 	# save and plot results
 	save_results()
