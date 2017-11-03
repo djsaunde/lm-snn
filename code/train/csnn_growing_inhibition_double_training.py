@@ -556,16 +556,15 @@ def build_network():
 			spike_monitors[name + 'i'] = b.SpikeMonitor(neuron_groups[name + 'i'])
 
 	if record_spikes and do_plot:
-		b.figure(fig_num, figsize=(8, 6))
-		
-		fig_num += 1
-		
+		b.figure(fig_num, figsize=(8, 6))		
 		b.ion()
 		b.subplot(211)
 		b.raster_plot(spike_monitors['Ae'], refresh=1000 * b.ms, showlast=1000 * b.ms, title='Excitatory spikes per neuron')
 		b.subplot(212)
 		b.raster_plot(spike_monitors['Ai'], refresh=1000 * b.ms, showlast=1000 * b.ms, title='Inhibitory spikes per neuron')
 		b.tight_layout()
+
+		fig_num += 1
 
 	# creating Poission spike train from input image (784 vector, 28x28 image)
 	for name in input_population_names:

@@ -872,7 +872,9 @@ def run_train():
 def run_test():
 	global fig_num, input_intensity, previous_spike_count, rates, assignments, clusters, cluster_assignments, \
 				simple_clusters, simple_cluster_assignments, index_matrix, accumulated_rates, \
-				accumulated_inputs, spike_proportions
+				accumulated_inputs, spike_proportions, ending
+
+	ending = '_'.join([ending, str(test_time), str(test_rest)])
 
 	if do_plot:
 		assignments_image = plot_assignments(assignments)
@@ -989,83 +991,13 @@ def run_test():
 			input_intensity = start_input_intensity
 			j += 1
 
-	print '\nAccuracy:\n'
-
-	# print [ output_numbers[scheme][:, 0] for scheme in voting_schemes ]
-	# print [ correct[scheme] for scheme in voting_schemes ]
-	# print input_numbers
-
+	accuracies = {}
 	for scheme in voting_schemes:
-		print scheme, ':', (correct[scheme] / float(num_test)) * 100
+		accuracies[scheme] = float((correct[scheme] / float(num_test)) * 100)
 
-	print '\n'
+	print accuracies.values()
 
-
-def save_results():
-	'''
-	Save results of simulation (train or test)
-	'''
-	print '...Saving results'
-
-	if not test_mode:
-		save_connections(end_weights_dir, connections, input_connections, ending, 'end')
-		save_theta(end_weights_dir, population_names, neuron_groups, ending, 'end')
-
-		np.save(os.path.join(end_assignments_dir, '_'.join(['assignments', ending, 'end'])), assignments)
-		np.save(os.path.join(end_misc_dir, '_'.join(['accumulated_rates', ending, 'end'])), accumulated_rates)
-		np.save(os.path.join(end_misc_dir, '_'.join(['spike_proportions', ending, 'end'])), spike_proportions)
-	else:
-		np.save(os.path.join(activity_dir, '_'.join(['results', str(num_examples), ending])), result_monitor)
-		np.save(os.path.join(activity_dir, '_'.join(['input_numbers', str(num_examples), ending])), input_numbers)
-
-	print '\n'
-
-
-def evaluate_results():
-	'''
-	Evalute the network using the various voting schemes in test mode
-	'''
-	global update_interval
-
-	test_results = {}
-	for scheme in voting_schemes:
-		test_results[scheme] = np.zeros((10, num_examples))
-
-	print '\n...Calculating accuracy per voting scheme'
-
-	# get network filter weights
-	filters = input_connections['XeAe'][:].todense()
-
-	# get the output classifications of the network
-	votes = {}
-	for scheme in voting_schemes:
-		votes[scheme] = np.zeros(num_tests)
-
-	print result_monitor.shape
-
-	for idx in xrange(num_examples * num_tests):
-		for scheme, outputs in predict_label(assignments, result_monitor[idx, :], accumulated_rates, spike_proportions).items():
-			print scheme, outputs
-			votes[scheme][idx % num_tests] = outputs[0]
-		if (idx + 1) % num_tests == 0:
-			for scheme in voting_schemes:
-				print scheme, votes[scheme]
-				test_results[scheme][:, 0] = np.argmax(np.bincount(votes[scheme].astype(int), minlength=10))
-				votes[scheme] = np.zeros(num_tests)
-
-	differences = { scheme : test_results[scheme][0, :] - input_numbers for scheme in voting_schemes }
-	correct = { scheme : len(np.where(differences[scheme] == 0)[0]) for scheme in voting_schemes }
-	incorrect = { scheme : len(np.where(differences[scheme] != 0)[0]) for scheme in voting_schemes }
-	accuracies = { scheme : correct[scheme] / float(num_examples) * 100 for scheme in voting_schemes }
-
-	conf_matrices = np.array([confusion_matrix(test_results[scheme][0, :], \
-								input_numbers) for scheme in voting_schemes])
-	np.save(os.path.join(results_path, '_'.join(['confusion_matrix', ending]) + '.npy'), conf_matrices)
-
-	print '\nConfusion matrix:\n\n', conf_matrices
-
-	for scheme in voting_schemes:
-		print '\n-', scheme, 'accuracy:', accuracies[scheme]
+	print results_path
 
 	results = pd.DataFrame([ [ ending ] + accuracies.values() ], columns=[ 'Model' ] + accuracies.keys())
 	if not 'results.csv' in os.listdir(results_path):
@@ -1147,11 +1079,11 @@ if __name__ == '__main__':
 														inputs are presented to the network.')
 	parser.add_argument('--train_rest', type=float, default=0.15, help='How long the network is allowed \
 												to settle back to equilibrium between training examples.')
-	parser.add_argument('--test_time', type=float, default=0.05, help='How long test \
+	parser.add_argument('--test_time', type=float, default=0.35, help='How long test \
 												inputs are presented to the network.')
-	parser.add_argument('--test_rest', type=float, default=0.05, help='How long the network is allowed \
+	parser.add_argument('--test_rest', type=float, default=0.15, help='How long the network is allowed \
 												to settle back to equilibrium between test examples.')
-	parser.add_argument('--num_tests', type=int, default=10, help='How many times to try to classify each input example.')
+	parser.add_argument('--num_tests', type=int, default=3, help='How many times to try to classify each input example.')
 
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
@@ -1384,10 +1316,3 @@ if __name__ == '__main__':
 		run_test()
 	else:
 		run_train()
-
-	# save and plot results
-	save_results()
-
-	# evaluate results
-	if test_mode:
-		evaluate_results()
