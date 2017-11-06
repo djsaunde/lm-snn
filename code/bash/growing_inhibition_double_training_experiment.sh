@@ -5,9 +5,9 @@ noise_const=0.0
 
 for num_train in 45000 60000
 do
-	for random_seed in 1 2 3
+	for random_seed in 1 2 3 4
 	do
-		for conv_features in 400
+		for conv_features in 625
 		do
 			for proportion_grow in 0.25 0.5 0.75 1.0
 			do
