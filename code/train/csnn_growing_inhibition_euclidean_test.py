@@ -36,7 +36,7 @@ b.log_level_error()
 top_level_path = os.path.join('..', '..')
 MNIST_data_path = os.path.join(top_level_path, 'data')
 model_name = 'csnn_growing_inhibition'
-results_path = os.path.join(top_level_path, 'results', model_name + '_multiple_test')
+results_path = os.path.join(top_level_path, 'results', '_'.join([model_name, 'euclidean_test']))
 
 performance_dir = os.path.join(top_level_path, 'performance', model_name)
 activity_dir = os.path.join(top_level_path, 'activity', model_name)
@@ -50,13 +50,14 @@ end_weights_dir = os.path.join(weights_dir, 'end')
 assignments_dir = os.path.join(top_level_path, 'assignments', model_name)
 best_assignments_dir = os.path.join(assignments_dir, 'best')
 end_assignments_dir = os.path.join(assignments_dir, 'end')
+relabel_assignments_dir = os.path.join(top_level_path, 'assignments', '_'.join([model_name, 'euclidean_test']))
 
 misc_dir = os.path.join(top_level_path, 'misc', model_name)
 best_misc_dir = os.path.join(misc_dir, 'best')
 end_misc_dir = os.path.join(misc_dir, 'end')
 
 for d in [ performance_dir, activity_dir, weights_dir, deltas_dir, misc_dir, best_misc_dir,
-				assignments_dir, best_assignments_dir, MNIST_data_path, results_path, 
+				assignments_dir, best_assignments_dir, MNIST_data_path, results_path, relabel_assignments_dir, 
 			best_weights_dir, end_weights_dir, end_misc_dir, end_assignments_dir, spikes_dir ]:
 	if not os.path.isdir(d):
 		os.makedirs(d)
@@ -745,7 +746,7 @@ def run_train():
 		else:			
 			num_retries = 0
 
-			if j > 0 and j % inhib_update_interval == 0:
+			if j > 0 and j % inhib_update_interval == 0 and not current_inhib >= max_inhib:
 				if inhib_schedule == 'linear':
 					current_inhib = current_inhib + inhib_increase
 				elif inhib_schedule == 'log':
@@ -769,7 +770,7 @@ def run_train():
 
 			# record the current number of spikes
 			result_monitor[j % update_interval, :] = current_spike_count
-
+			
 			# get true label of last input example
 			input_numbers[j] = data['y'][j % data_size][0]
 
@@ -799,12 +800,16 @@ def run_train():
 			# get the output classifications of the network
 			for scheme, outputs in predict_label(assignments, result_monitor[j % update_interval, :], \
 															accumulated_rates, spike_proportions).items():
-				output_numbers[scheme][j, :] = outputs
+				if scheme != 'distance':
+					output_numbers[scheme][j, :] = outputs
+				elif scheme == 'distance':
+					current_input = (rates * (weight['ee_input'] / np.sum(rates))).ravel()
+					output_numbers[scheme][j, 0] = assignments[np.argmin([ euclidean(current_input, \
+													filters[:, i]) for i in xrange(conv_features) ])]
 
 			# print progress
 			if j % print_progress_interval == 0 and j > 0:
-				print 'runs done:', j, 'of', int(num_examples * num_tests), '(time taken for past', print_progress_interval, \
-																		'runs:', str(timeit.default_timer() - start_time) + ')'
+				print 'runs done:', j, 'of', int(num_examples), '(time taken for past', print_progress_interval, 'runs:', str(timeit.default_timer() - start_time) + ')'
 				start_time = timeit.default_timer()
 
 			if j % weight_update_interval == 0 and do_plot:
@@ -867,12 +872,32 @@ def run_train():
 	print '\n'
 
 
+def run_relabel():
+	global filters, assignments
+
+	label_counts = np.zeros([conv_features, 10])
+
+	j = 0
+	while j < num_examples:
+		if j % 10 == 0:
+			print '(', j, '/', num_examples, ')'
+			print np.sum(label_counts, axis=1)
+
+		rates = data['x'][j % data_size, :, :]
+		true_label = data['y'][j % data_size]
+		current_input = (rates * (weight['ee_input'] / np.sum(rates))).ravel()
+		min_distance_neuron = np.argmin([ euclidean(current_input, filters[:, i]) for i in xrange(conv_features) ])
+		label_counts[min_distance_neuron,  true_label] += 1
+
+		j += 1
+
+	assignments = np.argmax(label_counts, axis=1)
+	assignments = assignments.reshape([conv_features, n_e])
+
 def run_test():
 	global fig_num, input_intensity, previous_spike_count, rates, assignments, clusters, cluster_assignments, \
 				simple_clusters, simple_cluster_assignments, index_matrix, accumulated_rates, \
-				accumulated_inputs, spike_proportions, ending
-
-	ending = '_'.join([ending, str(test_time), str(test_rest)])
+				accumulated_inputs, spike_proportions
 
 	if do_plot:
 		assignments_image = plot_assignments(assignments)
@@ -896,19 +921,9 @@ def run_test():
 	# start recording time
 	start_time = timeit.default_timer()
 
-	votes = {}
-	for scheme in voting_schemes:
-		votes[scheme] = np.zeros(num_tests)
-
-	correct = {}
-	for scheme in voting_schemes:
-		correct[scheme] = np.zeros(1)
-
-	while j < num_examples * num_tests:
-		np.random.seed(random_seed + (j % num_tests))
-
+	while j < num_examples:
 		# get the firing rates of the next input example
-		rates = (data['x'][(j // num_tests) % data_size, :, :] / 8.0) * input_intensity
+		rates = (data['x'][j % data_size, :, :] / 8.0) * input_intensity
 		
 		# sets the input firing rates
 		input_groups['Xe'].rate = rates.reshape(n_input)
@@ -947,17 +962,20 @@ def run_test():
 			result_monitor[j % update_interval, :] = current_spike_count
 			
 			# get true label of the past input example
-			input_numbers[j // num_tests] = data['y'][(j // num_tests) % data_size][0]
+			input_numbers[j] = data['y'][j % data_size][0]
 			
 			# get the output classifications of the network
-			for scheme, outputs in predict_label(assignments, result_monitor[j % update_interval, :], \
-															accumulated_rates, spike_proportions).items():
-				votes[scheme][j % num_tests] = outputs[0]
+			for scheme, outputs in predict_label(assignments, result_monitor[j % update_interval, :], accumulated_rates, spike_proportions).items():
+				if scheme != 'distance':
+					output_numbers[scheme][j, :] = outputs
+				elif scheme == 'distance':
+					current_input = (rates * (weight['ee_input'] / np.sum(rates))).ravel()
+					output_numbers[scheme][j, 0] = assignments[np.argmin([ euclidean(current_input, \
+													filters[:, i]) for i in xrange(conv_features) ])]
 
 			# print progress
 			if j % print_progress_interval == 0 and j > 0:
-				print 'runs done:', j, 'of', int(num_examples * num_tests), '(time taken for past', print_progress_interval, \
-																		'runs:', str(timeit.default_timer() - start_time) + ')'
+				print 'runs done:', j, 'of', int(num_examples), '(time taken for past', print_progress_interval, 'runs:', str(timeit.default_timer() - start_time) + ')'
 				start_time = timeit.default_timer()
 						
 			# set input firing rates back to zero
@@ -973,23 +991,79 @@ def run_test():
 					neuron_groups[neuron_group].ge = 0
 					neuron_groups[neuron_group].gi = 0
 
-			if (j + 1) % num_tests == 0:
-				for scheme in voting_schemes:
-					output_numbers[scheme][j // num_tests, 0] = np.argmax(np.bincount(votes[scheme].astype(int), minlength=10))
-					if output_numbers[scheme][j // num_tests, 0] == input_numbers[j // num_tests]:
-						correct[scheme] += 1
-				
-				for scheme in voting_schemes:
-					votes[scheme] = np.zeros(num_tests)
-
 			# bookkeeping
 			input_intensity = start_input_intensity
 			j += 1
 
-	accuracies = {}
+	print '\n'
+
+
+def save_results():
+	'''
+	Save results of simulation (train or test)
+	'''
+	print '...Saving results'
+
+	if not test_mode and not relabel_mode:
+		save_connections(end_weights_dir, connections, input_connections, ending, 'end')
+		save_theta(end_weights_dir, population_names, neuron_groups, ending, 'end')
+
+		np.save(os.path.join(end_assignments_dir, '_'.join(['assignments', ending, 'end'])), assignments)
+		np.save(os.path.join(end_misc_dir, '_'.join(['accumulated_rates', ending, 'end'])), accumulated_rates)
+		np.save(os.path.join(end_misc_dir, '_'.join(['spike_proportions', ending, 'end'])), spike_proportions)
+	elif relabel_mode:
+		np.save(os.path.join(relabel_assignments_dir, '_'.join(['assignments', ending])), assignments)
+	else:
+		np.save(os.path.join(activity_dir, '_'.join(['results', str(num_examples), ending])), result_monitor)
+		np.save(os.path.join(activity_dir, '_'.join(['input_numbers', str(num_examples), ending])), input_numbers)
+
+	print '\n'
+
+
+def evaluate_results():
+	'''
+	Evalute the network using the various voting schemes in test mode
+	'''
+	global update_interval
+
+	test_results = {}
 	for scheme in voting_schemes:
-		accuracies[scheme] = float((correct[scheme] / float(num_test)) * 100)
-		print scheme, ':', accuracies[scheme]
+		test_results[scheme] = np.zeros((10, num_examples))
+
+	print '\n...Calculating accuracy per voting scheme'
+
+	# get network filter weights
+	filters = input_connections['XeAe'][:].todense()
+
+	# for idx in xrange(end_time_testing - end_time_training):
+	for idx in xrange(num_examples):
+		label_rankings = predict_label(assignments, result_monitor[idx, :], accumulated_rates, spike_proportions)
+		for scheme in voting_schemes:
+			if scheme != 'distance':
+				test_results[scheme][:, idx] = label_rankings[scheme]
+			elif scheme == 'distance':
+				rates = (data['x'][idx % data_size, :, :] / 8.0) * input_intensity
+				current_input = (rates * (weight['ee_input'] / np.sum(rates))).ravel()
+				results = np.zeros(10)
+				results[0] = assignments[np.argmin([ euclidean(current_input, \
+								filters[:, i]) for i in xrange(conv_features) ])]
+				test_results[scheme][:, idx] = results
+
+	print test_results
+
+	differences = { scheme : test_results[scheme][0, :] - input_numbers for scheme in voting_schemes }
+	correct = { scheme : len(np.where(differences[scheme] == 0)[0]) for scheme in voting_schemes }
+	incorrect = { scheme : len(np.where(differences[scheme] != 0)[0]) for scheme in voting_schemes }
+	accuracies = { scheme : correct[scheme] / float(num_examples) * 100 for scheme in voting_schemes }
+
+	conf_matrices = np.array([confusion_matrix(test_results[scheme][0, :], \
+								input_numbers) for scheme in voting_schemes])
+	np.save(os.path.join(results_path, '_'.join(['confusion_matrix', ending]) + '.npy'), conf_matrices)
+
+	print '\nConfusion matrix:\n\n', conf_matrices
+
+	for scheme in voting_schemes:
+		print '\n-', scheme, 'accuracy:', accuracies[scheme]
 
 	results = pd.DataFrame([ [ ending ] + accuracies.values() ], columns=[ 'Model' ] + accuracies.keys())
 	if not 'results.csv' in os.listdir(results_path):
@@ -1019,6 +1093,8 @@ if __name__ == '__main__':
 												network operation speedier, and possible to run on HPC resources.')
 	parser.add_argument('--num_train', type=int, default=10000, help='The number of \
 											examples for which to train the network on.')
+	parser.add_argument('--num_relabel', type=int, default=10000, help='The number of \
+									examples for which to relabel networks neurons with.')
 	parser.add_argument('--num_test', type=int, default=10000, help='The number of \
 											examples for which to test the network on.')
 	parser.add_argument('--random_seed', type=int, default=42, help='The random seed \
@@ -1045,7 +1121,7 @@ if __name__ == '__main__':
 											weight for inhibitory to excitatory connections.')
 	parser.add_argument('--reset_state_vars', type=str, default='False', help='Whether to \
 							reset neuron / synapse state variables or run a "reset" period.')
-	parser.add_argument('--inhib_update_interval', type=int, default=100, \
+	parser.add_argument('--inhib_update_interval', type=int, default=250, \
 							help='How often to increase the inhibition strength.')
 	parser.add_argument('--inhib_schedule', type=str, default='linear', help='How to \
 							update the strength of inhibition as the training progresses.')
@@ -1075,7 +1151,6 @@ if __name__ == '__main__':
 												inputs are presented to the network.')
 	parser.add_argument('--test_rest', type=float, default=0.15, help='How long the network is allowed \
 												to settle back to equilibrium between test examples.')
-	parser.add_argument('--num_tests', type=int, default=3, help='How many times to try to classify each input example.')
 
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
@@ -1100,9 +1175,12 @@ if __name__ == '__main__':
 
 	# test or training mode
 	test_mode = mode == 'test'
+	relabel_mode = mode == 'relabel'
 
 	if test_mode:
 		num_examples = num_test
+	elif relabel_mode:
+		num_examples = num_relabel
 	else:
 		num_examples = num_train
 
@@ -1162,7 +1240,7 @@ if __name__ == '__main__':
 
 	# set the update interval
 	if test_mode:
-		update_interval = num_examples * num_tests
+		update_interval = num_examples
 
 	# weight updates and progress printing intervals
 	print_progress_interval = 10
@@ -1276,10 +1354,13 @@ if __name__ == '__main__':
 						conv_stride) + (x * n_input_sqrt) + y for y in xrange(conv_size) for x in xrange(conv_size) ]
 
 	# instantiating neuron "vote" monitor
-	result_monitor = np.zeros((update_interval * num_tests, conv_features, n_e))
+	result_monitor = np.zeros((update_interval, conv_features, n_e))
 
 	# build the spiking neural network
-	build_network()
+	if not relabel_mode:
+		build_network()
+	else:
+		filters = np.load(os.path.join(best_weights_dir, '_'.join(['XeAe', ending + '_best.npy'])))
 
 	# bookkeeping variables
 	previous_spike_count = np.zeros((conv_features, n_e))
@@ -1287,13 +1368,16 @@ if __name__ == '__main__':
 	rates = np.zeros((n_input_sqrt, n_input_sqrt))
 
 	if test_mode:
-		assignments = np.load(os.path.join(best_assignments_dir, '_'.join(['assignments', ending, 'best.npy'])))
+		assignments = np.load(os.path.join(relabel_assignments_dir, '_'.join(['assignments', ending + '.npy'])))
 		accumulated_rates = np.load(os.path.join(best_misc_dir, '_'.join(['accumulated_rates', ending, 'best.npy'])))
 		spike_proportions = np.load(os.path.join(best_misc_dir, '_'.join(['spike_proportions', ending, 'best.npy'])))
 	else:
 		assignments = -1 * np.ones((conv_features, n_e))
 
-	voting_schemes = ['all', 'most_spiked_patch', 'most_spiked_location', 'confidence_weighting']
+	if test_mode:
+		voting_schemes = ['all', 'most_spiked_patch', 'most_spiked_location', 'confidence_weighting', 'distance']
+	else:
+		voting_schemes = ['all', 'most_spiked_patch', 'most_spiked_location', 'confidence_weighting']
 
 	for scheme in voting_schemes:
 		output_numbers[scheme] = np.zeros((num_examples, 10))
@@ -1306,5 +1390,16 @@ if __name__ == '__main__':
 	# run the simulation of the network
 	if test_mode:
 		run_test()
+	elif relabel_mode:
+		run_relabel()
 	else:
 		run_train()
+
+	print assignments
+
+	# save and plot results
+	save_results()
+
+	# evaluate results
+	if test_mode:
+		evaluate_results()
