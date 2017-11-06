@@ -874,7 +874,7 @@ def run_test():
 				simple_clusters, simple_cluster_assignments, index_matrix, accumulated_rates, \
 				accumulated_inputs, spike_proportions, ending
 
-	ending = '_'.join([ending, str(test_time), str(test_rest)])
+	ending = '_'.join([ending, str(test_time), str(test_rest), str(num_tests)])
 
 	if do_plot:
 		assignments_image = plot_assignments(assignments)
@@ -978,9 +978,6 @@ def run_test():
 			if (j + 1) % num_tests == 0:
 				for scheme in voting_schemes:
 					output_numbers[scheme][j // num_tests, 0] = np.argmax(np.bincount(votes[scheme].astype(int), minlength=10))
-					# print np.argmax(np.bincount(votes[scheme].astype(int), minlength=10)), input_numbers[j // num_tests], scheme
-					# print output_numbers[scheme][j // num_tests]
-
 					if output_numbers[scheme][j // num_tests, 0] == input_numbers[j // num_tests]:
 						correct[scheme] += 1
 				
