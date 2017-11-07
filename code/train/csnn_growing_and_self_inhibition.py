@@ -548,6 +548,9 @@ def build_network():
 														min(max_inhib, start_inhib * \
 														mhat(np.sqrt(euclidean([x, y], [x_, y_])), \
 														sigma=1.0, scale=1.0, shift=0.0))
+						else:
+							for n in xrange(n_e):
+								connections[conn_name][feature * n_e + n, other_feature * n_e + n] = max_inhib
 
 		print '...Creating monitors for:', name
 
@@ -1118,7 +1121,7 @@ if __name__ == '__main__':
 														Gaussian noise on synapse weights on each iteration.')
 	parser.add_argument('--weights_noise_constant', type=float, default=1e-2, help='The spread of the \
 																Gaussian noise used on synapse weights ')
-	parser.add_argument('--start_input_intensity', type=float, default=2.0, help='The intensity at which the \
+	parser.add_argument('--start_input_intensity', type=float, default=3.0, help='The intensity at which the \
 																input is (default) presented to the network.')
 	parser.add_argument('--test_adaptive_threshold', type=str, default='False', help='Whether or not to allow \
 															neuron thresholds to adapt during the test phase.')

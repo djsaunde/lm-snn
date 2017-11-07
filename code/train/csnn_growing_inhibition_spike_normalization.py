@@ -447,14 +447,20 @@ def assign_labels(result_monitor, input_numbers, accumulated_rates, accumulated_
 	'''
 	for j in xrange(10):
 		num_assignments = len(np.where(input_numbers == j)[0])
+
 		if num_assignments > 0:
 			accumulated_inputs[j] += num_assignments
-			accumulated_rates[:, j] = accumulated_rates[:, j] * 0.9 + \
-					np.ravel(np.sum(result_monitor[input_numbers == j], axis=0) / num_assignments)
+			accumulated_rates[:, j] = accumulated_rates[:, j] * 0.9
+			for idx in np.where(input_numbers == j)[0]:
+				if np.max(result_monitor[idx]) == 0:
+					num_assignments -= 1
+			for idx in np.where(input_numbers == j)[0]:
+				if np.max(result_monitor[idx]) != 0:
+					accumulated_rates[:, j] += np.ravel(result_monitor[idx] / (np.max(result_monitor[idx]) * num_assignments))
 	
 	assignments = np.argmax(accumulated_rates, axis=1).reshape((conv_features, n_e))
 
-	spike_proportions = np.divide(accumulated_rates, np.sum(accumulated_rates, axis=0))
+	spike_proportions = np.divide(accumulated_rates.T, np.sum(accumulated_rates, axis=1)).T
 
 	return assignments, accumulated_rates, spike_proportions
 
@@ -1094,7 +1100,7 @@ if __name__ == '__main__':
 														remove lateral inhibition during the test phase.')
 	parser.add_argument('--test_max_inhibition', type=str, default='False', help='Whether or not to \
 														use ETH-style inhibition during the test phase.')
-	parser.add_argument('--start_inhib', type=float, default=0.01, help='The beginning value \
+	parser.add_argument('--start_inhib', type=float, default=0.1, help='The beginning value \
 														of inhibiton for the increasing scheme.')
 	parser.add_argument('--max_inhib', type=float, default=17.4, help='The maximum synapse \
 											weight for inhibitory to excitatory connections.')
@@ -1118,7 +1124,7 @@ if __name__ == '__main__':
 														Gaussian noise on synapse weights on each iteration.')
 	parser.add_argument('--weights_noise_constant', type=float, default=1e-2, help='The spread of the \
 																Gaussian noise used on synapse weights ')
-	parser.add_argument('--start_input_intensity', type=float, default=2.0, help='The intensity at which the \
+	parser.add_argument('--start_input_intensity', type=float, default=3.0, help='The intensity at which the \
 																input is (default) presented to the network.')
 	parser.add_argument('--test_adaptive_threshold', type=str, default='False', help='Whether or not to allow \
 															neuron thresholds to adapt during the test phase.')
@@ -1348,7 +1354,8 @@ if __name__ == '__main__':
 		assignments = -1 * np.ones((conv_features, n_e))
 
 	if test_mode:
-		voting_schemes = ['all', 'all_active', 'most_spiked_patch', 'most_spiked_location', 'confidence_weighting', 'distance']
+		voting_schemes = ['all', 'all_active', 'most_spiked_patch', 'most_spiked_location', \
+															'confidence_weighting', 'distance']
 	else:
 		voting_schemes = ['all', 'all_active', 'most_spiked_patch', 'most_spiked_location', 'confidence_weighting']
 

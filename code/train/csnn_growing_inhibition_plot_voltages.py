@@ -56,10 +56,10 @@ misc_dir = os.path.join(top_level_path, 'misc', model_name)
 best_misc_dir = os.path.join(misc_dir, 'best')
 end_misc_dir = os.path.join(misc_dir, 'end')
 
-spike_activity_dir = os.path.join(top_level_path, 'spike_activity', model_name)
+voltage_activity_dir = os.path.join(top_level_path, 'voltage_activity_dir', model_name)
 
 for d in [ performance_dir, activity_dir, weights_dir, deltas_dir, misc_dir, best_misc_dir,
-				assignments_dir, best_assignments_dir, MNIST_data_path, results_path, spike_activity_dir,
+				assignments_dir, best_assignments_dir, MNIST_data_path, results_path, voltage_activity_dir,
 			best_weights_dir, end_weights_dir, end_misc_dir, end_assignments_dir, spikes_dir ]:
 	if not os.path.isdir(d):
 		os.makedirs(d)
@@ -98,6 +98,9 @@ def plot_labels_and_spikes(assignments, spike_counts, ending, j, image, predicti
 	fig.canvas.draw()
 	mng = plt.get_current_fig_manager()
 	mng.full_screen_toggle()
+	
+	plt.savefig(os.path.join(voltage_activity_dir, ending, str(j) + '.png'))
+
 	plt.show()
 
 	plt.ion()
@@ -306,14 +309,15 @@ def build_network():
 
 		voltage_monitors[name + 'e'] = b.RecentStateMonitor(neuron_groups[name + 'e'], 'v', duration=500 * b.ms)
 		voltage_monitors[name + 'i'] = b.RecentStateMonitor(neuron_groups[name + 'i'], 'v', duration=500 * b.ms)
+
 		excitatory_conductance_monitors[name + 'e'] = b.RecentStateMonitor(neuron_groups[name + \
 																	'e'], 'ge', duration=500 * b.ms)
 		excitatory_conductance_monitors[name + 'i'] = b.RecentStateMonitor(neuron_groups[name + \
-																	'e'], 'ge', duration=500 * b.ms)
+																	'i'], 'ge', duration=500 * b.ms)
 		inhibitory_conductance_monitors[name + 'e'] = b.RecentStateMonitor(neuron_groups[name + \
 																	'e'], 'gi', duration=500 * b.ms)
 		inhibitory_conductance_monitors[name + 'i'] = b.RecentStateMonitor(neuron_groups[name + \
-																	'e'], 'gi', duration=500 * b.ms)
+																	'i'], 'gi', duration=500 * b.ms)
 
 	print '...Creating recurrent connections'
 
@@ -416,8 +420,8 @@ def run_activity_plotting():
 						str(num_train), str(random_seed), str(normalize_inputs), 
 						str(proportion_grow), str(noise_const), str(inhibition_level) ])
 
-	if not os.path.isdir(os.path.join(spike_activity_dir, ending)):
-		os.makedirs(os.path.join(spike_activity_dir, ending))
+	if not os.path.isdir(os.path.join(voltage_activity_dir, ending)):
+		os.makedirs(os.path.join(voltage_activity_dir, ending))
 
 	if do_plot:
 		assignments_image = plot_assignments(assignments)
@@ -715,7 +719,7 @@ if __name__ == '__main__':
 			dgi/dt = -gi/(2.0*ms)                                  : 1
 			'''
 			
-	neuron_eqs_e += '\n  theta      :volt'
+	neuron_eqs_e += '\n  theta      : volt'
 	neuron_eqs_e += '\n  dtimer/dt = 100.0 : ms'
 
 	neuron_eqs_i = '''
