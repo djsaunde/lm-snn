@@ -1097,7 +1097,7 @@ if __name__ == '__main__':
 														remove lateral inhibition during the test phase.')
 	parser.add_argument('--test_max_inhibition', type=str, default='False', help='Whether or not to \
 														use ETH-style inhibition during the test phase.')
-	parser.add_argument('--start_inhib', type=float, default=0.01, help='The beginning value \
+	parser.add_argument('--start_inhib', type=float, default=0.1, help='The beginning value \
 														of inhibiton for the increasing scheme.')
 	parser.add_argument('--max_inhib', type=float, default=17.4, help='The maximum synapse \
 											weight for inhibitory to excitatory connections.')
