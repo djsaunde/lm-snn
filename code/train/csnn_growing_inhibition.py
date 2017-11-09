@@ -370,10 +370,11 @@ def predict_label(assignments, spike_rates, accumulated_rates, spike_proportions
 				num_assignments[i] = len(np.where(assignments == i)[0])
 				if num_assignments[i] > 0:
 					for idx in np.where(assignments == i)[0]:
-						neighbors = [idx]
-						neighbors.extend(get_neighbors(idx, features_sqrt))
-						summed_rates[i] += np.sum(spike_rates[neighbors]) / \
-							np.size(np.nonzero(spike_rates[neighbors].ravel()))
+						if np.sum(spike_rates[idx]) != 0: 
+							neighbors = [idx]
+							neighbors.extend(get_neighbors(idx, features_sqrt))
+							summed_rates[i] += np.sum(spike_rates[neighbors]) / \
+								np.size(np.nonzero(spike_rates[neighbors].ravel()))
 
 		elif scheme == 'most_spiked_neighborhood':
 			neighborhood_activity = np.zeros([conv_features, n_e])
@@ -383,11 +384,12 @@ def predict_label(assignments, spike_rates, accumulated_rates, spike_proportions
 				num_assignments[i] = len(np.where(assignments == i)[0])
 				if num_assignments[i] > 0:
 					for idx in np.where(assignments == i)[0]:
-						neighbors = [idx]
-						neighbors.extend(get_neighbors(idx, features_sqrt))
-						if np.size(np.nonzero(spike_rates[neighbors])) > 0:
-							neighborhood_activity[idx] = np.sum(spike_rates[neighbors]) / \
-											np.size(np.nonzero(spike_rates[neighbors].ravel()))
+						if np.sum(spike_rates[idx]) != 0:
+							neighbors = [idx]
+							neighbors.extend(get_neighbors(idx, features_sqrt))
+							if np.size(np.nonzero(spike_rates[neighbors])) > 0:
+								neighborhood_activity[idx] = np.sum(spike_rates[neighbors]) / \
+												np.size(np.nonzero(spike_rates[neighbors].ravel()))
 
 			for n in xrange(n_e):
 				# find the excitatory neuron which spiked the most in this input location
