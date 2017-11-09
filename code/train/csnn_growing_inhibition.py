@@ -20,6 +20,7 @@ import time
 import math
 import os
 
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.spatial.distance import euclidean
 from sklearn.metrics import confusion_matrix
 from struct import unpack
@@ -100,14 +101,6 @@ def update_input(rates, im, fig):
 	return im
 
 
-def plot_assignments(assignments):
-	cmap = plt.get_cmap('RdBu', 11)
-	im = plt.matshow(assignments.reshape((int(np.sqrt(n_e_total)), int(np.sqrt(n_e_total)))).T, cmap=cmap, vmin=-1.5, vmax=9.5)
-	plt.colorbar(im, ticks=np.arange(-1, 10))
-	plt.title('Neuron labels')
-	return im
-
-
 def update_assignments_plot(assignments, im):
 	im.set_array(assignments.reshape((int(np.sqrt(n_e_total)), int(np.sqrt(n_e_total)))).T)
 	return im
@@ -172,48 +165,71 @@ def get_input_weights(weight_matrix):
 	return weights
 
 
-def plot_2d_input_weights():
+def plot_weights_and_assignments(assignments):
 	'''
 	Plot the weights from input to excitatory layer to view during training.
 	'''
 	weights = get_2d_input_weights()
 
-	if n_e != 1:
-		fig = plt.figure(fig_num, figsize=(9, 9))
-	else:
-		fig = plt.figure(fig_num, figsize=(9, 9))
+	fig = plt.figure(fig_num, figsize=(18, 9))
 
-	im = plt.imshow(weights, interpolation='nearest', vmin=0, vmax=wmax_ee, cmap=cmap.get_cmap('hot_r'))
-	
-	if n_e != 1:
-		plt.colorbar(im, fraction=0.06)
-	else:
-		plt.colorbar(im, fraction=0.06)
+	ax1 = plt.subplot(121)
+	image1 = ax1.imshow(weights, interpolation='nearest', vmin=0, vmax=wmax_ee, cmap=cmap.get_cmap('hot_r'))
+	ax1.set_title(ending.replace('_', ' '))
 
-	plt.title(ending.replace('_', ' '))
+	ax2 = plt.subplot(122)
+	color = plt.get_cmap('RdBu', 11)
+	reshaped_assignments = assignments.reshape((int(np.sqrt(n_e_total)), int(np.sqrt(n_e_total)))).T
+	image2 = ax2.matshow(reshaped_assignments, cmap=color, vmin=-1.5, vmax=9.5)
+	ax2.set_title('Neuron labels')
+
+	divider1 = make_axes_locatable(ax1)
+	divider2 = make_axes_locatable(ax2)
+	cax1 = divider1.append_axes("right", size="5%", pad=0.05)
+	cax2 = divider2.append_axes("right", size="5%", pad=0.05)
+
+	plt.colorbar(image1, cax=cax1)
+	plt.colorbar(image2, cax=cax2, ticks=np.arange(-1, 10))
 
 	if n_e != 1:
-		plt.xticks(xrange(conv_size, conv_size * n_e_sqrt * features_sqrt + 1, conv_size), xrange(1, conv_size * n_e_sqrt * features_sqrt + 1))
-		plt.yticks(xrange(conv_size, conv_size * n_e_sqrt * features_sqrt + 1, conv_size), xrange(1, conv_size * n_e_sqrt * features_sqrt + 1))
+		ax1.set_xticks(xrange(conv_size, conv_size * n_e_sqrt * features_sqrt + 1, conv_size), xrange(1, conv_size * n_e_sqrt * features_sqrt + 1))
+		ax1.set_yticks(xrange(conv_size, conv_size * n_e_sqrt * features_sqrt + 1, conv_size), xrange(1, conv_size * n_e_sqrt * features_sqrt + 1))
 		for pos in xrange(conv_size * features_sqrt, conv_size * features_sqrt * n_e_sqrt, conv_size * features_sqrt):
-			plt.axhline(pos)
-			plt.axvline(pos)
+			ax1.axhline(pos)
+			ax1.axvline(pos)
 	else:
-		plt.xticks(xrange(conv_size, conv_size * (int(np.sqrt(conv_features)) + 1), conv_size), xrange(1, int(np.sqrt(conv_features)) + 1))
-		plt.yticks(xrange(conv_size, conv_size * (int(np.sqrt(conv_features)) + 1), conv_size), xrange(1, int(np.sqrt(conv_features)) + 1))
+		ax1.set_xticks(xrange(conv_size, conv_size * (int(np.sqrt(conv_features)) + 1), conv_size), xrange(1, int(np.sqrt(conv_features)) + 1))
+		ax1.set_yticks(xrange(conv_size, conv_size * (int(np.sqrt(conv_features)) + 1), conv_size), xrange(1, int(np.sqrt(conv_features)) + 1))
 	
+	plt.tight_layout()
+
 	fig.canvas.draw()
-	return im, fig
+	return fig, ax1, ax2, image1, image2
 
 
-def update_2d_input_weights(im, fig):
+def update_weights_and_assignments(fig, ax1, ax2, im1, im2, assignments, spike_counts):
 	'''
 	Update the plot of the weights from input to excitatory layer to view during training.
 	'''
 	weights = get_2d_input_weights()
-	im.set_array(weights)
+	im1.set_array(weights)
+	
+	reshaped_assignments = assignments.reshape((int(np.sqrt(n_e_total)), int(np.sqrt(n_e_total)))).T
+	im2.set_array(reshaped_assignments)
+
+	for txt in ax2.texts:
+		txt.set_visible(False)
+
+	spike_counts_reshaped = spike_counts.reshape([features_sqrt, features_sqrt])
+	for x in xrange(features_sqrt):
+		for y in xrange(features_sqrt):
+			c = spike_counts_reshaped[x, y]
+			if c > 0:
+				ax2.text(x, y, str(c), va='center', ha='center', weight='heavy', fontsize=16)
+			else:
+				ax2.text(x, y, '', va='center', ha='center')
+	
 	fig.canvas.draw()
-	return im
 
 
 def get_current_performance(performances, current_example_num):
@@ -326,49 +342,6 @@ def update_deltas_plot(line, deltas, current_example_num, fig):
 	return line, deltas
 
 
-def plot_all_deltas(fig_num, all_deltas, num_weight_updates):
-	'''
-	Set up the performance plot for the beginning of the simulation.
-	'''
-	time_steps = range(0, num_weight_updates)
-
-	fig = plt.figure(fig_num, figsize = (12, 4))
-	fig_num += 1
-
-	for idx in xrange(all_deltas.shape[1]):
-		plt.plot([], [])
-
-	lines = plt.gca().lines
-
-	plt.ylim(ymin=-1, ymax=1)
-	plt.xticks(xrange(0, num_weight_updates + weight_update_interval, 100), \
-			xrange(0, ((num_weight_updates + weight_update_interval) * weight_update_interval), 100))
-	plt.legend()
-	plt.grid(True)
-	plt.title('Differences per synapse weight per weight update interval')
-	
-	fig.canvas.draw()
-
-	return lines, fig_num, fig
-
-
-def update_all_deltas_plot(lines, all_deltas, current_example_num, fig):
-	'''
-	Update the plot of the performance based on results thus far.
-	'''
-	deltas = all_deltas[int(current_example_num / weight_update_interval)]
-	
-	for idx, line in enumerate(lines):
-		line.set_xdata(range(int(current_example_num / weight_update_interval) + 1))
-		ydata = list(line.get_ydata())
-		ydata.append(deltas[idx])
-		line.set_ydata(ydata)
-
-	fig.canvas.draw()
-
-	return lines, deltas
-
-
 def predict_label(assignments, spike_rates, accumulated_rates, spike_proportions):
 	'''
 	Given the label assignments of the excitatory layer and their spike rates over
@@ -391,6 +364,44 @@ def predict_label(assignments, spike_rates, accumulated_rates, spike_proportions
 				num_assignments[i] = len(np.where(assignments == i)[0])
 				if num_assignments[i] > 0:
 					summed_rates[i] = np.sum(np.nonzero(spike_rates[assignments == i])) / num_assignments[i]
+
+		elif scheme == 'activity_neighborhood':
+			for i in xrange(10):
+				num_assignments[i] = len(np.where(assignments == i)[0])
+				if num_assignments[i] > 0:
+					for idx in np.where(assignments == i)[0]:
+						neighbors = [idx]
+						neighbors.extend(get_neighbors(idx, features_sqrt))
+						summed_rates[i] += np.sum(spike_rates[neighbors]) / \
+							np.size(np.nonzero(spike_rates[neighbors].ravel()))
+
+		elif scheme == 'most_spiked_neighborhood':
+			neighborhood_activity = np.zeros([conv_features, n_e])
+			most_spiked_array = np.array(np.zeros((conv_features, n_e)), dtype=bool)
+
+			for i in xrange(10):
+				num_assignments[i] = len(np.where(assignments == i)[0])
+				if num_assignments[i] > 0:
+					for idx in np.where(assignments == i)[0]:
+						neighbors = [idx]
+						neighbors.extend(get_neighbors(idx, features_sqrt))
+						if np.size(np.nonzero(spike_rates[neighbors])) > 0:
+							neighborhood_activity[idx] = np.sum(spike_rates[neighbors]) / \
+											np.size(np.nonzero(spike_rates[neighbors].ravel()))
+
+			for n in xrange(n_e):
+				# find the excitatory neuron which spiked the most in this input location
+				most_spiked_array[np.argmax(neighborhood_activity[:, n : n + 1]), n] = True
+
+			# for each label
+			for i in xrange(10):
+				# get the number of label assignments of this type
+				num_assignments[i] = len(np.where(assignments[most_spiked_array] == i)[0])
+
+				if len(spike_rates[np.where(assignments[most_spiked_array] == i)]) > 0:
+					# sum the spike rates of all excitatory neurons with this label, which fired the most in its patch
+					summed_rates[i] = np.sum(spike_rates[np.where(np.logical_and(assignments == i,
+													 most_spiked_array))]) / float(np.sum(spike_rates[most_spiked_array]))
 
 		elif scheme == 'most_spiked_patch':
 			most_spiked_array = np.array(np.zeros((conv_features, n_e)), dtype=bool)
@@ -460,7 +471,7 @@ def assign_labels(result_monitor, input_numbers, accumulated_rates, accumulated_
 
 
 def build_network():
-	global fig_num
+	global fig_num, assignments
 
 	neuron_groups['e'] = b.NeuronGroup(n_e_total, neuron_eqs_e, threshold=v_thresh_e, refractory=refrac_e, reset=scr_e, compile=True, freeze=True)
 	neuron_groups['i'] = b.NeuronGroup(n_e_total, neuron_eqs_i, threshold=v_thresh_i, refractory=refrac_i, reset=v_reset_i, compile=True, freeze=True)
@@ -612,7 +623,7 @@ def build_network():
 
 			if test_mode:
 				if do_plot:
-					plot_2d_input_weights()
+					plot_weights_and_assignments(assignments)
 					fig_num += 1	
 
 		# if excitatory -> excitatory STDP is specified, add it here (input to excitatory populations)
@@ -634,15 +645,12 @@ def run_train():
 				accumulated_inputs, spike_proportions
 
 	if do_plot:
-		assignments_image = plot_assignments(assignments)
-		fig_num += 1
-
 		input_image_monitor, input_image = plot_input(rates)
 		fig_num += 1
 
-		if not test_mode:
-			input_weight_monitor, fig_weights = plot_2d_input_weights()
-			fig_num += 1
+		weights_assignments_figure, weights_axes, assignments_axes, weights_image, \
+						assignments_image = plot_weights_and_assignments(assignments)
+		fig_num += 1
 
 	# set up performance recording and plotting
 	num_evaluations = int(num_examples / update_interval) + 1
@@ -723,11 +731,9 @@ def run_train():
 
 		# update weights every 'weight_update_interval'
 		if j % weight_update_interval == 0 and do_plot:
-			update_2d_input_weights(input_weight_monitor, fig_weights)
+			update_weights_and_assignments(weights_assignments_figure, weights_axes, assignments_axes, \
+										weights_image, assignments_image, assignments, current_spike_count)
 		
-		if do_plot:
-			assignments_image = update_assignments_plot(assignments, assignments_image)
-
 		# if the neurons in the network didn't spike more than four times
 		if np.sum(current_spike_count) < 5 and num_retries < 3:
 			# increase the intensity of input
@@ -881,10 +887,6 @@ def run_test():
 	global fig_num, input_intensity, previous_spike_count, rates, assignments, clusters, cluster_assignments, \
 				simple_clusters, simple_cluster_assignments, index_matrix, accumulated_rates, \
 				accumulated_inputs, spike_proportions
-
-	if do_plot:
-		assignments_image = plot_assignments(assignments)
-		fig_num += 1
 
 	# set up performance recording and plotting
 	num_evaluations = int(num_examples / update_interval) + 1
@@ -1094,7 +1096,7 @@ if __name__ == '__main__':
 														remove lateral inhibition during the test phase.')
 	parser.add_argument('--test_max_inhibition', type=str, default='False', help='Whether or not to \
 														use ETH-style inhibition during the test phase.')
-	parser.add_argument('--start_inhib', type=float, default=0.01, help='The beginning value \
+	parser.add_argument('--start_inhib', type=float, default=0.1, help='The beginning value \
 														of inhibiton for the increasing scheme.')
 	parser.add_argument('--max_inhib', type=float, default=17.4, help='The maximum synapse \
 											weight for inhibitory to excitatory connections.')
@@ -1332,9 +1334,6 @@ if __name__ == '__main__':
 	# instantiating neuron "vote" monitor
 	result_monitor = np.zeros((update_interval, conv_features, n_e))
 
-	# build the spiking neural network
-	build_network()
-
 	# bookkeeping variables
 	previous_spike_count = np.zeros((conv_features, n_e))
 	input_numbers = np.zeros(num_examples)
@@ -1347,10 +1346,15 @@ if __name__ == '__main__':
 	else:
 		assignments = -1 * np.ones((conv_features, n_e))
 
+	# build the spiking neural network
+	build_network()
+
 	if test_mode:
-		voting_schemes = ['all', 'all_active', 'most_spiked_patch', 'most_spiked_location', 'confidence_weighting', 'distance']
+		voting_schemes = ['all', 'all_active', 'most_spiked_patch', 'most_spiked_location', 'confidence_weighting', \
+													'activity_neighborhood', 'most_spiked_neighborhood', 'distance']
 	else:
-		voting_schemes = ['all', 'all_active', 'most_spiked_patch', 'most_spiked_location', 'confidence_weighting']
+		voting_schemes = ['all', 'all_active', 'most_spiked_patch', 'most_spiked_location', \
+					'confidence_weighting', 'activity_neighborhood', 'most_spiked_neighborhood']
 
 	for scheme in voting_schemes:
 		output_numbers[scheme] = np.zeros((num_examples, 10))

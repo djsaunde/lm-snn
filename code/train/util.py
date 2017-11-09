@@ -175,6 +175,19 @@ def is_lattice_connection(sqrt, i, j, lattice_structure):
 		return True
 
 
+def get_neighbors(n, sqrt):
+	i, j = n // sqrt, n % sqrt
+	
+	neighbors = []
+	for (i_, j_) in [(i + 1, j), (i - 1, j), (i, j + 1), (i, j - 1), (i + 1, j + 1), \
+										(i + 1, j - 1), (i - 1, j + 1), (i - 1, j - 1)]:
+		if is_lattice_connection(sqrt, i * sqrt + j, i_ * sqrt + j_, '8') \
+					and i_ * sqrt + j_ >= 0 and i_ * sqrt + j_ < sqrt ** 2:
+			neighbors.append(i_ * sqrt + j_)
+
+	return neighbors
+
+
 def save_connections(weights_dir, connections, input_connections, ending, suffix):
 	'''
 	Save all synaptic connection parameters out to disk.
