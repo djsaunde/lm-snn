@@ -22,10 +22,10 @@ cd ../train/
 echo "csnn_decreasing_inhibition_job.sh"
 
 python csnn_decreasing_inhibition.py --mode=train --num_train=$num_train --conv_size=$conv_size --conv_stride=$conv_stride --noise_const=$noise_const \
-	--conv_features=$conv_features --random_seed=$random_seed --normalize_inputs=$normalize_inputs --proportion_shrink=$proportion_grow --start_inhib=$start_inhib \
+	--conv_features=$conv_features --random_seed=$random_seed --normalize_inputs=$normalize_inputs --proportion_shrink=$proportion_shrink --start_inhib=$start_inhib \
 	--min_inhib=$min_inhib
 
-python csnn_decreasing_inhibition.py --mode=test --num_test=10000 --conv_size=$conv_size --conv_stride=$conv_stride --proportion_shrink=$proportion_grow \
+python csnn_decreasing_inhibition.py --mode=test --num_test=10000 --conv_size=$conv_size --conv_stride=$conv_stride --proportion_shrink=$proportion_shrink \
 	--conv_features=$conv_features --num_train=$num_train --random_seed=$random_seed --normalize_inputs=$normalize_inputs --noise_const=$noise_const \
 	--start_inhib=$start_inhib --min_inhib=$min_inhib
 
