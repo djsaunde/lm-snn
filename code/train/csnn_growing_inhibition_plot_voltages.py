@@ -68,6 +68,17 @@ for d in [ performance_dir, activity_dir, weights_dir, deltas_dir, misc_dir, bes
 def plot_labels_and_spikes(assignments, spike_counts, ending, j, image, predictions, true):
 	plt.ioff()
 
+	# for (key, value) in neuron_groups['e'].__dict__.items():
+	# 	print key, ':', value
+
+	# print '\n'
+
+	# for (key, value) in neuron_groups['i'].__dict__.items():
+	# 	print key, ':', value
+
+	print neuron_groups['e'].I_synE
+	print neuron_groups['i'].I_synE
+
 	fig = plt.figure(16, figsize=(18, 12))
 	plt.gcf().clear()
 	
@@ -91,10 +102,10 @@ def plot_labels_and_spikes(assignments, spike_counts, ending, j, image, predicti
 	ax5.plot(inhibitory_conductance_monitors['Ae'].times, inhibitory_conductance_monitors['Ae'].values)
 	ax5.set_title('Excitatory neuron inhibitory synaptic conductance')
 	
-	ax6 = plt.subplot(236)
-	ax6.plot(inhibitory_conductance_monitors['Ai'].times, inhibitory_conductance_monitors['Ai'].values)
-	ax6.set_title('Inhibitory neuron inhibitory synaptic conductance')
-	
+	ax7 = plt.subplot(236)
+	ax7.plot(theta_monitors['Ae'].times, theta_monitors['Ae'].values)
+	ax7.set_title('Excitatory neuron adaptive thresholds')
+
 	fig.canvas.draw()
 	mng = plt.get_current_fig_manager()
 	mng.full_screen_toggle()
@@ -321,9 +332,10 @@ def build_network():
 
 	print '...Creating recurrent connections'
 
-	for name in population_names:
-		neuron_groups['e'].theta = np.load(os.path.join(best_weights_dir, '_'.join(['theta_A', ending +'_best.npy'])))
-		
+	neuron_groups['e'].theta = np.load(os.path.join(best_weights_dir, '_'.join(['theta_A', ending +'_best.npy'])))
+	theta_monitors['Ae'] = b.RecentStateMonitor(neuron_groups['e'], 'theta', duration=500 * b.ms)
+
+	for name in population_names:		
 		for conn_type in recurrent_conn_names:
 			if conn_type == 'ei':
 				# create connection name (composed of population and connection types)
@@ -439,6 +451,9 @@ def run_activity_plotting():
 	num_retries = 0
 	b.run(0)
 
+	print neuron_groups['e'].I_synE
+	print neuron_groups['e'].I_synI
+
 	# get network filter weights
 	filters = input_connections['XeAe'][:].todense()
 
@@ -477,6 +492,7 @@ def run_activity_plotting():
 					neuron_groups[neuron_group].v = v_reset_e
 					neuron_groups[neuron_group].ge = 0
 					neuron_groups[neuron_group].gi = 0
+					b.run(0)
 
 		# otherwise, record results and continue simulation
 		else:			
@@ -521,6 +537,8 @@ def run_activity_plotting():
 					neuron_groups[neuron_group].v = v_reset_e
 					neuron_groups[neuron_group].ge = 0
 					neuron_groups[neuron_group].gi = 0
+
+					b.run(0)
 
 			# bookkeeping
 			input_intensity = start_input_intensity
@@ -567,7 +585,7 @@ if __name__ == '__main__':
 														of inhibiton for the increasing scheme.')
 	parser.add_argument('--max_inhib', type=float, default=17.4, help='The maximum synapse \
 											weight for inhibitory to excitatory connections.')
-	parser.add_argument('--reset_state_vars', type=str, default='False', help='Whether to \
+	parser.add_argument('--reset_state_vars', type=str, default='True', help='Whether to \
 							reset neuron / synapse state variables or run a "reset" period.')
 	parser.add_argument('--inhib_update_interval', type=int, default=250, \
 							help='How often to increase the inhibition strength.')
@@ -762,7 +780,8 @@ if __name__ == '__main__':
 	neuron_groups, input_groups, connections, input_connections, stdp_methods, \
 					rate_monitors, spike_monitors, spike_counters, output_numbers, \
 					voltage_monitors, excitatory_conductance_monitors, \
-					inhibitory_conductance_monitors = {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}
+					inhibitory_conductance_monitors, theta_monitors = {}, {}, \
+										{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}
 
 	# creating convolution locations inside the input image
 	convolution_locations = {}

@@ -1134,6 +1134,7 @@ if __name__ == '__main__':
 												inputs are presented to the network.')
 	parser.add_argument('--test_rest', type=float, default=0.15, help='How long the network is allowed \
 												to settle back to equilibrium between test examples.')
+	parser.add_argument('--dt', type=float, default=0.25, help='Integration time step in milliseconds.')
 
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
@@ -1179,7 +1180,7 @@ if __name__ == '__main__':
 		raise Exception('Exception one of "linear" or "log" for argument "inhib_schedule".')
 
 	# set brian global preferences
-	b.set_global_preferences(defaultclock = b.Clock(dt=0.5*b.ms), useweave = True, gcc_options = ['-ffast-math -march=native'], usecodegen = True,
+	b.set_global_preferences(defaultclock = b.Clock(dt=dt*b.ms), useweave = True, gcc_options = ['-ffast-math -march=native'], usecodegen = True,
 		usecodegenweave = True, usecodegenstateupdate = True, usecodegenthreshold = False, usenewpropagate = True, usecstdp = True, openmp = False,
 		magic_useframes = False, useweave_linear_diffeq = True)
 

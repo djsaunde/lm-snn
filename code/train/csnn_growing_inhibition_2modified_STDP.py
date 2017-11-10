@@ -24,7 +24,6 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.spatial.distance import euclidean
 from sklearn.metrics import confusion_matrix
 from struct import unpack
-from copy import deepcopy
 from brian import *
 
 from util import *
@@ -37,7 +36,7 @@ b.log_level_error()
 # set these appropriate to your directory structure
 top_level_path = os.path.join('..', '..')
 MNIST_data_path = os.path.join(top_level_path, 'data')
-model_name = 'csnn_growing_inhibition_seizure_safe'
+model_name = 'csnn_growing_inhibition_modified_STDP'
 results_path = os.path.join(top_level_path, 'results', model_name)
 
 performance_dir = os.path.join(top_level_path, 'performance', model_name)
@@ -697,206 +696,188 @@ def run_train():
 		if do_plot:
 			input_image_monitor = update_input(rates, input_image_monitor, input_image)
 
-		np.save('temp_weights.npy', np.array(input_connections['XeAe'].W.alldata))
-
 		# run the network for a single example time
 		b.run(single_example_time)
+
+		# add Gaussian noise to weights after each iteration
+		if weights_noise:
+			input_connections['XeAe'].W.alldata[:] *= 1 + (np.random.randn(n_input * conv_features) * weights_noise_constant)
+
+		# get new neuron label assignments every 'update_interval'
+		if j % update_interval == 0 and j > 0:
+			assignments, accumulated_rates, spike_proportions = assign_labels(result_monitor, input_numbers[j - update_interval : j], accumulated_rates, accumulated_inputs)
 
 		# get count of spikes over the past iteration
 		current_spike_count = np.copy(spike_counters['Ae'].count[:]).reshape((conv_features, n_e)) - previous_spike_count
 		previous_spike_count = np.copy(spike_counters['Ae'].count[:]).reshape((conv_features, n_e))
 
-		if np.sum(current_spike_count) > conv_features * 25:
+		# make sure synapse weights don't grow too large
+		normalize_weights()
+
+		if not j % weight_update_interval == 0 and save_weights:
+			save_connections(weights_dir, connections, input_connections, ending, j)
+			save_theta(weights_dir, population_names, neuron_groups, ending, j)
+
+			np.save(os.path.join(assignments_dir, '_'.join(['assignments', ending, str(j)])), assignments)
+			np.save(os.path.join(misc_dir, '_'.join(['accumulated_rates', ending, str(j)])), accumulated_rates)
+			np.save(os.path.join(misc_dir, '_'.join(['spike_proportions', ending, str(j)])), spike_proportions)
+			
+		if j % weight_update_interval == 0:
+			deltas[j / weight_update_interval] = np.sum(np.abs((input_connections['XeAe'][:].todense() - last_weights)))
+			if plot_all_deltas:
+				all_deltas[j / weight_update_interval, :] = np.ravel(input_connections['XeAe'][:].todense() - last_weights)
+			last_weights = input_connections['XeAe'][:].todense()
+
+			# pickling performance recording and iteration number
+			p.dump((j, deltas), open(os.path.join(deltas_dir, ending + '.p'), 'wb'))
+
+		# update weights every 'weight_update_interval'
+		if j % weight_update_interval == 0 and do_plot:
+			update_weights_and_assignments(weights_assignments_figure, weights_axes, assignments_axes, \
+										weights_image, assignments_image, assignments, current_spike_count)
+		
+		# if the neurons in the network didn't spike more than four times
+		if np.sum(current_spike_count) < 5 and num_retries < 3:
+			# increase the intensity of input
+			input_intensity += 2
+			num_retries += 1
+			
+			# set all network firing rates to zero
 			for name in input_population_names:
 				input_groups[name + 'e'].rate = 0
 
-			input_connections['XeAe'].W.alldata = np.load('temp_weights.npy')
+			# let the network relax back to equilibrium
+			if not reset_state_vars:
+				b.run(resting_time)
+			else:
+				for neuron_group in neuron_groups:
+					neuron_groups[neuron_group].v = v_reset_e
+					neuron_groups[neuron_group].ge = 0
+					neuron_groups[neuron_group].gi = 0
 
-			for neuron_group in neuron_groups:
-				neuron_groups[neuron_group].v = v_reset_e
-				neuron_groups[neuron_group].ge = 0
-				neuron_groups[neuron_group].gi = 0
-				b.run(0)
+		# otherwise, record results and continue simulation
+		else:			
+			num_retries = 0
 
-			# update weights every 'weight_update_interval'
-			if j % weight_update_interval == 0 and do_plot:
-				update_weights_and_assignments(weights_assignments_figure, weights_axes, assignments_axes, \
-											weights_image, assignments_image, assignments, current_spike_count)
+			if j > 0 and j % inhib_update_interval == 0 and not current_inhib >= max_inhib:
+				if inhib_schedule == 'linear':
+					current_inhib = current_inhib + inhib_increase
+				elif inhib_schedule == 'log':
+					current_inhib = inhib_increase[j // inhib_update_interval]
 
-		else:
-			# get new neuron label assignments every 'update_interval'
-			if j % update_interval == 0 and j > 0:
-				assignments, accumulated_rates, spike_proportions = assign_labels(result_monitor, input_numbers[j - update_interval : j], accumulated_rates, accumulated_inputs)	
+				print '\nCurrent inhibition level:', min(max_inhib, current_inhib)
 
-			# make sure synapse weights don't grow too large
-			normalize_weights()
+				for feature in xrange(conv_features):
+					for other_feature in xrange(conv_features):
+						if feature != other_feature:
+							if n_e == 1:
+								x, y = feature // np.sqrt(n_e_total), feature % np.sqrt(n_e_total)
+								x_, y_ = other_feature // np.sqrt(n_e_total), other_feature % np.sqrt(n_e_total)
+							else:
+								x, y = feature // np.sqrt(conv_features), feature % np.sqrt(conv_features)
+								x_, y_ = other_feature // np.sqrt(conv_features), other_feature % np.sqrt(conv_features)
 
-			if not j % weight_update_interval == 0 and save_weights:
-				save_connections(weights_dir, connections, input_connections, ending, j)
-				save_theta(weights_dir, population_names, neuron_groups, ending, j)
+							for n in xrange(n_e):
+								connections['AiAe'][feature * n_e + n, other_feature * n_e + n] = \
+										min(max_inhib, current_inhib * np.sqrt(euclidean([x, y], [x_, y_])))
 
-				np.save(os.path.join(assignments_dir, '_'.join(['assignments', ending, str(j)])), assignments)
-				np.save(os.path.join(misc_dir, '_'.join(['accumulated_rates', ending, str(j)])), accumulated_rates)
-				np.save(os.path.join(misc_dir, '_'.join(['spike_proportions', ending, str(j)])), spike_proportions)
+			# record the current number of spikes
+			result_monitor[j % update_interval, :] = current_spike_count
+			
+			# get true label of last input example
+			input_numbers[j] = data['y'][j % data_size][0]
+
+			activity = result_monitor[j % update_interval, :] / np.sum(result_monitor[j % update_interval, :])
+
+			if do_plot and save_spikes:
+				fig = plt.figure(9, figsize = (8, 8))
+				plt.imshow(rates.reshape((28, 28)), interpolation='nearest', vmin=0, vmax=64, cmap='binary')
+				plt.title(str(data['y'][j % data_size][0]) + ' : ' + ', '.join( \
+					[str(int(output_numbers[scheme][j, 0])) for scheme in voting_schemes]))
+				fig = plt.figure(10, figsize = (7, 7))
+				plt.xticks(xrange(features_sqrt))
+				plt.yticks(xrange(features_sqrt))
+				plt.title('Activity heatmap (total spikes = ' + str(np.sum(result_monitor[j % update_interval, :])) + ')')
+				plt.imshow(activity.reshape((features_sqrt, features_sqrt)).T, interpolation='nearest', cmap='binary')
+				plt.grid(True)
 				
-			if j % weight_update_interval == 0:
-				deltas[j / weight_update_interval] = np.sum(np.abs((input_connections['XeAe'][:].todense() - last_weights)))
+				fig.canvas.draw()
+
+			if save_spikes:
+				np.save(os.path.join(spikes_dir, '_'.join([ending, 'spike_counts', str(j)])), current_spike_count)
+				np.save(os.path.join(spikes_dir, '_'.join([ending, 'rates', str(j)])), rates)
+
+			# get network filter weights
+			filters = input_connections['XeAe'][:].todense()
+			
+			# get the output classifications of the network
+			for scheme, outputs in predict_label(assignments, result_monitor[j % update_interval, :], \
+															accumulated_rates, spike_proportions).items():
+				if scheme != 'distance':
+					output_numbers[scheme][j, :] = outputs
+				elif scheme == 'distance':
+					current_input = (rates * (weight['ee_input'] / np.sum(rates))).ravel()
+					output_numbers[scheme][j, 0] = assignments[np.argmin([ euclidean(current_input, \
+													filters[:, i]) for i in xrange(conv_features) ])]
+
+			# print progress
+			if j % print_progress_interval == 0 and j > 0:
+				print 'runs done:', j, 'of', int(num_examples), '(time taken for past', print_progress_interval, 'runs:', str(timeit.default_timer() - start_time) + ')'
+				start_time = timeit.default_timer()
+
+			if j % weight_update_interval == 0 and do_plot:
+				update_deltas_plot(line, deltas, j, deltas_figure)
 				if plot_all_deltas:
-					all_deltas[j / weight_update_interval, :] = np.ravel(input_connections['XeAe'][:].todense() - last_weights)
-				last_weights = input_connections['XeAe'][:].todense()
+					update_all_deltas_plot(lines, all_deltas, j, all_deltas_figure)
+			
+			# plot performance if appropriate
+			if (j % update_interval == 0 or j == num_examples - 1) and j > 0:
+				if do_plot:
+					# updating the performance plot
+					perf_plot, performances, wrong_idxs, wrong_labels = update_performance_plot(performance_monitor, performances, j, fig_performance)
+				else:
+					performances, wrong_idxs, wrong_labels = get_current_performance(performances, j)
 
 				# pickling performance recording and iteration number
-				p.dump((j, deltas), open(os.path.join(deltas_dir, ending + '.p'), 'wb'))
+				p.dump((j, performances), open(os.path.join(performance_dir, ending + '.p'), 'wb'))
 
-			# update weights every 'weight_update_interval'
-			if j % weight_update_interval == 0 and do_plot:
-				update_weights_and_assignments(weights_assignments_figure, weights_axes, assignments_axes, \
-											weights_image, assignments_image, assignments, current_spike_count)
-			
-			# if the neurons in the network didn't spike more than four times
-			if np.sum(current_spike_count) < 5 and num_retries < 3:
-				# increase the intensity of input
-				input_intensity += 2
-				num_retries += 1
-				
-				# set all network firing rates to zero
-				for name in input_population_names:
-					input_groups[name + 'e'].rate = 0
-
-				# let the network relax back to equilibrium
-				if not reset_state_vars:
-					b.run(resting_time)
-				else:
-					for neuron_group in neuron_groups:
-						neuron_groups[neuron_group].v = v_reset_e
-						neuron_groups[neuron_group].ge = 0
-						neuron_groups[neuron_group].gi = 0
-						b.run(0)
-
-			# otherwise, record results and continue simulation
-			else:			
-				num_retries = 0
-
-				if j > 0 and j % inhib_update_interval == 0 and not current_inhib >= max_inhib:
-					if inhib_schedule == 'linear':
-						current_inhib = current_inhib + inhib_increase
-					elif inhib_schedule == 'log':
-						current_inhib = inhib_increase[j // inhib_update_interval]
-
-					print '\nCurrent inhibition level:', min(max_inhib, current_inhib)
-
-					for feature in xrange(conv_features):
-						for other_feature in xrange(conv_features):
-							if feature != other_feature:
-								if n_e == 1:
-									x, y = feature // np.sqrt(n_e_total), feature % np.sqrt(n_e_total)
-									x_, y_ = other_feature // np.sqrt(n_e_total), other_feature % np.sqrt(n_e_total)
-								else:
-									x, y = feature // np.sqrt(conv_features), feature % np.sqrt(conv_features)
-									x_, y_ = other_feature // np.sqrt(conv_features), other_feature % np.sqrt(conv_features)
-
-								for n in xrange(n_e):
-									connections['AiAe'][feature * n_e + n, other_feature * n_e + n] = \
-											min(max_inhib, current_inhib * np.sqrt(euclidean([x, y], [x_, y_])))
-
-				# record the current number of spikes
-				result_monitor[j % update_interval, :] = current_spike_count
-				
-				# get true label of last input example
-				input_numbers[j] = data['y'][j % data_size][0]
-
-				activity = result_monitor[j % update_interval, :] / np.sum(result_monitor[j % update_interval, :])
-
-				if do_plot and save_spikes:
-					fig = plt.figure(9, figsize = (8, 8))
-					plt.imshow(rates.reshape((28, 28)), interpolation='nearest', vmin=0, vmax=64, cmap='binary')
-					plt.title(str(data['y'][j % data_size][0]) + ' : ' + ', '.join( \
-						[str(int(output_numbers[scheme][j, 0])) for scheme in voting_schemes]))
-					fig = plt.figure(10, figsize = (7, 7))
-					plt.xticks(xrange(features_sqrt))
-					plt.yticks(xrange(features_sqrt))
-					plt.title('Activity heatmap (total spikes = ' + str(np.sum(result_monitor[j % update_interval, :])) + ')')
-					plt.imshow(activity.reshape((features_sqrt, features_sqrt)).T, interpolation='nearest', cmap='binary')
-					plt.grid(True)
-					
-					fig.canvas.draw()
-
-				if save_spikes:
-					np.save(os.path.join(spikes_dir, '_'.join([ending, 'spike_counts', str(j)])), current_spike_count)
-					np.save(os.path.join(spikes_dir, '_'.join([ending, 'rates', str(j)])), rates)
-
-				# get network filter weights
-				filters = input_connections['XeAe'][:].todense()
-				
-				# get the output classifications of the network
-				for scheme, outputs in predict_label(assignments, result_monitor[j % update_interval, :], \
-																accumulated_rates, spike_proportions).items():
-					if scheme != 'distance':
-						output_numbers[scheme][j, :] = outputs
-					elif scheme == 'distance':
-						current_input = (rates * (weight['ee_input'] / np.sum(rates))).ravel()
-						output_numbers[scheme][j, 0] = assignments[np.argmin([ euclidean(current_input, \
-														filters[:, i]) for i in xrange(conv_features) ])]
-
-				# print progress
-				if j % print_progress_interval == 0 and j > 0:
-					print 'runs done:', j, 'of', int(num_examples), '(time taken for past', print_progress_interval, 'runs:', str(timeit.default_timer() - start_time) + ')'
-					start_time = timeit.default_timer()
-
-				if j % weight_update_interval == 0 and do_plot:
-					update_deltas_plot(line, deltas, j, deltas_figure)
-					if plot_all_deltas:
-						update_all_deltas_plot(lines, all_deltas, j, all_deltas_figure)
-				
-				# plot performance if appropriate
-				if (j % update_interval == 0 or j == num_examples - 1) and j > 0:
-					if do_plot:
-						# updating the performance plot
-						perf_plot, performances, wrong_idxs, wrong_labels = update_performance_plot(performance_monitor, performances, j, fig_performance)
-					else:
-						performances, wrong_idxs, wrong_labels = get_current_performance(performances, j)
-
-					# pickling performance recording and iteration number
-					p.dump((j, performances), open(os.path.join(performance_dir, ending + '.p'), 'wb'))
-
-					# Save the best model's weights and theta parameters (if so specified)
-					if save_best_model:
-						for performance in performances:
-							if performances[performance][int(j / float(update_interval))] > best_performance:
-								print '\n', 'Best model thus far! Voting scheme:', performance, '\n'
-
-								best_performance = performances[performance][int(j / float(update_interval))]
-								save_connections(best_weights_dir, connections, input_connections, ending, 'best')
-								save_theta(best_weights_dir, population_names, neuron_groups, ending, 'best')
-
-								np.save(os.path.join(best_assignments_dir, '_'.join(['assignments', ending, 'best'])), assignments)
-								np.save(os.path.join(best_misc_dir, '_'.join(['accumulated_rates', ending, 'best'])), accumulated_rates)
-								np.save(os.path.join(best_misc_dir, '_'.join(['spike_proportions', ending, 'best'])), spike_proportions)
-
-					# Print out performance progress intermittently
+				# Save the best model's weights and theta parameters (if so specified)
+				if save_best_model:
 					for performance in performances:
-						print '\nClassification performance (' + performance + ')', performances[performance][1:int(j / float(update_interval)) + 1], \
-									'\nAverage performance:', sum(performances[performance][1:int(j / float(update_interval)) + 1]) / \
-										float(len(performances[performance][1:int(j / float(update_interval)) + 1])), \
-										'\nBest performance:', max(performances[performance][1:int(j / float(update_interval)) + 1]), '\n'
-							
-				# set input firing rates back to zero
-				for name in input_population_names:
-					input_groups[name + 'e'].rate = 0
-				
-				# run the network for 'resting_time' to relax back to rest potentials
-				if not reset_state_vars:
-					b.run(resting_time)
-				else:
-					for neuron_group in neuron_groups:
-						neuron_groups[neuron_group].v = v_reset_e
-						neuron_groups[neuron_group].ge = 0
-						neuron_groups[neuron_group].gi = 0
-						b.run(0)
+						if performances[performance][int(j / float(update_interval))] > best_performance:
+							print '\n', 'Best model thus far! Voting scheme:', performance, '\n'
 
-				# bookkeeping
-				input_intensity = start_input_intensity
-				j += 1
+							best_performance = performances[performance][int(j / float(update_interval))]
+							save_connections(best_weights_dir, connections, input_connections, ending, 'best')
+							save_theta(best_weights_dir, population_names, neuron_groups, ending, 'best')
+
+							np.save(os.path.join(best_assignments_dir, '_'.join(['assignments', ending, 'best'])), assignments)
+							np.save(os.path.join(best_misc_dir, '_'.join(['accumulated_rates', ending, 'best'])), accumulated_rates)
+							np.save(os.path.join(best_misc_dir, '_'.join(['spike_proportions', ending, 'best'])), spike_proportions)
+
+				# Print out performance progress intermittently
+				for performance in performances:
+					print '\nClassification performance (' + performance + ')', performances[performance][1:int(j / float(update_interval)) + 1], \
+								'\nAverage performance:', sum(performances[performance][1:int(j / float(update_interval)) + 1]) / \
+									float(len(performances[performance][1:int(j / float(update_interval)) + 1])), \
+									'\nBest performance:', max(performances[performance][1:int(j / float(update_interval)) + 1]), '\n'
+						
+			# set input firing rates back to zero
+			for name in input_population_names:
+				input_groups[name + 'e'].rate = 0
+			
+			# run the network for 'resting_time' to relax back to rest potentials
+			if not reset_state_vars:
+				b.run(resting_time)
+			else:
+				for neuron_group in neuron_groups:
+					neuron_groups[neuron_group].v = v_reset_e
+					neuron_groups[neuron_group].ge = 0
+					neuron_groups[neuron_group].gi = 0
+
+			# bookkeeping
+			input_intensity = start_input_intensity
+			j += 1
 
 	# ensure weights don't grow without bound
 	normalize_weights()
@@ -959,7 +940,6 @@ def run_test():
 					neuron_groups[neuron_group].v = v_reset_e
 					neuron_groups[neuron_group].ge = 0
 					neuron_groups[neuron_group].gi = 0
-					b.run(0)
 
 		# otherwise, record results and continue simulation
 		else:			
@@ -997,7 +977,6 @@ def run_test():
 					neuron_groups[neuron_group].v = v_reset_e
 					neuron_groups[neuron_group].ge = 0
 					neuron_groups[neuron_group].gi = 0
-					b.run(0)
 
 			# bookkeeping
 			input_intensity = start_input_intensity
@@ -1105,7 +1084,7 @@ if __name__ == '__main__':
 									(any integer) from which to generate random numbers.')
 	parser.add_argument('--save_weights', type=str, default='False', help='Whether or not to \
 									save the weights of the model every `weight_update_interval`.')
-	parser.add_argument('--weight_update_interval', type=int, default=1, help='How often \
+	parser.add_argument('--weight_update_interval', type=int, default=10, help='How often \
 												to update the plot of network filter weights.')
 	parser.add_argument('--save_best_model', type=str, default='True', help='Whether \
 										to save the current best version of the model.')
@@ -1123,7 +1102,7 @@ if __name__ == '__main__':
 														of inhibiton for the increasing scheme.')
 	parser.add_argument('--max_inhib', type=float, default=17.4, help='The maximum synapse \
 											weight for inhibitory to excitatory connections.')
-	parser.add_argument('--reset_state_vars', type=str, default='True', help='Whether to \
+	parser.add_argument('--reset_state_vars', type=str, default='False', help='Whether to \
 							reset neuron / synapse state variables or run a "reset" period.')
 	parser.add_argument('--inhib_update_interval', type=int, default=250, \
 							help='How often to increase the inhibition strength.')
@@ -1200,7 +1179,7 @@ if __name__ == '__main__':
 		raise Exception('Exception one of "linear" or "log" for argument "inhib_schedule".')
 
 	# set brian global preferences
-	b.set_global_preferences(defaultclock = b.Clock(dt=0.25*b.ms), useweave = True, gcc_options = ['-ffast-math -march=native'], usecodegen = True,
+	b.set_global_preferences(defaultclock = b.Clock(dt=0.5*b.ms), useweave = True, gcc_options = ['-ffast-math -march=native'], usecodegen = True,
 		usecodegenweave = True, usecodegenstateupdate = True, usecodegenthreshold = False, usenewpropagate = True, usecstdp = True, openmp = False,
 		magic_useframes = False, useweave_linear_diffeq = True)
 
@@ -1275,6 +1254,7 @@ if __name__ == '__main__':
 
 	# time constants, learning rates, max weights, weight dependence, etc.
 	tc_pre_ee, tc_post_ee = 20 * b.ms, 20 * b.ms
+	tc_countpre_ee, tc_countpost_ee = 20 * b.ms, 20 * b.ms
 	nu_ee_pre, nu_ee_post = 0.0001, 0.01
 	nu_AeAe_pre, nu_Ae_Ae_post = 0.1, 0.5
 	wmax_ee = 1.0
@@ -1320,6 +1300,8 @@ if __name__ == '__main__':
 	eqs_stdp_ee = '''
 				dpre/dt = -pre / tc_pre_ee : 1.0
 				dpost/dt = -post / tc_post_ee : 1.0
+				dcountpre/dt = -countpre / tc_countpre_ee : 1.0
+				dcountpost/dt = -countpost / tc_countpost_ee : 1.0
 				'''
 
 	eqs_stdp_AeAe = '''
@@ -1328,8 +1310,8 @@ if __name__ == '__main__':
 				'''
 
 	# STDP rule (post-pre, no weight dependence)
-	eqs_stdp_pre_ee = 'pre = 1.; w -= nu_ee_pre * post'
-	eqs_stdp_post_ee = 'w += nu_ee_post * pre; post = 1.'
+	eqs_stdp_pre_ee = 'pre = 1.; countpre += 1; w -= (nu_ee_pre * post) / (countpre + 1e-10)'
+	eqs_stdp_post_ee = 'post = 1.; countpost += 1; w += (nu_ee_post * pre) * / (countpost + 1e-10);'
 
 	eqs_stdp_pre_AeAe = 'pre += 1.; w -= nu_AeAe_pre * post'
 	eqs_stdp_post_AeAe = 'w += nu_AeAe_post * pre; post += 1.'
