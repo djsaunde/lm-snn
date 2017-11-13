@@ -36,7 +36,7 @@ b.log_level_error()
 # set these appropriate to your directory structure
 top_level_path = os.path.join('..', '..')
 MNIST_data_path = os.path.join(top_level_path, 'data')
-model_name = 'csnn_growing_inhibition_decreasing_learning_rate'
+model_name = 'csnn_growing_inhibition_sparse_input'
 results_path = os.path.join(top_level_path, 'results', model_name)
 
 performance_dir = os.path.join(top_level_path, 'performance', model_name)
@@ -615,13 +615,19 @@ def build_network():
 				for feature in xrange(conv_features):
 					for n in xrange(n_e):
 						for idx in xrange(conv_size ** 2):
-							input_connections[conn_name][convolution_locations[n][idx], feature * n_e + n] = \
-															weight_matrix[convolution_locations[n][idx], feature * n_e + n]
+							input_connections[conn_name][convolution_locations[n][idx], \
+														feature * n_e + n] = weight_matrix\
+														[convolution_locations[n][idx], feature * n_e + n]
 			else:
 				for feature in xrange(conv_features):
 					for n in xrange(n_e):
 						for idx in xrange(conv_size ** 2):
-							input_connections[conn_name][convolution_locations[n][idx], feature * n_e + n] = (b.random() + 0.01) * 0.3
+							if b.random() < input_sparsity:
+								input_connections[conn_name][convolution_locations[n][idx], \
+												feature * n_e + n] = (b.random() + 0.01) * 0.3
+							else:
+								input_connections[conn_name][convolution_locations[n][idx], \
+																	feature * n_e + n] = 0.0
 
 			if test_mode:
 				if do_plot:
@@ -705,16 +711,7 @@ def run_train():
 
 		# get new neuron label assignments every 'update_interval'
 		if j % update_interval == 0 and j > 0:
-			assignments, accumulated_rates, spike_proportions = assign_labels(result_monitor, \
-					input_numbers[j - update_interval : j], accumulated_rates, accumulated_inputs)
-
-			splitlines = stdp_methods['XeAe']._contained_objects[-1].propagate.codestr.splitlines()
-			splitlines[16] = 'w += ' + str(float(splitlines[16].split()[2].split('*')[0]) * lr_decrease) + '*pre;;'
-			stdp_methods['XeAe']._contained_objects[-1].propagate.codestr = '\n'.join(splitlines)
-
-			splitlines = stdp_methods['XeAe']._contained_objects[-2].propagate.codestr.splitlines()
-			splitlines[13] = 'w -= ' + str(float(splitlines[13].split()[2].split('*')[0]) * lr_decrease) + '*post;;'
-			stdp_methods['XeAe']._contained_objects[-2].propagate.codestr = '\n'.join(splitlines)
+			assignments, accumulated_rates, spike_proportions = assign_labels(result_monitor, input_numbers[j - update_interval : j], accumulated_rates, accumulated_inputs)
 
 		# get count of spikes over the past iteration
 		current_spike_count = np.copy(spike_counters['Ae'].count[:]).reshape((conv_features, n_e)) - previous_spike_count
@@ -1144,10 +1141,8 @@ if __name__ == '__main__':
 	parser.add_argument('--test_rest', type=float, default=0.15, help='How long the network is allowed \
 												to settle back to equilibrium between test examples.')
 	parser.add_argument('--dt', type=float, default=0.25, help='Integration time step in milliseconds.')
-	parser.add_argument('--lr_decrease', type=float, default=0.99, help='Multiplicative decrease constant \
-																for pre- and post-synaptic learning rates.')
-	parser.add_argument('--nu_ee_pre', type=float, default=0.0005, help='Pre-synaptic initial learning rate.')
-	parser.add_argument('--nu_ee_post', type=float, default=0.05, help='Post-synaptic initial learning rate.')
+	parser.add_argument('--input_sparsity', type=float, default=0.75, help='Sparsity of \
+														input to excitatory connectivity.')
 
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
@@ -1268,6 +1263,8 @@ if __name__ == '__main__':
 
 	# time constants, learning rates, max weights, weight dependence, etc.
 	tc_pre_ee, tc_post_ee = 20 * b.ms, 20 * b.ms
+	nu_ee_pre, nu_ee_post = 0.0001, 0.01
+	nu_AeAe_pre, nu_Ae_Ae_post = 0.1, 0.5
 	wmax_ee = 1.0
 	exp_ee_post = exp_ee_pre = 0.2
 	w_mu_pre, w_mu_post = 0.2, 0.2
@@ -1313,16 +1310,24 @@ if __name__ == '__main__':
 				dpost/dt = -post / tc_post_ee : 1.0
 				'''
 
+	eqs_stdp_AeAe = '''
+				dpre/dt = -pre / tc_pre_ee : 1.0
+				dpost/dt = -post / tc_post_ee : 1.0
+				'''
+
 	# STDP rule (post-pre, no weight dependence)
-	eqs_stdp_pre_ee = 'pre = 1.; w -= nu_ee_pre * post'
-	eqs_stdp_post_ee = 'w += nu_ee_post * pre; post = 1.'
+	eqs_stdp_pre_ee = 'pre = 1.; w -= w * nu_ee_pre * post'
+	eqs_stdp_post_ee = 'w += nu_ee_post * pre * (1 - w); post = 1.'
+
+	eqs_stdp_pre_AeAe = 'pre += 1.; w -= nu_AeAe_pre * post'
+	eqs_stdp_post_AeAe = 'w += nu_AeAe_post * pre; post += 1.'
 
 	print '\n'
 
 	# set ending of filename saves
 	ending = '_'.join([ str(conv_size), str(conv_stride), str(conv_features), str(n_e), \
 						str(num_train), str(random_seed), str(normalize_inputs), 
-						str(proportion_grow), str(noise_const), str(lr_decrease) ])
+						str(proportion_grow), str(noise_const), str(input_sparsity) ])
 
 	b.ion()
 	fig_num = 1
