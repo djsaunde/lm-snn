@@ -332,8 +332,8 @@ def evaluate_results():
 # SET PARAMETERS AND EQUATIONS #
 ################################
 
-b.set_global_preferences(
-                        defaultclock = b.Clock(dt=0.25*b.ms), # The default clock to use if none is provided or defined in any enclosing scope.
+b.set_global_preferences( 
+                        defaultclock = b.Clock(dt=0.5*b.ms), # The default clock to use if none is provided or defined in any enclosing scope.
                         useweave = True, # Defines whether or not functions should use inlined compiled C code where defined.
                         gcc_options = ['-ffast-math -march=native'],  # Defines the compiler switches passed to the gcc compiler. 
                         #For gcc versions 4.2+ we recommend using -march=native. By default, the -ffast-math optimizations are turned on 
@@ -343,10 +343,6 @@ b.set_global_preferences(
                         usecodegenthreshold = False,  # Whether or not to use experimental code generation support on thresholds.
                         usenewpropagate = True,  # Whether or not to use experimental new C propagation functions.
                         usecstdp = True,  # Whether or not to use experimental new C STDP.
-                        openmp = False, # whether or not to use OpenMP pragmas in generated C code.
-                        magic_useframes = False, # defines whether or not the magic functions should serach for objects defined only in the calling frame,
-                                                # or if they should find all objects defined in any frame. Set to "True" if not in an interactive shell.
-                        useweave_linear_diffeq = True, # Whether to use weave C++ acceleration for the solution of linear differential equations.
                        )
 
 parser = argparse.ArgumentParser()
@@ -441,7 +437,7 @@ runtime = num_examples * (single_example_time + resting_time)
 if test_mode:
     update_interval = num_examples
 else:
-    update_interval = 100
+    update_interval = 10000
 
 # set weight update interval (plotting)
 weight_update_interval = 10
@@ -450,10 +446,14 @@ weight_update_interval = 10
 print_progress_interval = 10
 
 # rest potential parameters, reset potential parameters, threshold potential parameters, and refractory periods
-v_rest_e, v_rest_i = -65. * b.mV, -60. * b.mV
-v_reset_e, v_reset_i = -65. * b.mV, -45. * b.mV
-v_thresh_e, v_thresh_i = -52. * b.mV, -40. * b.mV
-refrac_e, refrac_i = 5. * b.ms, 2. * b.ms
+v_rest_e = -65. * b.mV 
+v_rest_i = -60. * b.mV 
+v_reset_e = -65. * b.mV
+v_reset_i = -45. * b.mV
+v_thresh_e = -52. * b.mV
+v_thresh_i = -40. * b.mV
+refrac_e = 5. * b.ms
+refrac_i = 2. * b.ms
 
 # dictionaries for weights and delays
 weight, delay = {}, {}
@@ -469,13 +469,15 @@ input_conn_names = [ 'ee_input' ]
 recurrent_conn_names = [ 'ei', 'ie' ]
 
 # setting weight, delay, and intensity parameters
-weight['ee_input'] = (conv_size ** 2) * 0.099489796
+weight['ee_input'] = 78.
 delay['ee_input'] = (0 * b.ms, 10 * b.ms)
 delay['ei_input'] = (0 * b.ms, 5 * b.ms)
 input_intensity = start_input_intensity = 2.0
 
 # time constants, learning rates, max weights, weight dependence, etc.
-tc_pre_ee, tc_post_ee = 20 * b.ms, 20 * b.ms
+tc_pre_ee = 20*b.ms
+tc_post_1_ee = 20*b.ms
+tc_post_2_ee = 40*b.ms
 nu_ee_pre, nu_ee_post = 0.0001, 0.01
 nu_AeAe_pre, nu_Ae_Ae_post = 0.1, 0.5
 wmax_ee = 1.0
@@ -519,13 +521,13 @@ neuron_eqs_i = '''
 
 # STDP synaptic traces
 eqs_stdp_ee = '''
-            dpre/dt = -pre / tc_pre_ee : 1.0
-            dpost/dt = -post / tc_post_ee : 1.0
+                post2before                            : 1.0
+                dpre/dt   =   -pre/(tc_pre_ee)         : 1.0
+                dpost1/dt  = -post1/(tc_post_1_ee)     : 1.0
+                dpost2/dt  = -post2/(tc_post_2_ee)     : 1.0
             '''
-
-# STDP rule (post-pre, no weight dependence)
-eqs_stdp_pre_ee = 'pre = 1.; w -= nu_ee_pre * post'
-eqs_stdp_post_ee = 'w += nu_ee_post * pre; post = 1.'
+eqs_stdp_pre_ee = 'pre = 1.; w -= nu_ee_pre * post1'
+eqs_stdp_post_ee = 'post2before = post2; w += nu_ee_post * pre * post2before; post1 = 1.; post2 = 1.'
 
 b.ion()
 
@@ -642,20 +644,14 @@ for name in input_connection_names:
         # get weight matrix depending on training or test phase
         if test_mode:
             weight_matrix = np.load(os.path.join(weights_dir, '_'.join([conn_name, ending + '.npy'])))
+        else:
+            weight_matrix = (b.random([n_input, conv_features]) + 0.01) * 0.3
 
         # create connections from the windows of the input group to the neuron population
-        input_connections[conn_name] = b.Connection(input_groups['Xe'], neuron_groups[name[1] + conn_type[1]], structure='sparse', state='g' + conn_type[0], delay=True, max_delay=delay[conn_type][1])
-        
-        if test_mode:
-            for feature in xrange(conv_features):
-                for n in xrange(n_e):
-                    for idx in xrange(conv_size ** 2):
-                        input_connections[conn_name][convolution_locations[n][idx], feature * n_e + n] = weight_matrix[convolution_locations[n][idx], feature * n_e + n]
-        else:
-            for feature in xrange(conv_features):
-                for n in xrange(n_e):
-                    for idx in xrange(conv_size ** 2):
-                        input_connections[conn_name][convolution_locations[n][idx], feature * n_e + n] = (b.random() + 0.01) * 0.3
+        input_connections[conn_name] = b.Connection(input_groups['Xe'], neuron_groups[name[1] + conn_type[1]], \
+                        structure='sparse', state='g' + conn_type[0], delay=True, max_delay=delay[conn_type][1])
+        input_connections[conn_name].connect(input_groups[conn_name[0:2]], \
+            neuron_groups[conn_name[2:4]], weight_matrix, delay=delay[conn_type])        
 
     # if excitatory -> excitatory STDP is specified, add it here (input to excitatory populations)
         if not test_mode:
@@ -706,7 +702,6 @@ for name in input_population_names:
 
 # initialize network
 j = 0
-num_retries = 0
 b.run(0)
 
 # start recording time
@@ -750,11 +745,10 @@ while j < num_examples:
         update_2d_input_weights(input_weight_monitor, fig_weights)
     
     # if the neurons in the network didn't spike more than four times
-    if np.sum(current_spike_count) < 5 and num_retries < 3:
+    if np.sum(current_spike_count) < 5:
         # increase the intensity of input
-        input_intensity += 2
-        num_retries += 1
-        
+        input_intensity += 1
+
         # set all network firing rates to zero
         for name in input_population_names:
             input_groups[name + 'e'].rate = 0
@@ -763,7 +757,6 @@ while j < num_examples:
         b.run(resting_time)
     # otherwise, record results and confinue simulation
     else:
-        num_retries = 0
     	# record the current number of spikes
         result_monitor[j % update_interval, :] = current_spike_count
         
