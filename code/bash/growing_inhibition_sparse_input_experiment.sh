@@ -13,7 +13,7 @@ do
 			do
 				for input_sparsity in 0.1 0.25 0.5 0.75 0.9 1.0
 				do
-					sbatch csnn_growing_inhibition_job.sh 28 0 $conv_features $num_train $random_seed \
+					sbatch csnn_growing_inhibition_sparse_input_job.sh 28 0 $conv_features $num_train $random_seed \
 							$normalize_inputs $proportion_grow $noise_const $input_sparsity
 				done
 			done
