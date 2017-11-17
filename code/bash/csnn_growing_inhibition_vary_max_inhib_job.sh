@@ -19,11 +19,11 @@ cd ../train/
 echo "csnn_growing_inhibition_vary_max_inhib_job.sh"
 
 python csnn_growing_inhibition_vary_max_inhib.py --mode=train --num_train=$num_train --conv_size=$conv_size \
-												--conv_stride=$conv_stride --conv_features=$conv_features \
-												--random_seed=$random_seed  --proportion_grow=$proportion_grow
+						--conv_stride=$conv_stride --conv_features=$conv_features --random_seed=$random_seed \
+													--proportion_grow=$proportion_grow --max_inhib=$max_inhib
 
 python csnn_growing_inhibition_vary_max_inhib.py --mode=test --num_test=10000 --num_train=$num_train \
 					--conv_size=$conv_size --conv_stride=$conv_stride --conv_features=$conv_features \
-										--random_seed=$random_seed  --proportion_grow=$proportion_grow
+					--random_seed=$random_seed  --proportion_grow=$proportion_grow --max_inhib=$max_inhib
 
 exit
