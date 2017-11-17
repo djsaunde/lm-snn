@@ -169,13 +169,26 @@ def is_lattice_connection(sqrt, i, j, lattice_structure):
 		return i + 1 == j and j % sqrt != 0 or i - 1 == j and i % sqrt != 0 or i + sqrt == j or i - sqrt == j
 	if lattice_structure == '8':
 		return i + 1 == j and j % sqrt != 0 or i - 1 == j and i % sqrt != 0 or i + sqrt == j or i - sqrt == j \
-											or i + sqrt == j + 1 and j % sqrt != 0 or i + sqrt == j - 1 and i % sqrt != 0 \
-											or i - sqrt == j + 1 and i % sqrt != 0 or i - sqrt == j - 1 and j % sqrt != 0
+								or i + sqrt == j + 1 and j % sqrt != 0 or i + sqrt == j - 1 and i % sqrt != 0 \
+								or i - sqrt == j + 1 and i % sqrt != 0 or i - sqrt == j - 1 and j % sqrt != 0
 	if lattice_structure == 'all':
 		return True
 
 
-def get_neighbors(n, sqrt, lattice):
+def get_neighbors(n, sqrt):
+	i, j = n // sqrt, n % sqrt
+	
+	neighbors = []
+	for (i_, j_) in [(i + 1, j), (i - 1, j), (i, j + 1), (i, j - 1), (i + 1, j + 1), \
+										(i + 1, j - 1), (i - 1, j + 1), (i - 1, j - 1)]:
+		if is_lattice_connection(sqrt, i * sqrt + j, i_ * sqrt + j_, '8') \
+					and i_ * sqrt + j_ >= 0 and i_ * sqrt + j_ < sqrt ** 2:
+			neighbors.append(i_ * sqrt + j_)
+
+	return neighbors
+
+
+def get_mesh_neighbors(n, sqrt, lattice):
 	i, j = n // sqrt, n % sqrt
 	
 	neighbors = []

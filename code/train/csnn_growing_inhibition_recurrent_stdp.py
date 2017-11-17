@@ -594,7 +594,7 @@ def build_network():
 					neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
 
 				for feature in xrange(conv_features):
-					for other_feature in get_neighbors(feature, features_sqrt, mesh):
+					for other_feature in get_mesh_neighbors(feature, features_sqrt, mesh):
 						if feature != other_feature:
 							for n in xrange(n_e):
 								connections[conn_name][feature * n_e + n, \
@@ -1192,6 +1192,8 @@ if __name__ == '__main__':
 	parser.add_argument('--mesh', type=int, default=4, help='Specifies connectivity between excitatory neurons.')
 	parser.add_argument('--mesh_wmax', type=float, default=1.0, help='Maximal weight value on synapses \
 																		connecting excitatory neurons.')
+	parser.add_argument('--average_mesh_strength', type=float, default=0.25, help='Average proportion of \
+												"mesh_wmax" weight on each excitatory-excitatory synapse.')
 
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
@@ -1304,7 +1306,7 @@ if __name__ == '__main__':
 	
 	# setting weight, delay, and intensity parameters
 	weight['ee_input'] = (conv_size ** 2) * 0.099489796
-	weight['ee_recurr'] = mesh * (0.25 * mesh_wmax)
+	weight['ee_recurr'] = mesh * average_mesh_strength * mesh_wmax
 	delay['ee_input'] = (0 * b.ms, 10 * b.ms)
 	delay['ei_input'] = (0 * b.ms, 5 * b.ms)
 	input_intensity = start_input_intensity
@@ -1377,7 +1379,8 @@ if __name__ == '__main__':
 	# set ending of filename saves
 	ending = '_'.join([ str(conv_size), str(conv_stride), str(conv_features), str(n_e), \
 						str(num_train), str(random_seed), str(normalize_inputs), 
-						str(proportion_grow), str(noise_const), str(mesh), str(mesh_wmax) ])
+						str(proportion_grow), str(noise_const), \
+						str(mesh), str(mesh_wmax), str(average_mesh_strength) ])
 
 	b.ion()
 	fig_num = 1
