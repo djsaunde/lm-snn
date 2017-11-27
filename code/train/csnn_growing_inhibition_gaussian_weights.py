@@ -107,6 +107,23 @@ def update_assignments_plot(assignments, im):
 	return im
 
 
+def plot_recurrent_weights():
+	weight_matrix = connections['AeAe'][:].todense()
+	fig = plt.figure(fig_num)
+	im = plt.imshow(weight_matrix.reshape([conv_features, conv_features]), \
+				interpolation='nearest', vmin=0, vmax=mesh_wmax, cmap='hot_r')
+	plt.colorbar(im)
+	plt.title('Recurrent weights')
+	fig.canvas.draw()
+	return im, fig
+
+
+def update_recurrent_weights(im, fig):
+	weight_matrix = connections['AeAe'][:].todense()
+	im.set_array(weight_matrix.reshape([conv_features, conv_features]))
+	return im
+
+
 def get_2d_input_weights():
 	'''
 	Get the weights from the input to excitatory layer and reshape it to be two
@@ -563,6 +580,40 @@ def build_network():
 														mhat(np.sqrt(euclidean([x, y], [x_, y_])), \
 														sigma=1.0, scale=1.0, shift=0.0))
 
+			elif conn_type == 'ee':
+				# create connection name (composed of population and connection types)
+				conn_name = name + conn_type[0] + name + conn_type[1]
+
+				# get weight matrix depending on training or test phase
+				if test_mode:
+					if save_best_model:
+						weight_matrix = np.load(os.path.join(best_weights_dir, \
+									'_'.join([conn_name, ending + '_best.npy'])))
+					else:
+						weight_matrix = np.load(os.path.join(end_weights_dir, \
+									'_'.join([conn_name, ending + '_end.npy'])))
+
+				# create a connection from the first group in conn_name with the second group
+				connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], \
+					neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
+
+				for feature in xrange(conv_features):
+					for other_feature in get_mesh_neighbors(feature, features_sqrt, mesh):
+						if feature != other_feature:
+							for n in xrange(n_e):
+								connections[conn_name][feature * n_e + n, \
+									other_feature * n_e + n] = (b.random() + 0.01) * (0.3 * mesh_wmax)
+
+		# if excitatory -> excitatory STDP is specified, add it here (excitatory to excitatory populations)
+		if not test_mode and 'ee' in recurrent_conn_names:
+			print '...Creating STDP for connection', name
+			
+			# STDP connection name
+			conn_name = name + conn_type[0] + name + conn_type[1]
+			# create the STDP object
+			stdp_methods[conn_name] = b.STDP(connections[conn_name], eqs=eqs_stdp_ee, \
+					pre=eqs_stdp_pre_ee, post=eqs_stdp_post_ee, wmin=0., wmax=mesh_wmax)
+
 		print '...Creating monitors for:', name
 
 		# spike rate monitors for excitatory and inhibitory neuron populations
@@ -684,6 +735,10 @@ def run_train():
 						assignments_image = plot_weights_and_assignments(assignments)
 		fig_num += 1
 
+		rweights_image, rweights_figure = plot_recurrent_weights()
+
+		fig_num += 1
+
 	# set up performance recording and plotting
 	num_evaluations = int(num_examples / update_interval) + 1
 	performances = { voting_scheme : np.zeros(num_evaluations) for voting_scheme in voting_schemes }
@@ -725,6 +780,7 @@ def run_train():
 		# plot the input at this step
 		if do_plot:
 			input_image_monitor = update_input(rates, input_image_monitor, input_image)
+			rweights_image = update_recurrent_weights(rweights_image, rweights_figure)
 
 		# run the network for a single example time
 		b.run(single_example_time)
@@ -1171,6 +1227,11 @@ if __name__ == '__main__':
 																using the "multimodal" weights type.')
 	parser.add_argument('--gauss_variance', type=float, default=5.0, help='The variance of the Gaussian \
 															distributions used for weight initialization.')
+	parser.add_argument('--mesh', type=int, default=8, help='Specifies connectivity between excitatory neurons.')
+	parser.add_argument('--mesh_wmax', type=float, default=2.5, help='Maximal weight value on synapses \
+																		connecting excitatory neurons.')
+	parser.add_argument('--average_mesh_strength', type=float, default=0.25, help='Average proportion of \
+												"mesh_wmax" weight on each excitatory-excitatory synapse.')
 
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
@@ -1283,6 +1344,7 @@ if __name__ == '__main__':
 	
 	# setting weight, delay, and intensity parameters
 	weight['ee_input'] = (conv_size ** 2) * 0.099489796
+	weight['ee_recurr'] = mesh * average_mesh_strength * mesh_wmax
 	delay['ee_input'] = (0 * b.ms, 10 * b.ms)
 	delay['ei_input'] = (0 * b.ms, 5 * b.ms)
 	input_intensity = start_input_intensity
@@ -1353,7 +1415,8 @@ if __name__ == '__main__':
 	ending = '_'.join([ str(conv_size), str(conv_stride), str(conv_features), str(n_e), \
 						str(num_train), str(random_seed), str(normalize_inputs), 
 						str(proportion_grow), str(noise_const), str(weights_type), \
-						str(n_modes), str(gauss_variance) ])
+						str(n_modes), str(gauss_variance), str(mesh), \
+						str(mesh_wmax), str(average_mesh_strength) ])
 
 	b.ion()
 	fig_num = 1

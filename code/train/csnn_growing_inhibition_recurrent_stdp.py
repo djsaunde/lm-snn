@@ -749,7 +749,6 @@ def run_train():
 			input_image_monitor = update_input(rates, input_image_monitor, input_image)
 			rweights_image = update_recurrent_weights(rweights_image, rweights_figure)
 
-
 		# run the network for a single example time
 		b.run(single_example_time)
 
