@@ -1156,7 +1156,7 @@ if __name__ == '__main__':
 																input is (default) presented to the network.')
 	parser.add_argument('--test_adaptive_threshold', type=str, default='False', help='Whether or not to allow \
 															neuron thresholds to adapt during the test phase.')
-	parser.add_argument('--train_time', type=float, default=0.35, help='How long training \
+	parser.add_argument('--train_time', type=float, default=0.05, help='How long training \
 														inputs are presented to the network.')
 	parser.add_argument('--train_rest', type=float, default=0.15, help='How long the network is allowed \
 												to settle back to equilibrium between training examples.')
