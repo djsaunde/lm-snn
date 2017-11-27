@@ -109,8 +109,6 @@ def plot_2d_input_weights(title):
 	else:
 		fig = plt.figure(fig_num, figsize=(9, 9))
 
-	plt.title(title)
-
 	plt.tick_params(
 	    axis='x',          # changes apply to the x-axis
 	    which='both',      # both major and minor ticks are affected

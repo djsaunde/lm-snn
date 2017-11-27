@@ -23,8 +23,6 @@ def plot_labels(labels):
 	
 	im = ax.matshow(labels, cmap=cmap, vmin=-0.5, vmax=9.5)
 
-	plt.title('Neuron labels')
-
 	divider = make_axes_locatable(ax)
 	cax = divider.append_axes("right", size="5%", pad=0.1)
 	
