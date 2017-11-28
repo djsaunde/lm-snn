@@ -527,7 +527,8 @@ def build_network():
 				# create connection name (composed of population and connection types)
 				conn_name = name + conn_type[0] + name + conn_type[1]
 				# create a connection from the first group in conn_name with the second group
-				connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
+				connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups\
+									[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
 				
 				# instantiate the created connection
 				for feature in xrange(conv_features):
@@ -541,14 +542,17 @@ def build_network():
 				# get weight matrix depending on training or test phase
 				if test_mode:
 					if save_best_model and not test_max_inhibition:
-						weight_matrix = np.load(os.path.join(best_weights_dir, '_'.join([conn_name, ending + '_best.npy'])))
+						weight_matrix = np.load(os.path.join(best_weights_dir, \
+									'_'.join([conn_name, ending, 'best.npy'])))
 					elif test_max_inhibition:
 						weight_matrix = max_inhib * np.ones((n_e_total, n_e_total))
 					else:
-						weight_matrix = np.load(os.path.join(end_weights_dir, '_'.join([conn_name, ending + '_end.npy'])))
+						weight_matrix = np.load(os.path.join(end_weights_dir, \
+									'_'.join([conn_name, ending, 'end.npy'])))
 				
 				# create a connection from the first group in conn_name with the second group
-				connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
+				connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], neuron_groups\
+									[conn_name[2:4]], structure='sparse', state='g' + conn_type[0])
 				
 				# define the actual synaptic connections and strengths
 				for feature in xrange(conv_features):
@@ -559,7 +563,8 @@ def build_network():
 								x_, y_ = other_feature // np.sqrt(n_e_total), other_feature % np.sqrt(n_e_total)
 							else:
 								x, y = feature // np.sqrt(conv_features), feature % np.sqrt(conv_features)
-								x_, y_ = other_feature // np.sqrt(conv_features), other_feature % np.sqrt(conv_features)
+								x_, y_ = other_feature // np.sqrt(conv_features), \
+											other_feature % np.sqrt(conv_features)
 
 							for n in xrange(n_e):
 								if test_mode:
@@ -588,10 +593,10 @@ def build_network():
 				if test_mode:
 					if save_best_model:
 						weight_matrix = np.load(os.path.join(best_weights_dir, \
-									'_'.join([conn_name, ending + '_best.npy'])))
+									'_'.join([conn_name, ending, 'best.npy'])))
 					else:
 						weight_matrix = np.load(os.path.join(end_weights_dir, \
-									'_'.join([conn_name, ending + '_end.npy'])))
+									'_'.join([conn_name, ending, 'end.npy'])))
 
 				# create a connection from the first group in conn_name with the second group
 				connections[conn_name] = b.Connection(neuron_groups[conn_name[0:2]], \
@@ -617,8 +622,10 @@ def build_network():
 		print '...Creating monitors for:', name
 
 		# spike rate monitors for excitatory and inhibitory neuron populations
-		rate_monitors[name + 'e'] = b.PopulationRateMonitor(neuron_groups[name + 'e'], bin=(single_example_time + resting_time) / b.second)
-		rate_monitors[name + 'i'] = b.PopulationRateMonitor(neuron_groups[name + 'i'], bin=(single_example_time + resting_time) / b.second)
+		rate_monitors[name + 'e'] = b.PopulationRateMonitor(neuron_groups[name + 'e'], \
+									bin=(single_example_time + resting_time) / b.second)
+		rate_monitors[name + 'i'] = b.PopulationRateMonitor(neuron_groups[name + 'i'], \
+									bin=(single_example_time + resting_time) / b.second)
 		spike_counters[name + 'e'] = b.SpikeCounter(neuron_groups[name + 'e'])
 
 		# record neuron population spikes if specified
@@ -656,9 +663,11 @@ def build_network():
 			# get weight matrix depending on training or test phase
 			if test_mode:
 				if save_best_model:
-					weight_matrix = np.load(os.path.join(best_weights_dir, '_'.join([conn_name, ending + '_best.npy'])))
+					weight_matrix = np.load(os.path.join(best_weights_dir, \
+								'_'.join([conn_name, ending + '_best.npy'])))
 				else:
-					weight_matrix = np.load(os.path.join(end_weights_dir, '_'.join([conn_name, ending + '_end.npy'])))
+					weight_matrix = np.load(os.path.join(end_weights_dir, \
+								'_'.join([conn_name, ending + '_end.npy'])))
 
 			# create connections from the windows of the input group to the neuron population
 			input_connections[conn_name] = b.Connection(input_groups['Xe'], neuron_groups[name[1] + conn_type[1]], \
@@ -787,11 +796,13 @@ def run_train():
 
 		# add Gaussian noise to weights after each iteration
 		if weights_noise:
-			input_connections['XeAe'].W.alldata[:] *= 1 + (np.random.randn(n_input * conv_features) * weights_noise_constant)
+			input_connections['XeAe'].W.alldata[:] *= 1 + (np.random.randn(n_input \
+										* conv_features) * weights_noise_constant)
 
 		# get new neuron label assignments every 'update_interval'
 		if j % update_interval == 0 and j > 0:
-			assignments, accumulated_rates, spike_proportions = assign_labels(result_monitor, input_numbers[j - update_interval : j], accumulated_rates, accumulated_inputs)
+			assignments, accumulated_rates, spike_proportions = assign_labels(result_monitor, \
+					input_numbers[j - update_interval : j], accumulated_rates, accumulated_inputs)
 
 		# get count of spikes over the past iteration
 		current_spike_count = np.copy(spike_counters['Ae'].count[:]).reshape((conv_features, n_e)) - previous_spike_count
@@ -809,9 +820,11 @@ def run_train():
 			np.save(os.path.join(misc_dir, '_'.join(['spike_proportions', ending, str(j)])), spike_proportions)
 			
 		if j % weight_update_interval == 0:
-			deltas[j / weight_update_interval] = np.sum(np.abs((input_connections['XeAe'][:].todense() - last_weights)))
+			deltas[j / weight_update_interval] = np.sum(np.abs((input_connections\
+											['XeAe'][:].todense() - last_weights)))
 			if plot_all_deltas:
-				all_deltas[j / weight_update_interval, :] = np.ravel(input_connections['XeAe'][:].todense() - last_weights)
+				all_deltas[j / weight_update_interval, :] = np.ravel(input_connections\
+												['XeAe'][:].todense() - last_weights)
 			last_weights = input_connections['XeAe'][:].todense()
 
 			# pickling performance recording and iteration number
@@ -908,7 +921,9 @@ def run_train():
 
 			# print progress
 			if j % print_progress_interval == 0 and j > 0:
-				print 'runs done:', j, 'of', int(num_examples), '(time taken for past', print_progress_interval, 'runs:', str(timeit.default_timer() - start_time) + ')'
+				print 'runs done:', j, 'of', int(num_examples), '(time taken for past', \
+													print_progress_interval, 'runs:', \
+												str(timeit.default_timer() - start_time) + ')'
 				start_time = timeit.default_timer()
 
 			if j % weight_update_interval == 0 and do_plot:
@@ -920,7 +935,9 @@ def run_train():
 			if (j % update_interval == 0 or j == num_examples - 1) and j > 0:
 				if do_plot:
 					# updating the performance plot
-					perf_plot, performances, wrong_idxs, wrong_labels = update_performance_plot(performance_monitor, performances, j, fig_performance)
+					perf_plot, performances, wrong_idxs, wrong_labels = \
+							update_performance_plot(performance_monitor, \
+										performances, j, fig_performance)
 				else:
 					performances, wrong_idxs, wrong_labels = get_current_performance(performances, j)
 
@@ -937,9 +954,12 @@ def run_train():
 							save_connections(best_weights_dir, connections, input_connections, ending, 'best')
 							save_theta(best_weights_dir, population_names, neuron_groups, ending, 'best')
 
-							np.save(os.path.join(best_assignments_dir, '_'.join(['assignments', ending, 'best'])), assignments)
-							np.save(os.path.join(best_misc_dir, '_'.join(['accumulated_rates', ending, 'best'])), accumulated_rates)
-							np.save(os.path.join(best_misc_dir, '_'.join(['spike_proportions', ending, 'best'])), spike_proportions)
+							np.save(os.path.join(best_assignments_dir, '_'.join(['assignments', \
+																	ending, 'best'])), assignments)
+							np.save(os.path.join(best_misc_dir, '_'.join(['accumulated_rates', \
+															ending, 'best'])), accumulated_rates)
+							np.save(os.path.join(best_misc_dir, '_'.join(['spike_proportions', \
+															ending, 'best'])), spike_proportions)
 
 				# Print out performance progress intermittently
 				for performance in performances:
