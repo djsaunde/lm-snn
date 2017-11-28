@@ -2,7 +2,7 @@
 #
 #SBATCH --partition=longq
 #SBATCH --time=04-00:00:00
-#SBATCH --mem=50000
+#SBATCH --mem=60000
 #SBATCH --account=rkozma
 #SBATCH --output=/mnt/nfs/work1/rkozma/djsaunde/stdp-mnist/code/bash/snn_job_reports/%j.out
 

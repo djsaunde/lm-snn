@@ -6,11 +6,11 @@ do
 	do
 		for conv_features in 625
 		do
-			for proportion_low in 0.25 0.5 0.75
+			for proportion_low in 0.0
 			do
-				for start_inhib in 0.1 1.0 2.5
+				for start_inhib in 0.5
 				do
-					for max_inhib in 10.0 15.0 17.4 20.0
+					for max_inhib in 16.5 17.0 17.5 18.0 18.5 19.0 19.5 20.0 20.5 21.0 21.5
 					do
 						sbatch csnn_two_level_inhibition_job.sh 28 0 $conv_features $num_train \
 											$random_seed $proportion_low $start_inhib $max_inhib
