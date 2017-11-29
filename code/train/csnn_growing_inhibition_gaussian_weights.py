@@ -584,6 +584,8 @@ def build_network():
 														min(max_inhib, start_inhib * \
 														mhat(np.sqrt(euclidean([x, y], [x_, y_])), \
 														sigma=1.0, scale=1.0, shift=0.0))
+									elif inhib_scheme == 'zero':
+										pass
 
 			elif conn_type == 'ee':
 				# create connection name (composed of population and connection types)
@@ -858,7 +860,8 @@ def run_train():
 		else:			
 			num_retries = 0
 
-			if j > 0 and j % inhib_update_interval == 0 and not current_inhib >= max_inhib:
+			if j > 0 and j % inhib_update_interval == 0 and not current_inhib \
+									>= max_inhib and not inhib_scheme == 'zero':
 				if inhib_schedule == 'linear':
 					current_inhib = current_inhib + inhib_increase
 				elif inhib_schedule == 'log':
@@ -1436,7 +1439,7 @@ if __name__ == '__main__':
 						str(num_train), str(random_seed), str(normalize_inputs), 
 						str(proportion_grow), str(noise_const), str(weights_type), \
 						str(n_modes), str(gauss_variance), str(mesh), \
-						str(mesh_wmax), str(average_mesh_strength) ])
+						str(mesh_wmax), str(average_mesh_strength), str(inhib_scheme) ])
 
 	b.ion()
 	fig_num = 1
