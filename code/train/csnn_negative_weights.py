@@ -711,7 +711,7 @@ def run_train():
 		if weights_noise:
 			input_connections['XeAe'].W.alldata[:] *= 1 + (np.random.randn(n_input * conv_features) * weights_noise_constant)
 
-		if j > update_interval:
+		if j > burn_in:
 			input_connections['YeAe'].W = neg_multiplier * -(1 - input_connections['XeAe'].W)
 
 		# get new neuron label assignments every 'update_interval'
@@ -1087,7 +1087,7 @@ if __name__ == '__main__':
 												to update the plot of network filter weights.')
 	parser.add_argument('--save_best_model', type=str, default='True', help='Whether \
 										to save the current best version of the model.')
-	parser.add_argument('--update_interval', type=int, default=100, help='How often \
+	parser.add_argument('--update_interval', type=int, default=250, help='How often \
 										to update neuron labels and classify new inputs.')
 	parser.add_argument('--plot_all_deltas', type=str, default='False', help='Whether or not to \
 								plot weight changes for all neurons from input to excitatory layer.')
@@ -1136,6 +1136,8 @@ if __name__ == '__main__':
 	parser.add_argument('--dt', type=float, default=0.25, help='Integration time step in milliseconds.')
 	parser.add_argument('--neg_multiplier', type=float, default=0.5, help='Constant to multiple positive \
 												weights by after transforming them to negative weights.')
+	parser.add_argument('--burn_in', type=float, default=1000, help='The number of training examples to \
+																	use before applying negative weights.')
 
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
