@@ -4,6 +4,7 @@ Supporting functions for use in training scripts.
 
 import cPickle as p
 import numpy as np
+import brian as b
 import os, sys
 
 from struct import unpack
@@ -267,7 +268,11 @@ def save_connections(weights_dir, connections, input_connections, ending, suffix
 	# save out each connection's parameters to disk
 	for connection_name in connections.keys():		
 		# get parameters of this connection
-		connection_matrix = connections[connection_name][:].todense()
+		print type(connections[connection_name][:])
+		if type(connections[connection_name][:]) == b.DenseConnectionMatrix:
+			connection_matrix = connections[connection_name][:]
+		else:
+			connection_matrix = connections[connection_name][:].todense()
 		# save it out to disk
 		if suffix != None:
 			np.save(os.path.join(weights_dir, connection_name + '_' + ending + '_' + str(suffix)), connection_matrix)
