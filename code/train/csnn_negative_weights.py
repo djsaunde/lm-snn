@@ -177,7 +177,7 @@ def plot_weights_and_assignments(assignments):
 	ax1.set_title(ending.replace('_', ' '))
 
 	ax2 = plt.subplot(132)
-	image2 = ax2.imshow(-(1 - weights), interpolation='nearest', vmin=0, vmax=-wmax_ee, cmap=cmap.get_cmap('hot'))
+	image2 = ax2.imshow(neg_multiplier * (-(1 - weights)), interpolation='nearest', vmin=0, vmax=-(neg_multiplier * wmax_ee), cmap=cmap.get_cmap('hot'))
 	ax2.set_title('Transformed weights')
 
 	ax3 = plt.subplot(133)
@@ -712,7 +712,7 @@ def run_train():
 			input_connections['XeAe'].W.alldata[:] *= 1 + (np.random.randn(n_input * conv_features) * weights_noise_constant)
 
 		if j > burn_in:
-			input_connections['YeAe'].W = neg_multiplier * -(1 - input_connections['XeAe'].W)
+			input_connections['YeAe'].W = neg_multiplier * (-(1 - input_connections['XeAe'].W))
 
 		# get new neuron label assignments every 'update_interval'
 		if j % update_interval == 0 and j > 0:

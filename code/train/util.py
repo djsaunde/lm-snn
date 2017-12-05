@@ -268,7 +268,6 @@ def save_connections(weights_dir, connections, input_connections, ending, suffix
 	# save out each connection's parameters to disk
 	for connection_name in connections.keys():		
 		# get parameters of this connection
-		print type(connections[connection_name][:])
 		if type(connections[connection_name][:]) == b.DenseConnectionMatrix:
 			connection_matrix = connections[connection_name][:]
 		else:

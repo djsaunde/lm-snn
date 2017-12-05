@@ -333,7 +333,7 @@ def evaluate_results():
 ################################
 
 b.set_global_preferences( 
-                        defaultclock = b.Clock(dt=0.25*b.ms), # The default clock to use if none is provided or defined in any enclosing scope.
+                        defaultclock = b.Clock(dt=0.1*b.ms), # The default clock to use if none is provided or defined in any enclosing scope.
                         useweave = True, # Defines whether or not functions should use inlined compiled C code where defined.
                         gcc_options = ['-ffast-math -march=native'],  # Defines the compiler switches passed to the gcc compiler. 
                         #For gcc versions 4.2+ we recommend using -march=native. By default, the -ffast-math optimizations are turned on 
