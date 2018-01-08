@@ -352,7 +352,7 @@ parser.add_argument('--num_train', default=60000, type=int, help='Number of exam
 parser.add_argument('--num_test', default=10000, type=int, help='Number of examples to test on.')
 parser.add_argument('--plot', dest='plot', action='store_true')
 parser.add_argument('--conv_features', default=400, type=int, help='Number of neurons in excitatory, inhibitory population (in this case).')
-parser.set_defaults(feature=False)
+parser.set_defaults(plot=False)
 
 # parse arguments and place them in local scope
 args = parser.parse_args()
