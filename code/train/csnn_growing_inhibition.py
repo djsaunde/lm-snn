@@ -1051,12 +1051,13 @@ def evaluate_results():
 		print '\n-', scheme, 'accuracy:', accuracies[scheme]
 
 	results = pd.DataFrame([ [ ending ] + accuracies.values() ], columns=[ 'Model' ] + accuracies.keys())
-	if not 'results.csv' in os.listdir(results_path):
-		results.to_csv(os.path.join(results_path, 'results.csv'), index=False)
+	filename = '_'.join([str(conv_features), 'results.csv'])
+	if not filename in os.listdir(results_path):
+		results.to_csv(os.path.join(results_path, filename), index=False)
 	else:
-		all_results = pd.read_csv(os.path.join(results_path, 'results.csv'))
+		all_results = pd.read_csv(os.path.join(results_path, filename))
 		all_results = pd.concat([all_results, results], ignore_index=True)
-		all_results.to_csv(os.path.join(results_path, 'results.csv'), index=False)
+		all_results.to_csv(os.path.join(results_path, filename), index=False)
 
 	print '\n'
 
