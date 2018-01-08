@@ -705,7 +705,12 @@ def run_train():
 
 		# get new neuron label assignments every 'update_interval'
 		if j % update_interval == 0 and j > 0:
-			assignments, accumulated_rates, spike_proportions = assign_labels(result_monitor, input_numbers[j - update_interval : j], accumulated_rates, accumulated_inputs)
+			if j % data_size == 0:
+				assignments, accumulated_rates, spike_proportions = assign_labels(result_monitor, 
+					input_numbers[data_size - update_interval : data_size], accumulated_rates, accumulated_inputs)
+			else:
+				assignments, accumulated_rates, spike_proportions = assign_labels(result_monitor, 
+					input_numbers[(j % data_size) - update_interval : j % data_size], accumulated_rates, accumulated_inputs)
 
 		# get count of spikes over the past iteration
 		current_spike_count = np.copy(spike_counters['Ae'].count[:]).reshape((conv_features, n_e)) - previous_spike_count
