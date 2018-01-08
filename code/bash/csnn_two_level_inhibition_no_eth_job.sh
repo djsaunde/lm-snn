@@ -20,12 +20,12 @@ cd ../train/
 
 echo "csnn_two_level_inhibition_no_eth_job.sh"
 
-python csnn_two_level_inhibition.py --mode=train --num_train=$num_train --conv_size=$conv_size \
+python csnn_two_level_inhibition_no_eth.py --mode=train --num_train=$num_train --conv_size=$conv_size \
 			--conv_stride=$conv_stride --conv_features=$conv_features --random_seed=$random_seed \
 					--proportion_low=$proportion_low --start_low_inhib=$start_low_inhib \
 							--end_low_inhib=$end_low_inhib --max_inhib=$max_inhib
 
-python csnn_two_level_inhibition.py --mode=test --num_test=10000 --conv_size=$conv_size \
+python csnn_two_level_inhibition_no_eth.py --mode=test --num_test=10000 --conv_size=$conv_size \
 	--conv_stride=$conv_stride --proportion_low=$proportion_low --conv_features=$conv_features \
 	--num_train=$num_train --random_seed=$random_seed --start_low_inhib=$start_low_inhib \
 				--end_low_inhib=$end_low_inhib --max_inhib=$max_inhib
