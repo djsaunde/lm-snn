@@ -318,13 +318,14 @@ def evaluate_results():
 
     print 'Sum response - accuracy: ', accuracy, ' num incorrect: ', len(incorrect)
 
-    results = pd.DataFrame([[ ending, accuracy ]], columns=[ 'Model' ] + ['all'])
-    if not 'results.csv' in os.listdir(results_path):
-        results.to_csv(os.path.join(results_path, 'results.csv'), index=False)
+    results = pd.DataFrame([[ending] + accuracies.values()], columns=['Model'] + accuracies.keys())
+    filename = '_'.join([str(conv_features), 'results.csv'])
+    if not filename in os.listdir(results_path):
+        results.to_csv(os.path.join(results_path, filename), index=False)
     else:
-        all_results = pd.read_csv(os.path.join(results_path, 'results.csv'))
+        all_results = pd.read_csv(os.path.join(results_path, filename))
         all_results = pd.concat([all_results, results], ignore_index=True)
-        all_results.to_csv(os.path.join(results_path, 'results.csv'), index=False)
+        all_results.to_csv(os.path.join(results_path, filename), index=False)
 
     print '\n'
 
