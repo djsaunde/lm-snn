@@ -43,6 +43,7 @@ conv_size = int(file_name.split('_')[1])
 conv_stride = int(file_name.split('_')[2])
 conv_features = int(file_name.split('_')[3])
 lattice_structure = file_name[-7:-6]
+
 if 'no_weight_sharing' in file_name:
     weight_sharing = 'no_weight_sharing'
 else:

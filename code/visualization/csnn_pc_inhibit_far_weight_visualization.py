@@ -5,6 +5,7 @@ import cPickle as p
 import brian_no_units
 import brian as b
 import argparse
+import os
 
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.sparse import coo_matrix
@@ -24,6 +25,9 @@ top_level_path = os.path.join('..', '..')
 model_name = 'csnn_pc_inhibit_far'
 weight_dir = os.path.join(top_level_path, 'weights', model_name, directory)
 plots_dir = os.path.join(top_level_path, 'plots', model_name)
+
+if not os.path.isdir(plots_dir):
+	os.makedirs(plots_dir)
 
 
 def normalize_weights():
@@ -105,8 +109,6 @@ def plot_2d_input_weights(title):
 	else:
 		fig = plt.figure(fig_num, figsize=(9, 9))
 
-	plt.title(title)
-
 	plt.tick_params(
 	    axis='x',          # changes apply to the x-axis
 	    which='both',      # both major and minor ticks are affected
@@ -123,7 +125,7 @@ def plot_2d_input_weights(title):
 
 	ax = plt.gca()
 
-	im = ax.imshow(weights, interpolation='nearest', vmin=0, vmax=wmax_ee, cmap=cmap.get_cmap('binary'))
+	im = ax.imshow(weights, interpolation='nearest', vmin=0, vmax=wmax_ee, cmap=cmap.get_cmap('hot_r'))
 	
 	divider = make_axes_locatable(ax)
 	cax = divider.append_axes("right", size="5%", pad=0.1)
@@ -165,7 +167,6 @@ n_input_sqrt = int(math.sqrt(n_input))
 conv_size = int(file_name.split('_')[2])
 conv_stride = int(file_name.split('_')[3])
 conv_features = int(file_name.split('_')[4])
-lattice_structure = file_name[-9:-8]
 
 # number of excitatory neurons (number output from convolutional layer)
 if conv_size == 28 and conv_stride == 0:

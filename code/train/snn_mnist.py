@@ -437,7 +437,7 @@ runtime = num_examples * (single_example_time + resting_time)
 if test_mode:
     update_interval = num_examples
 else:
-    update_interval = 10000
+    update_interval = 250
 
 # set weight update interval (plotting)
 weight_update_interval = 10
@@ -733,9 +733,12 @@ while j < num_examples:
     b.run(single_example_time)
     
     # get new neuron label assignments every 'update_interval'
-    if j % update_interval == 0 and j > 0:
-        assignments = get_new_assignments(result_monitor[:], input_numbers[j - update_interval : j])
-    
+        if j % update_interval == 0 and j > 0:
+            if j % data_size == 0:
+                assignments = get_new_assignments(result_monitor[:], input_numbers[j - update_interval : j])
+            else:
+                assignments = get_new_assignments(result_monitor[:], input_numbers[(j % data_size) - update_interval : j % data_size])
+
     # get count of spikes over the past iteration
     current_spike_count = np.copy(spike_counters['Ae'].count[:]).reshape((conv_features, n_e)) - previous_spike_count
     previous_spike_count = np.copy(spike_counters['Ae'].count[:]).reshape((conv_features, n_e))
@@ -776,18 +779,17 @@ while j < num_examples:
         
         # plot performance if appropriate
         if j % update_interval == 0 and j > 0:
+            # pickling performance recording and iteration number
+            p.dump((j, performance), open(os.path.join(performance_dir, ending + '.p'), 'wb'))
+
             if plot:
                 # updating the performance plot
                 perf_plot, performance = update_performance_plot(performance_monitor, performance, j, fig_performance)
             else:
                 performance = get_current_performance(performance, j)
+            
             # printing out classification performance results so far
             print '\nClassification performance', performance[:int(j / float(update_interval)) + 1], '\n'
-            target = open(os.path.join(performance_dir, '_'.join(['XeAe', ending + '.txt'])), 'w')
-            target.truncate()
-            target.write('Iteration ' + str(j) + '\n')
-            target.write(str(performance[:int(j / float(update_interval)) + 1]))
-            target.close()
                 
         # set input firing rates back to zero
         for name in input_population_names:

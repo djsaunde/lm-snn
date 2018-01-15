@@ -1,127 +1,107 @@
+import os
+import sys
+import math
 import numpy as np
-from pylab import *
-import matplotlib.cm as cm
+import cPickle as p
+import matplotlib.cm as cmap
+import matplotlib.pyplot as plt
 
-chosenCmap = cm.get_cmap('hot_r')
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-top_level_path = '../../'
-weight_path = top_level_path + 'weights/snn/'
+top_level_path = os.path.join('..', '..')
+model_name = 'snn'
+weights_dir = os.path.join(top_level_path, 'weights', model_name)
+plots_dir = os.path.join(top_level_path, 'plots', model_name)
 
+if not os.path.isdir(plots_dir):
+    os.makedirs(plots_dir)
 
-# number of excitatory neurons
-n_e_input = raw_input('Enter number of excitatory / inhibitory neurons (default 100): ')
-if n_e_input == '':
-    n_e = 100
-else:
-    n_e = int(n_e_input)
+fig_num = 1
 
-# number of inhibitory neurons
-n_i = n_e
+def get_2d_weights(weights):
+    '''
+    Get the weights from the input to excitatory layer and reshape it to be two
+    dimensional and square.
+    '''
+    # specify the desired shape of the reshaped input -> excitatory weights
+    rearranged_weights = np.zeros((conv_features * conv_size, conv_size * n_e))
 
-# set ending of filename saves
-ending = str(n_e)
+    for n in xrange(n_e):
+        for feature in xrange(conv_features):
+            temp = weights[:, feature * n_e + (n // n_e_sqrt) * n_e_sqrt + (n % n_e_sqrt)]
+            rearranged_weights[ feature * conv_size : (feature + 1) * conv_size, n * conv_size : (n + 1) * conv_size ] = \
+                                                            temp[convolution_locations[n]].reshape((conv_size, conv_size))
 
-# determine STDP rule to use
-stdp_input = ''
+    if n_e == 1:
+        ceil_sqrt = int(math.ceil(math.sqrt(conv_features)))
+        square_weights = np.zeros((28 * ceil_sqrt, 28 * ceil_sqrt))
 
-if raw_input('Use weight dependence (default no)?: ') in [ 'no', '' ]:
-    use_weight_dependence = False
-    stdp_input += 'no_weight_dependence_'
-else:
-    use_weight_dependence = True
-    stdp_input += 'weight_dependence_'
+        for n in xrange(conv_features):
+            square_weights[(n // ceil_sqrt) * 28 : ((n // ceil_sqrt) + 1) * 28, 
+                            (n % ceil_sqrt) * 28 : ((n % ceil_sqrt) + 1) * 28] = rearranged_weights[n * 28 : (n + 1) * 28, :]
 
-if raw_input('Enter (yes / no) for post-pre (default yes): ') in [ 'yes', '' ]:
-    post_pre = True
-    stdp_input += 'postpre'
-else:
-    post_pre = False
-    stdp_input += 'no_postpre'
-
-readout_name = 'XeAe' + str(n_e) + '_' + stdp_input
-
-def computePopVector(popArray):
-    size = len(popArray)
-    complex_unit_roots = np.array([np.exp(1j*(2*np.pi/size)*cur_pos) for cur_pos in xrange(size)])
-    cur_pos = (np.angle(np.sum(popArray * complex_unit_roots)) % (2*np.pi)) / (2*np.pi)
-    return cur_pos
-
-def get_2d_input_weights():
-    weight_matrix = XA_values
-    n_e_sqrt = int(np.sqrt(n_e))
-    n_in_sqrt = int(np.sqrt(n_input))
-    num_values_col = n_e_sqrt*n_in_sqrt
-    num_values_row = num_values_col
-    rearranged_weights = np.zeros((num_values_col, num_values_row))
-        
-    for i in xrange(n_e_sqrt):
-        for j in xrange(n_e_sqrt):
-                rearranged_weights[i*n_in_sqrt : (i+1)*n_in_sqrt, j*n_in_sqrt : (j+1)*n_in_sqrt] = \
-                    weight_matrix[:, i + j*n_e_sqrt].reshape((n_in_sqrt, n_in_sqrt))
-    return rearranged_weights
-
-def plot_2d_input_weights():
-    name = 'XeAe'
-    weights = get_2d_input_weights()
-    fig = figure(figsize = (18, 18))
-    im2 = imshow(weights, interpolation = "nearest", vmin = 0, cmap = chosenCmap) #my_cmap
-    colorbar(im2)
-    title('weights of connection' + name)
-    fig.canvas.draw()
-    return im2, fig
-
-
-bright_grey = '#f4f4f4'
-red   = '#ff0000'
-green   = '#00ff00'
-black   = '#000000'
-my_cmap = matplotlib.colors.LinearSegmentedColormap.from_list('own2',[bright_grey,black])
-
-n_input = 784
-
-
-readout = np.load(weight_path + readout_name + '.npy')
-value_arr = np.nan * np.ones((n_input, n_e))
-connection_parameters = readout
-
-for conn in connection_parameters: 
-    src, tgt, value = conn
-    if np.isnan(value_arr[src, tgt]):
-        value_arr[src, tgt] = value
+        return square_weights.T
     else:
-        value_arr[src, tgt] += value
+        square_weights = np.zeros((conv_size * features_sqrt * n_e_sqrt, conv_size * features_sqrt * n_e_sqrt))
 
-for i in xrange(n_e):
-    print values[i,i]
-    
-fi = figure()
-im = imshow(values, interpolation="nearest", cmap = chosenCmap, aspect='auto')  # copper_r   autumn_r  Greys  my_cmap  gist_rainbow
-cbar = colorbar(im)
+        for n_1 in xrange(n_e_sqrt):
+            for n_2 in xrange(n_e_sqrt):
+                for f_1 in xrange(features_sqrt):
+                    for f_2 in xrange(features_sqrt):
+                        square_weights[conv_size * (n_2 * features_sqrt + f_2) : conv_size * (n_2 * features_sqrt + f_2 + 1), \
+                                conv_size * (n_1 * features_sqrt + f_1) : conv_size * (n_1 * features_sqrt + f_1 + 1)] = \
+                                rearranged_weights[(f_1 * features_sqrt + f_2) * conv_size : (f_1 * features_sqrt + f_2 + 1) * conv_size, \
+                                        (n_1 * n_e_sqrt + n_2) * conv_size : (n_1 * n_e_sqrt + n_2 + 1) * conv_size]
 
-xlabel('Target excitatory neuron number')
-ylabel('Source excitatory neuron number')
+        return square_weights.T
 
-title(name)
-savefig(str(fi.number))
 
-XA_values = np.copy(values)
-    
-im, fi = plot_2d_input_weights()
-savefig(str(fi.number))
+def plot_2d_weights(weights):
+    '''
+    Plot the weights from input to excitatory layer to view during training.
+    '''
+    weights = get_2d_weights(weights)
+    fig = plt.figure(fig_num, figsize=(18, 18))
+    im = plt.imshow(weights, interpolation='nearest', vmin=0, vmax=1, cmap=cmap.get_cmap('hot_r'))
+    plt.colorbar(im)
+    plt.title('Reshaped weights from input -> excitatory layer')
+    fig.canvas.draw()
+    plt.savefig(os.path.join(plots_dir, 'weights' + '_'.join(file_name.split('_')[1:])[:-4] + '.png'))
+    plt.show()
 
-XA_sum = np.nansum(XA_values[0:n_input,0:n_e], axis = 0)/n_e
-AA_sum = np.nansum(AA_values[0:n_e,0:n_e], axis = 0)/n_e
 
-fi = figure()
-plot(XA_sum, AA_sum, 'w.')
-for label, x, y in zip(range(200), XA_sum, AA_sum):
-    plt.annotate(label, 
-                xy = (x, y), xytext = (-0, 0),
-                textcoords = 'offset points', ha = 'right', va = 'bottom',
-                color = 'k')
+print '\n'
+print '\n'.join([ str(idx) + ' | ' + file_name for idx, file_name in \
+    enumerate([ file_name for file_name in sorted(os.listdir(weights_dir))]) ])
+print '\n'
 
-xlabel('summed input from X to A for A neurons')
-ylabel('summed input from A to A for A neurons')
-savefig(str(fi.number))
+to_plot = raw_input('Enter the index of the file from above which you\'d like to visualize: ')
+if to_plot == '':
+    file_name = [ file_name for file_name in sorted(os.listdir(weights_dir))][0]
+else:
+    file_name = [ file_name for file_name in sorted(os.listdir(weights_dir))][int(to_plot)]
 
-show()
+conv_size = int(file_name.split('_')[1])
+conv_stride = int(file_name.split('_')[2])
+conv_features = int(file_name.split('_')[3])
+
+n_input_sqrt = 28
+
+if conv_size == 28 and conv_stride == 0:
+    n_e = n_e_sqrt = 1
+    n_e_total = conv_features
+else:
+    n_e = ((n_input_sqrt - conv_size) / conv_stride + 1) ** 2
+    n_e_total = n_e * conv_features
+    n_e_sqrt = int(math.sqrt(n_e))
+
+# creating convolution locations inside the input image
+convolution_locations = {}
+for n in xrange(n_e):
+    convolution_locations[n] = [ ((n % n_e_sqrt) * conv_stride + (n // n_e_sqrt) * n_input_sqrt * conv_stride) + (x * n_input_sqrt) + y for y in xrange(conv_size) for x in xrange(conv_size) ]
+
+
+weights = np.load(os.path.join(weights_dir, file_name))
+print weights
+
+plot_2d_weights(weights)
