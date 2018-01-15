@@ -734,11 +734,11 @@ while j < num_examples:
     b.run(single_example_time)
     
     # get new neuron label assignments every 'update_interval'
-        if j % update_interval == 0 and j > 0:
-            if j % data_size == 0:
-                assignments = get_new_assignments(result_monitor[:], input_numbers[j - update_interval : j])
-            else:
-                assignments = get_new_assignments(result_monitor[:], input_numbers[(j % data_size) - update_interval : j % data_size])
+    if j % update_interval == 0 and j > 0:
+        if j % data_size == 0:
+            assignments = get_new_assignments(result_monitor[:], input_numbers[j - update_interval : j])
+        else:
+            assignments = get_new_assignments(result_monitor[:], input_numbers[(j % data_size) - update_interval : j % data_size])
 
     # get count of spikes over the past iteration
     current_spike_count = np.copy(spike_counters['Ae'].count[:]).reshape((conv_features, n_e)) - previous_spike_count
