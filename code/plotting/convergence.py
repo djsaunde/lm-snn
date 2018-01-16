@@ -18,7 +18,7 @@ parser.add_argument('--random_seed', type=str, default='0')
 parser.add_argument('--start_inhib', type=str, default='1.0')
 parser.add_argument('--max_inhib', type=str, default='20.0')
 parser.add_argument('--proportion_low', type=str, default='0.1')
-parser.add_argument('--sizes', type=str, nargs='+', default=['400', '625', '900'])
+parser.add_argument('--sizes', type=str, nargs='+', default=['225', '400', '625', '900'])
 parser.add_argument('--window_size', type=int, default=10)
 
 # parse arguments and place them in local scope
@@ -46,11 +46,13 @@ snn_performances = np.array([ p.load(open(os.path.join(snn_performance_dir, f), 
 two_level_performances = np.array([ p.load(open(os.path.join(two_level_performance_dir, f), 'r'))[1]['confidence_weighting'] \
 								for f in sorted(os.listdir(two_level_performance_dir)) if (filestring in f and n_neurons(f)) ])
 
-for perf, label in zip(snn_performances, sizes):
-	plt.plot(np.convolve(perf, window(), 'same')[:-window_size], '--', label=r'SNN: $n_e =$ ' + label)
+colors = ['r', 'b', 'g', 'k']
 
-for perf, label in zip(two_level_performances, sizes):
-	plt.plot(np.convolve(perf, window(), 'same')[:-window_size], '-', label=r'LM-SNN: $n_e =$ ' + label)
+for perf, label, color in zip(snn_performances, sizes, colors):
+	plt.plot(np.convolve(perf, window(), 'same')[:-window_size], '--', label=r'SNN: $n_e =$ ' + label, color=color)
+
+for perf, label, color in zip(two_level_performances, sizes, colors):
+	plt.plot(np.convolve(perf, window(), 'same')[:-window_size], '-', label=r'LM-SNN: $n_e =$ ' + label, color=color)
 
 plt.xticks(xrange(0, 200, 10), xrange(0, 47500, 2500)); plt.yticks(xrange(0, 110, 10))
 plt.xlim([0, 180]); plt.ylim([0, 100])
