@@ -7,6 +7,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 import matplotlib.cm as cmap
+import pickle as pickle
 import brian_no_units
 import networkx as nx
 import cPickle as p
@@ -18,6 +19,7 @@ import random
 import timeit
 import time
 import math
+import sys
 import os
 
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -67,23 +69,18 @@ def normalize_weights():
 	Squash the input to excitatory synaptic weights to sum to a prespecified number.
 	'''
 	for conn_name in input_connections:
-		connection = input_connections[conn_name][:].todense()
+		weights = input_connections[conn_name][:].todense()
 
 		for n in xrange(n_neurons):
-			n_connection = connection[:, n]
-			column_sums = np.sum(np.asarray(n_connection), axis=0)
-			column_factors = weight['ee_input'] / column_sums
-
-			dense_weights = input_connections[conn_name][:, n].todense()
-			dense_weights *= column_factors
-			input_connections[conn_name][:, n] = dense_weights
+			weights[:, n] *= weight['ee_input'] / np.sum(np.asarray(weights[:, n]))
+			input_connections[conn_name][:, n] = weights[:, n]
 
 
 def plot_input(rates):
 	'''
 	Plot the current input example during the training procedure.
 	'''
-	fig = plt.figure(fig_num, figsize = (5, 5))
+	fig = plt.figure(fig_num, figsize=(5, 5))
 	im = plt.imshow(rates.reshape([window, window]), interpolation='nearest', vmin=0, vmax=64, cmap='binary')
 	plt.colorbar(im)
 	plt.title('Current input example')
@@ -315,7 +312,7 @@ def build_network():
 				neuron_groups['e'].theta = np.load(os.path.join(end_weights_dir, '_'.join(['theta_A', ending +'_end.npy'])))
 		else:
 			# otherwise, set the adaptive additive threshold parameter at 20mV
-			neuron_groups['e'].theta = np.ones((n_neurons)) * 20.0 * b.mV
+			neuron_groups['e'].theta = np.ones(n_neurons) * 20.0 * b.mV
 		
 		for conn_type in recurrent_conn_names:
 			if conn_type == 'ei':
@@ -403,7 +400,7 @@ def build_network():
 			# create connections from the windows of the input group to the neuron population
 			input_connections[conn_name] = b.Connection(input_groups['Xe'], neuron_groups[name[1] + conn_type[1]],
 							structure='dense', state='g' + conn_type[0], delay=True, max_delay=delay[conn_type][1])
-			
+
 			input_connections[conn_name].connect(input_groups[conn_name[0:2]],
 					neuron_groups[conn_name[2:4]], weights, delay=delay[conn_type])
 			
@@ -493,10 +490,41 @@ def run_train():
 		current_spike_count = np.copy(spike_counters['Ae'].count[:]) - previous_spike_count
 		previous_spike_count = np.copy(spike_counters['Ae'].count[:])
 
+		if plot:
+			spike_show = -np.log(spike_counters['Ae'].count[:].reshape([n_neurons_sqrt, n_neurons_sqrt]).T / float(np.sum(spike_counters['Ae'].count[:])))
+			theta_show = neuron_groups['e'].theta.reshape([n_neurons_sqrt, n_neurons_sqrt]).T
+			voltage_show = np.copy(neuron_groups['e'].v).reshape([n_neurons_sqrt, n_neurons_sqrt]).T
+
+			print theta_show.shape
+			
+			if j == 0:
+				spike_fig, spike_axes = plt.subplots()
+				spike_im = spike_axes.matshow(spike_show, vmin=0, vmax=10)
+				plt.colorbar(spike_im)
+				spike_axes.set_title('Spikes')
+
+				theta_fig, theta_axes = plt.subplots()
+				theta_im = theta_axes.matshow(theta_show)
+				plt.colorbar(theta_im)
+				theta_axes.set_title('Theta')
+
+				voltage_fig, voltage_axes = plt.subplots()
+				voltage_axes.set_title('Voltage')
+				voltage_im = voltage_axes.matshow(voltage_show)
+			else:
+				spike_im.set_array(spike_show)
+				spike_fig.canvas.draw()
+
+				theta_im.set_array(theta_show)
+				theta_fig.canvas.draw()
+
+				voltage_im.set_array(voltage_show)
+				voltage_fig.canvas.draw()
+
 		# update weights every 'weight_update_interval'
 		if j % weight_update_interval == 0 and plot:
-			update_weights_and_assignments(weights_assignments_figure, weights_axes, assignments_axes, \
-										weights_image, assignments_image, assignments)
+			update_weights_and_assignments(weights_assignments_figure, weights_axes, assignments_axes,
+														weights_image, assignments_image, assignments)
 			
 		# if the neurons in the network didn't spike more than four times
 		if np.sum(current_spike_count) < 5 and num_retries < 3:
@@ -892,14 +920,10 @@ if __name__ == '__main__':
 	eqs_stdp_pre_ee = 'pre = 1.; w -= nu_ee_pre * post'
 	eqs_stdp_post_ee = 'w += nu_ee_post * pre; post = 1.'
 
-	eqs_stdp_pre_AeAe = 'pre += 1.; w -= nu_AeAe_pre * post'
-	eqs_stdp_post_AeAe = 'w += nu_AeAe_post * pre; post += 1.'
-
 	print '\n'
 
 	# set ending of filename saves
-	ending = '_'.join([ str(window), str(stride), str(n_neurons), str(n_e), \
-									str(n_train), str(random_seed), str(inhib) ])
+	ending = '_'.join(map(str, [window, stride, n_neurons, n_e, n_train, random_seed, inhib]))
 
 	b.ion()
 	fig_num = 1
@@ -911,8 +935,8 @@ if __name__ == '__main__':
 	# creating convolution locations inside the input image
 	convolution_locations = {}
 	for n in xrange(n_e):
-		convolution_locations[n] = [ ((n % n_e_sqrt) * stride + (n // n_e_sqrt) * n_input_sqrt * \
-						stride) + (x * n_input_sqrt) + y for y in xrange(window) for x in xrange(window) ]
+		convolution_locations[n] = [((n % n_e_sqrt) * stride + (n // n_e_sqrt) * n_input_sqrt * \
+						stride) + (x * n_input_sqrt) + y for y in xrange(window) for x in xrange(window)]
 
 	# instantiating neuron "vote" monitor
 	result_monitor = np.zeros((update_interval, n_neurons))

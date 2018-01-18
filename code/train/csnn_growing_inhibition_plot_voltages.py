@@ -76,9 +76,6 @@ def plot_labels_and_spikes(assignments, spike_counts, ending, j, image, predicti
 	# for (key, value) in neuron_groups['i'].__dict__.items():
 	# 	print key, ':', value
 
-	print neuron_groups['e'].I_synE
-	print neuron_groups['i'].I_synE
-
 	fig = plt.figure(16, figsize=(18, 12))
 	plt.gcf().clear()
 	
