@@ -41,7 +41,7 @@ def window(window_size=window_size):
 	return np.ones(window_size) / float(window_size)
 
 snn_performances = np.array([ p.load(open(os.path.join(snn_performance_dir, f), 'r'))[1] \
-			for f in sorted(os.listdir(snn_performance_dir)) if '.p' in f and '4_60000' in f and '1225' not in f and n_neurons(f) ])
+			for f in sorted(os.listdir(snn_performance_dir)) if '.p' in f and '0_60000' in f and '1225' not in f and n_neurons(f) ])
 
 two_level_performances = np.array([ p.load(open(os.path.join(two_level_performance_dir, f), 'r'))[1]['confidence_weighting'] \
 								for f in sorted(os.listdir(two_level_performance_dir)) if (filestring in f and n_neurons(f) and '1225' not in f) ])

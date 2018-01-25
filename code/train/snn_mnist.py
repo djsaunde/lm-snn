@@ -401,10 +401,10 @@ else:
 # set parameters for simulation based on train / test mode
 if test_mode:
     use_testing_set = True
-    record_spikes = True
+    record_spikes = False
 else:
     use_testing_set = False
-    record_spikes = True
+    record_spikes = False
 
 # number of inputs to the network
 n_input = 784
