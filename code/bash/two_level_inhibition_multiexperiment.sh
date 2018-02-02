@@ -2,11 +2,11 @@
 
 source /home/dsanghavi/anaconda2/bin/activate
 
-for num_train in 60000
+for num_train in 120000 180000
 do
 	for random_seed in 0 1 2 3 4
 	do
-		for conv_features in 100 225 400 625 900 1225 1600
+		for conv_features in 1225 1600
 		do
 			for proportion_low in 0.1
 			do

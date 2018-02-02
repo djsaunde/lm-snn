@@ -1,4 +1,12 @@
 '''
+To learn ngram:
+python csnn_two_level_inhibition.py --conv_features=900 --conv_size=28 --conv_stride=0 --num_train=60000 --mode=test --proportion_low=0.1 --random_seed=1 --start_inhib=1.0 --max_inhib=20.0 --use_ngram=True --learn_ngram=True --num_examples_ngram=100 --do_plot=True
+
+To test: 
+python csnn_two_level_inhibition.py --conv_features=900 --conv_size=28 --conv_stride=0 --num_train=60000 --mode=test --proportion_low=0.1 --random_seed=1 --start_inhib=1.0 --max_inhib=20.0 --use_ngram=True --learn_ngram=False --num_examples_ngram=50 --do_plot=True --num_test=30
+'''
+
+'''
 Convolutional spiking neural network training, testing, and evaluation script. Evaluation can be done outside of this script; however, it is most straightforward to call this 
 script with mode=train, then mode=test on HPC systems, where in the test mode, the network evaluation is written to disk.
 '''
@@ -27,6 +35,7 @@ from struct import unpack
 from brian import *
 
 from util import *
+import pickle
 
 np.set_printoptions(threshold=np.nan, linewidth=200)
 
@@ -56,9 +65,11 @@ misc_dir = os.path.join(top_level_path, 'misc', model_name)
 best_misc_dir = os.path.join(misc_dir, 'best')
 end_misc_dir = os.path.join(misc_dir, 'end')
 
+ngram_dir = os.path.join(top_level_path, 'ngrams', model_name)
+
 for d in [ performance_dir, activity_dir, weights_dir, deltas_dir, misc_dir, best_misc_dir,
 				assignments_dir, best_assignments_dir, MNIST_data_path, results_path, 
-			best_weights_dir, end_weights_dir, end_misc_dir, end_assignments_dir, spikes_dir ]:
+			best_weights_dir, end_weights_dir, end_misc_dir, end_assignments_dir, spikes_dir, ngram_dir ]:
 	if not os.path.isdir(d):
 		os.makedirs(d)
 
@@ -348,6 +359,7 @@ def predict_label(assignments, spike_rates, accumulated_rates, spike_proportions
 	the past 'update_interval', get the ranking of each of the categories of input.
 	'''
 	output_numbers = {}
+	fire_order_calculated = False
 
 	for scheme in voting_schemes:
 		summed_rates = [0] * 10
@@ -448,10 +460,40 @@ def predict_label(assignments, spike_rates, accumulated_rates, spike_proportions
 				if num_assignments[i] > 0:
 					summed_rates[i] = np.sum(spike_rates[assignments == i] * spike_proportions[(assignments == i).ravel(), i]) / num_assignments[i]
 		
+		elif 'ngram' in scheme:
+			spikes = spike_monitors['Ae'].spikes
+			last_fire = spikes[-1][1]
+			n = int(last_fire/0.5)
+			start_time = 0.5*n # as we need to find the first spike for this particular example, which has to be in this section of 500 ms
+			
+			i = 1
+			while len(spikes)>=i and spikes[-1*i][1]>start_time:
+				i += 1
+			i -= 1
+			fire_order = []
+			while i>0:
+				fire_order.append(spikes[-1*i][0]) # TODO correst
+				i -= 1
+
+			ngram_score = np.zeros(10)
+
+			##### TODO Check from here
+			for i in xrange(len(fire_order)-n_ngram+1):
+				if tuple(fire_order[i:i+n_ngram]) in ngrams:
+					ngram_score += normalize_probability(ngrams[tuple(fire_order[i:i+n_ngram])])
+
+			ngram_score = normalize_probability(ngram_score)
+			summed_rates = ngram_score # + (lambda_neighbor*neighbor_influence)
+
+
+
 		output_numbers[scheme] = np.argsort(summed_rates)[::-1]
 	
 	return output_numbers
 
+def normalize_probability(v):
+	# v is a numpy array
+	return v/np.sum(v)
 
 def assign_labels(result_monitor, input_numbers, accumulated_rates, accumulated_inputs):
 	'''
@@ -570,7 +612,7 @@ def build_network():
 		spike_counters[name + 'e'] = b.SpikeCounter(neuron_groups[name + 'e'])
 
 		# record neuron population spikes if specified
-		if record_spikes and do_plot:
+		if record_spikes or do_plot:
 			spike_monitors[name + 'e'] = b.SpikeMonitor(neuron_groups[name + 'e'])
 			spike_monitors[name + 'i'] = b.SpikeMonitor(neuron_groups[name + 'i'])
 
@@ -875,6 +917,125 @@ def run_train():
 
 	print '\n'
 
+def increment_count_ngram(seq,true_label):
+	global ngrams
+	if not seq in ngrams:
+		ngrams[seq] = np.zeros(10)
+	ngrams[seq][true_label] += 1
+
+
+def calculate_and_save_ngrams(n_ngram):
+	global input_intensity, previous_spike_count, rates, ngrams
+
+	# initialize network
+	j = 0
+	num_retries = 0
+	b.run(0)
+
+	# get network filter weights
+	filters = input_connections['XeAe'][:].todense()
+
+	# start recording time
+	start_time = timeit.default_timer()
+	print "[INFO] | Calculating n-gram probabilities using", num_examples, "examples"
+	while j < num_examples:
+		# get the firing rates of the next input example
+		rates = (data['x'][j % data_size, :, :] / 8.0) * input_intensity
+		
+		# sets the input firing rates
+		input_groups['Xe'].rate = rates.reshape(n_input)
+
+		# run the network for a single example time
+		b.run(single_example_time)
+
+		# get count of spikes over the past iteration
+		current_spike_count = np.copy(spike_counters['Ae'].count[:]).reshape((conv_features, n_e)) - previous_spike_count
+		previous_spike_count = np.copy(spike_counters['Ae'].count[:]).reshape((conv_features, n_e))
+
+		# if the neurons in the network didn't spike more than four times
+		if np.sum(current_spike_count) < 5 and num_retries < 3:
+			# increase the intensity of input
+			input_intensity += 2
+			num_retries += 1
+			
+			# set all network firing rates to zero
+			for name in input_population_names:
+				input_groups[name + 'e'].rate = 0
+
+			# let the network relax back to equilibrium
+			if not reset_state_vars:
+				b.run(resting_time)
+			else:
+				for neuron_group in neuron_groups:
+					neuron_groups[neuron_group].v = v_reset_e
+					neuron_groups[neuron_group].ge = 0
+					neuron_groups[neuron_group].gi = 0
+
+		# otherwise, record results and continue simulation
+		else:			
+			num_retries = 0
+
+			# record the current number of spikes
+			result_monitor[j % update_interval, :] = current_spike_count
+			
+			# get true label of the past input example
+			input_numbers[j] = data['y'][j % data_size][0]
+			
+			# Get the spikes for current example and learn from it
+			spikes = spike_monitors['Ae'].spikes
+			
+			last_fire = spikes[-1][1]
+			n = int(last_fire/0.5)
+			start_time = 0.5*n # as we need to find the first spike for this particular example, which has to be in this section of 500 ms
+			
+			i = 1
+			while len(spikes)>=i and spikes[-1*i][1]>start_time:
+				i += 1
+			i -= 1
+			fire_order = []
+			while i>0:
+				fire_order.append(spikes[-1*i][0])
+				i -= 1
+
+			# l = len(fire_order)
+			# print "Len=Total spikes for current example: ", l
+
+			# Add to counts for every n-gram
+			for i in xrange(1,n_ngram+1): # from 1 to n_ngram
+				for beg in xrange(len(fire_order)-i+1): 
+					increment_count_ngram(tuple(fire_order[beg:beg+i]), int(input_numbers[j]))
+
+			# print progress
+			if j % print_progress_interval == 0 and j > 0:
+				print 'runs done:', j, 'of', int(num_examples), '(time taken for past', print_progress_interval, 'runs:', str(timeit.default_timer() - start_time) + ')'
+				start_time = timeit.default_timer()
+						
+			# set input firing rates back to zero
+			for name in input_population_names:
+				input_groups[name + 'e'].rate = 0
+			
+			# run the network for 'resting_time' to relax back to rest potentials
+			if not reset_state_vars:
+				b.run(resting_time)
+			else:
+				for neuron_group in neuron_groups:
+					neuron_groups[neuron_group].v = v_reset_e
+					neuron_groups[neuron_group].ge = 0
+					neuron_groups[neuron_group].gi = 0
+
+			# bookkeeping
+			input_intensity = start_input_intensity
+			j += 1
+
+	print '\n'
+	print "[INFO] | Total keys = ", len(ngrams.keys())
+	f_path = os.path.join(ngram_dir,'ngrams_'+ending+'_n'+str(n_ngram)+'_ne'+str(num_examples_ngram)+'.pickle')
+	f_ngram = open(f_path, 'wb')	
+	pickle.dump(ngrams,f_ngram)
+	f_ngram.close()
+	print "[FILE WRITE] | Saved to ", f_path
+
+
 
 def run_test():
 	global fig_num, input_intensity, previous_spike_count, rates, assignments, clusters, cluster_assignments, \
@@ -950,6 +1111,9 @@ def run_test():
 					current_input = (rates * (weight['ee_input'] / np.sum(rates))).ravel()
 					output_numbers[scheme][j, 0] = assignments[np.argmin([ euclidean(current_input, \
 													filters[:, i]) for i in xrange(conv_features) ])]
+				# Override
+				if 'ngram' in scheme:
+					ngram_results[scheme][j,:] = outputs
 
 			# print progress
 			if j % print_progress_interval == 0 and j > 0:
@@ -1000,13 +1164,17 @@ def evaluate_results():
 	'''
 	Evalute the network using the various voting schemes in test mode
 	'''
-	global update_interval
+	global update_interval, ngram_results
 
 	test_results = {}
 	for scheme in voting_schemes:
 		test_results[scheme] = np.zeros((10, num_examples))
 
 	print '\n...Calculating accuracy per voting scheme'
+
+	def most_common(lst):
+	    data_count = Counter(lst)
+	    return data_count.most_common(1)[0][0]
 
 	# get network filter weights
 	filters = input_connections['XeAe'][:].todense()
@@ -1024,6 +1192,9 @@ def evaluate_results():
 				results[0] = assignments[np.argmin([ euclidean(current_input, \
 								filters[:, i]) for i in xrange(conv_features) ])]
 				test_results[scheme][:, idx] = results
+			# Override
+			if 'ngram' in scheme:
+				test_results[scheme][:,idx] = ngram_results[scheme][idx]
 
 	differences = { scheme : test_results[scheme][0, :] - input_numbers for scheme in voting_schemes }
 	correct = { scheme : len(np.where(differences[scheme] == 0)[0]) for scheme in voting_schemes }
@@ -1126,6 +1297,13 @@ if __name__ == '__main__':
 												to settle back to equilibrium between test examples.')
 	parser.add_argument('--dt', type=float, default=0.25, help='Integration time step in milliseconds.')
 
+	parser.add_argument('--use_ngram', type=str, default='False', help='If True, will use n-grams for prediction.')
+	parser.add_argument('--learn_ngram', type=str, default='False', help='If True, will learn the n-gram probabilities for prediction.')
+	parser.add_argument('--n_ngram', type=int, default=2, help='Value of the highest n to consider.')
+	parser.add_argument('--num_examples_ngram', type=int, default=10, help='Number of training examples to use to estimate n-gram probabilities')
+	# parser.add_argument('--ngram_dir', type=str, default='ngrams', help='Folder from which to read/write n-gram probabilities')
+	
+
 	# parse arguments and place them in local scope
 	args = parser.parse_args()
 	args = vars(args)
@@ -1139,7 +1317,7 @@ if __name__ == '__main__':
 
 	for var in [ 'do_plot', 'plot_all_deltas', 'reset_state_vars', 'test_max_inhibition', \
 					'normalize_inputs', 'save_weights', 'save_best_model', 'test_no_inhibition', \
-					'save_spikes', 'weights_noise', 'test_adaptive_threshold' ]:
+					'save_spikes', 'weights_noise', 'test_adaptive_threshold', 'use_ngram', 'learn_ngram' ]:
 		if locals()[var] == 'True':
 			locals()[var] = True
 		elif locals()[var] == 'False':
@@ -1160,22 +1338,11 @@ if __name__ == '__main__':
 	else:
 		data_size = 60000
 
-	# At which iteration do we increase the inhibition to the ETH level?
-	increase_iter = int(num_train * proportion_low) 
+	# Override
+	if use_ngram and learn_ngram:
+		num_examples = num_examples_ngram
 
-	# set brian global preferences
-	b.set_global_preferences(defaultclock = b.Clock(dt=dt*b.ms), useweave = True, gcc_options = ['-ffast-math -march=native'], usecodegen = True,
-		usecodegenweave = True, usecodegenstateupdate = True, usecodegenthreshold = False, usenewpropagate = True, usecstdp = True, openmp = False,
-		magic_useframes = False, useweave_linear_diffeq = True)
-
-	# for reproducibility's sake
-	np.random.seed(random_seed)
-
-	start = timeit.default_timer()
-	data = get_labeled_data(os.path.join(MNIST_data_path, 'testing' if test_mode else 'training'), 
-												not test_mode, False, xrange(10), 1000, normalize_inputs)
-	
-	print 'Time needed to load data:', timeit.default_timer() - start
+	ngram_results = {}
 
 	# set parameters for simulation based on train / test mode
 	record_spikes = True
@@ -1194,6 +1361,38 @@ if __name__ == '__main__':
 	n_e_sqrt = int(math.sqrt(n_e))
 	n_i = n_e
 	features_sqrt = int(math.ceil(math.sqrt(conv_features)))
+
+	# set ending of filename saves
+	ending = '_'.join([ str(conv_size), str(conv_stride), str(conv_features), str(n_e), \
+									str(num_train), str(random_seed), str(proportion_low), \
+															str(start_inhib), str(max_inhib) ])
+
+
+	# At which iteration do we increase the inhibition to the ETH level?
+	increase_iter = int(num_train * proportion_low) 
+
+	# set brian global preferences
+	b.set_global_preferences(defaultclock = b.Clock(dt=dt*b.ms), useweave = True, gcc_options = ['-ffast-math -march=native'], usecodegen = True,
+		usecodegenweave = True, usecodegenstateupdate = True, usecodegenthreshold = False, usenewpropagate = True, usecstdp = True, openmp = False,
+		magic_useframes = False, useweave_linear_diffeq = True)
+
+	# for reproducibility's sake
+	np.random.seed(random_seed)
+
+	# Override for use_ngram
+	dataset = 'testing' if test_mode else 'training'
+	if use_ngram:
+		if learn_ngram:
+			dataset = 'training'
+		else:
+			f_path = os.path.join(ngram_dir,'ngrams_'+ending+'_n'+str(n_ngram)+'_ne'+str(num_examples_ngram)+'.pickle')
+			assert os.path.exists(f_path) # If error pops up, run with learn_ngram=True
+
+	start = timeit.default_timer()
+	data = get_labeled_data(os.path.join(MNIST_data_path, dataset), 
+												not test_mode, False, xrange(10), 1000, normalize_inputs)
+	
+	print 'Time needed to load data:', timeit.default_timer() - start
 
 	# time (in seconds) per data example presentation and rest period in between
 	if not test_mode:
@@ -1300,11 +1499,7 @@ if __name__ == '__main__':
 
 	print '\n'
 
-	# set ending of filename saves
-	ending = '_'.join([ str(conv_size), str(conv_stride), str(conv_features), str(n_e), \
-									str(num_train), str(random_seed), str(proportion_low), \
-															str(start_inhib), str(max_inhib) ])
-
+	
 	b.ion()
 	fig_num = 1
 	
@@ -1343,14 +1538,36 @@ if __name__ == '__main__':
 		voting_schemes = ['all', 'all_active', 'most_spiked_patch', 'most_spiked_location', \
 					'confidence_weighting', 'activity_neighborhood', 'most_spiked_neighborhood']
 
+	# Override
+	if use_ngram:
+		voting_schemes.append('ngram'+str(n_ngram))
+
 	for scheme in voting_schemes:
 		output_numbers[scheme] = np.zeros((num_examples, 10))
+		if 'ngram' in scheme:
+			ngram_results[scheme] = np.zeros((num_examples, 10))
 
 	if not test_mode:
 		accumulated_rates = np.zeros((conv_features * n_e, 10))
 		accumulated_inputs = np.zeros(10)
 		spike_proportions = np.zeros((conv_features * n_e, 10))
 	
+
+	# Override
+	if use_ngram:
+		if not learn_ngram:
+			f_path = os.path.join(ngram_dir,'ngrams_'+ending+'_n'+str(n_ngram)+'_ne'+str(num_examples_ngram)+'.pickle')
+			print "[INFO] | Loading n-gram probabilities from file: ", f_path
+			f_ngram = open(f_path, 'rb')
+			ngrams = pickle.load(f_ngram)
+			f_ngram.close()
+		else:
+			print "[INFO] | Learning n-gram probabilities and writing to file ..."
+			ngrams = {}
+			calculate_and_save_ngrams(n_ngram)
+			print "[INFO] | Quitting. Please re-run with learn_ngram=False to use the learned probabilities."
+			sys.exit(0)
+
 	# run the simulation of the network
 	if test_mode:
 		run_test()
