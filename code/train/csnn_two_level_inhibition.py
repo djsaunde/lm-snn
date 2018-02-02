@@ -1025,8 +1025,6 @@ def evaluate_results():
 								filters[:, i]) for i in xrange(conv_features) ])]
 				test_results[scheme][:, idx] = results
 
-	print test_results
-
 	differences = { scheme : test_results[scheme][0, :] - input_numbers for scheme in voting_schemes }
 	correct = { scheme : len(np.where(differences[scheme] == 0)[0]) for scheme in voting_schemes }
 	incorrect = { scheme : len(np.where(differences[scheme] != 0)[0]) for scheme in voting_schemes }

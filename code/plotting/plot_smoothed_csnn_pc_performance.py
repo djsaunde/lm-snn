@@ -18,8 +18,10 @@ print '\n'.join([ str(idx + 1) + ' | ' + file_name for idx, file_name in enumera
 to_plot = raw_input('Enter the index of the file from above which you\'d like to plot: ')
 file_name = sorted([ file_name for file_name in os.listdir(performance_dir) if '.p' in file_name ])[int(to_plot) - 1]
 
+print file_name
+
 # get pickled performances dictionary (voting mechanism, performance recordings over training)
-_, performances = p.load(open(performance_dir + file_name, 'rb'))
+_, performances = p.load(open(os.path.join(performance_dir, file_name), 'rb'))
 
 print '\n'
 
@@ -43,6 +45,7 @@ conv_size = int(file_name.split('_')[1])
 conv_stride = int(file_name.split('_')[2])
 conv_features = int(file_name.split('_')[3])
 lattice_structure = file_name[-7:-6]
+
 if 'no_weight_sharing' in file_name:
     weight_sharing = 'no_weight_sharing'
 else:
@@ -52,7 +55,11 @@ plt.title(str(conv_size) + 'x' + str(conv_size) + ' convolutions, stride ' + str
                         ' convolution patches, ' + ' '.join(weight_sharing.split('_')) + ', ' + str(lattice_structure) + '-lattice')
 plt.tight_layout()
 
-plt.savefig(performance_dir + 'performance_plots/' + file_name[:file_name.index('.')])
+save_path = os.path.join(performance_dir, 'performance_plots', file_name[:file_name.index('.')])
+if not os.path.isdir(save_path):
+	os.makedirs(save_path)
+
+plt.savefig(save_path)
 plt.show()
 
 print '\n'

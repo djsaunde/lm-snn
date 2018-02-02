@@ -927,7 +927,7 @@ if __name__ == '__main__':
 																																				speedier, and possible to run on HPC resources.')
 	parser.add_argument('--sort_euclidean', type=str, default='False', help='When plotting reshaped input -> excitatory weights, whether to plot each row (corresponding to locations in the input) \
 																																				sorted by Euclidean distance from the 0 matrix.')
-	parser.add_argument('--num_examples', type=int, default=10000, help='The number of examples for which to train or test the network on.')
+	parser.add_argument('--num_examples', type=int, default=60000, help='The number of examples for which to train or test the network on.')
 	parser.add_argument('--random_seed', type=int, default=42, help='The random seed (any integer) from which to generate random numbers.')
 	parser.add_argument('--reduced_dataset', type=str, default='False', help='Whether or not to use 9-digit reduced-size dataset (900 images).')
 	parser.add_argument('--num_classes', type=int, default=10, help='Number of classes to use in reduced dataset.')
@@ -944,26 +944,10 @@ if __name__ == '__main__':
 
 	print '\n'
 
-	if do_plot == 'True':
-		do_plot = True
-	elif do_plot == 'False':
-		do_plot = False
-	else:
-		raise Exception('Expecting True or False-valued command line argument "do_plot".')
-
-	if sort_euclidean == 'True':
-		sort_euclidean = True
-	elif sort_euclidean == 'False':
-		sort_euclidean = False
-	else:
-		raise Exception('Expecting True or False-valued command line argument "sort_euclidean".')
-
-	if reduced_dataset == 'True':
-		reduced_dataset = True
-	elif reduced_dataset == 'False':
-		reduced_dataset = False
-	else:
-		raise Exception('Expecting True or False-valued command line argument "reduced_dataset".')
+	test_mode = mode == 'test'
+	do_plot = do_plot == 'True'
+	sort_euclidean = sort_euclidean == 'True'
+	reduced_dataset = reduced_dataset == 'True'
 
 	if reduced_dataset:
 		data_size = num_classes * examples_per_class
@@ -979,9 +963,6 @@ if __name__ == '__main__':
 
 	# for reproducibility's sake
 	np.random.seed(random_seed)
-
-	# test or train mode
-	test_mode = mode == 'test'
 
 	start = timeit.default_timer()
 	data = get_labeled_data(os.path.join(MNIST_data_path, 'testing' if test_mode else 'training'), 
@@ -1023,7 +1004,7 @@ if __name__ == '__main__':
 	if test_mode:
 		update_interval = num_examples
 	else:
-		update_interval = 100
+		update_interval = 250
 
 	# weight updates and progress printing intervals
 	weight_update_interval = 10

@@ -27,3 +27,4 @@ code/bash/job_reports/*
 *.out
 code/visualization/movies/*
 spikes/*
+*.ipynb_checkpoints
