@@ -49,7 +49,7 @@ for curve, color in zip(sorted(kmeans_curves), colors):
 	plt.plot(plot + plot[-2:], linestyle='--', label=curve, color=color)
 
 for curve, color in zip(sorted(nn_curves), colors):
-	plot = nn_curves[curve]
+	plot = nn_curves[curve][0::4]
 	plot = list(np.convolve(plot, window(), 'same')[:-window_size])
 	plt.plot(plot + plot[-2:], linestyle=':', label=curve, color=color)
 

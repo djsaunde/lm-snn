@@ -4,9 +4,7 @@ python csnn_two_level_inhibition.py --conv_features=900 --conv_size=28 --conv_st
 
 To test: 
 python csnn_two_level_inhibition.py --conv_features=900 --conv_size=28 --conv_stride=0 --num_train=60000 --mode=test --proportion_low=0.1 --random_seed=1 --start_inhib=1.0 --max_inhib=20.0 --use_ngram=True --learn_ngram=False --num_examples_ngram=50 --do_plot=True --num_test=30
-'''
 
-'''
 Convolutional spiking neural network training, testing, and evaluation script. Evaluation can be done outside of this script; however, it is most straightforward to call this 
 script with mode=train, then mode=test on HPC systems, where in the test mode, the network evaluation is written to disk.
 '''
@@ -493,7 +491,7 @@ def predict_label(assignments, spike_rates, accumulated_rates, spike_proportions
 
 def normalize_probability(v):
 	# v is a numpy array
-	return v/np.sum(v)
+	return v / np.sum(v)
 
 def assign_labels(result_monitor, input_numbers, accumulated_rates, accumulated_inputs):
 	'''

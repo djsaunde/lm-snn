@@ -21,7 +21,7 @@ mnist.target = mnist.target[s]
 
 expected = mnist.target[60000:]
 
-interval = 1000
+interval = 250
 maximum = 30000
 
 for hidden in [225, 400, 625]:

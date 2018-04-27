@@ -22,7 +22,7 @@ mnist.target = mnist.target[s]
 
 n_test = 10000
 
-interval = 1000
+interval = 250
 maximum = 30000
 
 for n_clusters in [400, 625]:
@@ -30,31 +30,34 @@ for n_clusters in [400, 625]:
 	model = MiniBatchKMeans(n_clusters=n_clusters, batch_size=interval)
 
 	for n_train in xrange(interval, maximum + interval, interval):
-		print('*** Fitting minibatch KMeans model with %d training examples and %d clusters. ***' % (n_train, n_clusters))
-		start = timeit.default_timer()
-		model.fit(mnist.data[:n_train])
-		print('Time: %.4f\n' % (timeit.default_timer() - start))
+		if n_train < n_clusters:
+			accuracies.append(0)
+		else:
+			print('*** Fitting minibatch KMeans model with %d training examples and %d clusters. ***' % (n_train, n_clusters))
+			start = timeit.default_timer()
+			model.fit(mnist.data[:n_train])
+			print('Time: %.4f\n' % (timeit.default_timer() - start))
 
-		print('Labeling cluster centroids.'); start = timeit.default_timer()
-		distances = np.array([np.linalg.norm(mnist.data[:n_train] - centroid, axis=1) for centroid in model.cluster_centers_])
-		clusters = np.argmin(distances, axis=0)
-		proportions = np.zeros([n_clusters, 10])
-		
-		for cluster, target in zip(clusters, mnist.target[:n_train]):
-			proportions[int(cluster), int(target)] += 1 / n_train
+			print('Labeling cluster centroids.'); start = timeit.default_timer()
+			distances = np.array([np.linalg.norm(mnist.data[:n_train] - centroid, axis=1) for centroid in model.cluster_centers_])
+			clusters = np.argmin(distances, axis=0)
+			proportions = np.zeros([n_clusters, 10])
 
-		assignments = np.argmax(proportions, axis=1)
-		print('Time: %.4f\n' % (timeit.default_timer() - start))
+			for cluster, target in zip(clusters, mnist.target[:n_train]):
+				proportions[int(cluster), int(target)] += 1 / n_train
 
-		print('Calculating classification accuracy of clustering.'); start = timeit.default_timer()
-		distances = np.array([np.linalg.norm(mnist.data[-n_test:] - centroid, axis=1) for centroid in model.cluster_centers_])
-		correct = np.sum(assignments[np.argmin(distances, axis=0)] == mnist.target[-n_test:])
-		accuracy = (correct / n_test) * 100
-		accuracies.append(accuracy)
+			assignments = np.argmax(proportions, axis=1)
+			print('Time: %.4f\n' % (timeit.default_timer() - start))
 
-		print('Time: %.4f\n' % (timeit.default_timer() - start))
-		print('Correct: %d / %d' % (correct, n_test))
-		print('Accuracy: %.4f\n' % accuracy)
+			print('Calculating classification accuracy of clustering.'); start = timeit.default_timer()
+			distances = np.array([np.linalg.norm(mnist.data[-n_test:] - centroid, axis=1) for centroid in model.cluster_centers_])
+			correct = np.sum(assignments[np.argmin(distances, axis=0)] == mnist.target[-n_test:])
+			accuracy = (correct / n_test) * 100
+			accuracies.append(accuracy)
+
+			print('Time: %.4f\n' % (timeit.default_timer() - start))
+			print('Correct: %d / %d' % (correct, n_test))
+			print('Accuracy: %.4f\n' % accuracy)
 
 	plt.plot(accuracies, label='K-Means with %d clusters' % n_clusters)
 
