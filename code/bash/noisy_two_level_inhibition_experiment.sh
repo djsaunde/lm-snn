@@ -1,6 +1,6 @@
 for num_train in 60000
 do
-	for random_seed in 0 1 2
+	for random_seed in 0
 	do
 		for conv_features in 100 200 300 400 500
 		do
@@ -14,7 +14,7 @@ do
 						do
 							sbatch csnn_noisy_two_level_inhibition_job.sh 28 0 $conv_features $num_train \
 								                                          $random_seed $proportion_low \
-								                                          $start_inhib $max_inhib $ p_flip
+								                                          $start_inhib $max_inhib $p_flip
 						done
 					done
 				done
