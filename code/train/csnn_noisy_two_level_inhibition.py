@@ -1197,12 +1197,10 @@ def evaluate_results():
                                 input_numbers) for scheme in voting_schemes])
     np.save(os.path.join(results_path, '_'.join(['confusion_matrix', ending]) + '.npy'), conf_matrices)
 
-    print '\nConfusion matrix:\n\n', conf_matrices
-
     for scheme in voting_schemes:
         print '\n-', scheme, 'accuracy:', accuracies[scheme]
 
-    results = pd.DataFrame([ [ ending ] + accuracies.values() ], columns=[ 'Model' ] + accuracies.keys())
+    results = pd.DataFrame([[ending] + accuracies.values()], columns=['Model'] + accuracies.keys())
     filename = '_'.join([str(conv_features), 'results.csv'])
     if not filename in os.listdir(results_path):
         results.to_csv(os.path.join(results_path, filename), index=False)
