@@ -1,7 +1,5 @@
 # Grid search over hyperparameters for experiments with new inhibition schemes.
 
-source /home/dsanghavi/anaconda2/bin/activate
-
 for num_train in 60000
 do
 	for random_seed in 0 1 2 3 4
@@ -22,6 +20,5 @@ do
 		done
 	done
 done
-source deactivate
 
 exit

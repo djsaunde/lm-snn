@@ -487,6 +487,14 @@ def normalize_probability(v):
     # v is a numpy array
     return v / np.sum(v)
 
+def bit_flip(x, p):
+    '''
+    Takes a binary tensor and flips each entry with probability p.
+    '''
+    i = np.random.binomial(1, p, x.shape) == 1
+    x[i] = ~x[i]
+    return x
+
 def assign_labels(result_monitor, input_numbers, accumulated_rates, accumulated_inputs):
     '''
     Based on the results from the previous 'update_interval', assign labels to the
@@ -684,8 +692,7 @@ def run_train():
         input_image_monitor, input_image = plot_input(rates)
         fig_num += 1
 
-        weights_assignments_figure, weights_axes, assignments_axes, weights_image, \
-                        assignments_image = plot_weights_and_assignments(assignments)
+        weights_assignments_figure, weights_axes, assignments_axes, weights_image, assignments_image = plot_weights_and_assignments(assignments)
         fig_num += 1
 
     # set up performance recording and plotting
@@ -711,17 +718,15 @@ def run_train():
     if save_best_model:
         best_performance = 0.0
 
-    # start recording time
-    start_time = timeit.default_timer()
-
+    current_inhib = start_inhib
     last_weights = input_connections['XeAe'][:].todense()
 
-    current_inhib = start_inhib
-
+    start_time = timeit.default_timer()
     while j < num_examples:
         # get the firing rates of the next input example
-        rates = (data['x'][j % data_size, :, :] / 8.0) * input_intensity * \
-            ((noise_const * np.random.randn(n_input_sqrt, n_input_sqrt)) + 1.0)
+        image = data['x'][j % data_size, :, :] > 0
+        image = bit_flip(image, p_flip)
+        rates = image * input_intensity * (255 / 8)
         
         # sets the input firing rates
         input_groups['Xe'].rate = rates.reshape(n_input)
@@ -732,10 +737,6 @@ def run_train():
 
         # run the network for a single example time
         b.run(single_example_time)
-
-        # add Gaussian noise to weights after each iteration
-        if weights_noise:
-            input_connections['XeAe'].W.alldata[:] *= 1 + (np.random.randn(n_input * conv_features) * weights_noise_constant)
 
         # get new neuron label assignments every 'update_interval'
         if j % update_interval == 0 and j > 0:
@@ -1216,81 +1217,44 @@ def evaluate_results():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--mode', default='train', help='Network operating mode: \
-                                "train" mode learns the synaptic weights of the network, and \
-                                "test" mode holds the weights fixed / evaluates accuracy on test data.')
-    parser.add_argument('--conv_size', type=int, default=28, help='Side length of the square convolution \
-                                            window used by the input -> excitatory layer of the network.')
-    parser.add_argument('--conv_stride', type=int, default=0, help='Horizontal, vertical stride \
-                                    of the convolution window used by input layer of the network.')
-    parser.add_argument('--conv_features', type=int, default=100, help='Number of excitatory \
-                                convolutional features / filters / patches used in the network.')
-    parser.add_argument('--do_plot', type=str, default='False', help='Whether or not to display plots during network \
-                                                    training / testing. Defaults to False, as this makes the \
-                                                network operation speedier, and possible to run on HPC resources.')
-    parser.add_argument('--num_train', type=int, default=10000, help='The number of \
-                                            examples for which to train the network on.')
-    parser.add_argument('--num_test', type=int, default=10000, help='The number of \
-                                            examples for which to test the network on.')
-    parser.add_argument('--random_seed', type=int, default=0, help='The random seed \
-                                    (any integer) from which to generate random numbers.')
-    parser.add_argument('--save_weights', type=str, default='False', help='Whether or not to \
-                                    save the weights of the model every `weight_update_interval`.')
-    parser.add_argument('--weight_update_interval', type=int, default=10, help='How often \
-                                                to update the plot of network filter weights.')
-    parser.add_argument('--save_best_model', type=str, default='True', help='Whether \
-                                        to save the current best version of the model.')
-    parser.add_argument('--update_interval', type=int, default=250, help='How often \
-                                        to update neuron labels and classify new inputs.')
-    parser.add_argument('--plot_all_deltas', type=str, default='False', help='Whether or not to \
-                                plot weight changes for all neurons from input to excitatory layer.')
-    parser.add_argument('--train_remove_inhibition', type=str, default='False', help='Whether or not to \
-                                                        remove lateral inhibition during the training phase.')
-    parser.add_argument('--test_no_inhibition', type=str, default='False', help='Whether or not to \
-                                                        remove lateral inhibition during the test phase.')
-    parser.add_argument('--test_max_inhibition', type=str, default='False', help='Whether or not to \
-                                                        use ETH-style inhibition during the test phase.')
-    parser.add_argument('--start_inhib', type=float, default=0.1, help='The beginning value \
-                                                        of inhibiton for the increasing scheme.')
-    parser.add_argument('--max_inhib', type=float, default=17.4, help='The maximum synapse \
-                                            weight for inhibitory to excitatory connections.')
-    parser.add_argument('--reset_state_vars', type=str, default='False', help='Whether to \
-                            reset neuron / synapse state variables or run a "reset" period.')
-    parser.add_argument('--inhib_update_interval', type=int, default=250, \
-                            help='How often to increase the inhibition strength.')
-    parser.add_argument('--inhib_schedule', type=str, default='linear', help='How to \
-                            update the strength of inhibition as the training progresses.')
-    parser.add_argument('--save_spikes', type=str, default='False', help='Whether or not to \
-                            save 2D graphs of spikes to later use to make an activity time-lapse.')
-    parser.add_argument('--normalize_inputs', type=str, default='False', help='Whether or not \
-                                            to ensure all inputs contain the same amount of "ink".')
-    parser.add_argument('--proportion_low', type=float, default=0.5, help='What proportion of \
-                                the training to grow the inhibition from "start_inhib" to "max_inhib".')
-    parser.add_argument('--noise_const', type=float, default=0.0, help='The scale of the \
-                                                            noise added to input examples.')
-    parser.add_argument('--inhib_scheme', type=str, default='increasing', help='How inhibition from \
-                                                            inhibitory to excitatory neurons is handled.')
-    parser.add_argument('--weights_noise', type=str, default='False', help='Whether to use multiplicative \
-                                                        Gaussian noise on synapse weights on each iteration.')
-    parser.add_argument('--weights_noise_constant', type=float, default=1e-2, help='The spread of the \
-                                                                Gaussian noise used on synapse weights ')
-    parser.add_argument('--start_input_intensity', type=float, default=2.0, help='The intensity at which the \
-                                                                input is (default) presented to the network.')
-    parser.add_argument('--test_adaptive_threshold', type=str, default='False', help='Whether or not to allow \
-                                                            neuron thresholds to adapt during the test phase.')
-    parser.add_argument('--train_time', type=float, default=0.35, help='How long training \
-                                                        inputs are presented to the network.')
-    parser.add_argument('--train_rest', type=float, default=0.15, help='How long the network is allowed \
-                                                to settle back to equilibrium between training examples.')
-    parser.add_argument('--test_time', type=float, default=0.35, help='How long test \
-                                                inputs are presented to the network.')
-    parser.add_argument('--test_rest', type=float, default=0.15, help='How long the network is allowed \
-                                                to settle back to equilibrium between test examples.')
-    parser.add_argument('--dt', type=float, default=0.25, help='Integration time step in milliseconds.')
-    parser.add_argument('--use_ngram', type=str, default='False', help='If True, will use n-grams for prediction.')
-    parser.add_argument('--learn_ngram', type=str, default='False', help='If True, will learn the n-gram probabilities for prediction.')
-    parser.add_argument('--n_ngram', type=int, default=2, help='Value of the highest n to consider.')
-    parser.add_argument('--num_examples_ngram', type=int, default=10, help='Number of training examples to use to estimate n-gram probabilities')
+    parser.add_argument('--mode', default='train')
+    parser.add_argument('--conv_size', type=int, default=28)
+    parser.add_argument('--conv_stride', type=int, default=0)
+    parser.add_argument('--conv_features', type=int, default=100)
+    parser.add_argument('--do_plot', type=str, default='False')
+    parser.add_argument('--num_train', type=int, default=10000)
+    parser.add_argument('--num_test', type=int, default=10000)
+    parser.add_argument('--random_seed', type=int, default=0)
+    parser.add_argument('--save_weights', type=str, default='False')
+    parser.add_argument('--weight_update_interval', type=int, default=10)
+    parser.add_argument('--save_best_model', type=str, default='True')
+    parser.add_argument('--update_interval', type=int, default=250)
+    parser.add_argument('--plot_all_deltas', type=str, default='False')
+    parser.add_argument('--train_remove_inhibition', type=str, default='False')
+    parser.add_argument('--test_no_inhibition', type=str, default='False')
+    parser.add_argument('--test_max_inhibition', type=str, default='False')
+    parser.add_argument('--start_inhib', type=float, default=0.1)
+    parser.add_argument('--max_inhib', type=float, default=17.4)
+    parser.add_argument('--reset_state_vars', type=str, default='False')
+    parser.add_argument('--inhib_update_interval', type=int, default=250)
+    parser.add_argument('--inhib_schedule', type=str, default='linear')
+    parser.add_argument('--save_spikes', type=str, default='False')
+    parser.add_argument('--normalize_inputs', type=str, default='False')
+    parser.add_argument('--proportion_low', type=float, default=0.5)
+    parser.add_argument('--noise_const', type=float, default=0.0)
+    parser.add_argument('--inhib_scheme', type=str, default='increasing')
+    parser.add_argument('--start_input_intensity', type=float, default=2.0)
+    parser.add_argument('--test_adaptive_threshold', type=str, default='False')
+    parser.add_argument('--train_time', type=float, default=0.35)
+    parser.add_argument('--train_rest', type=float, default=0.15)
+    parser.add_argument('--test_time', type=float, default=0.35)
+    parser.add_argument('--test_rest', type=float, default=0.15)
+    parser.add_argument('--dt', type=float, default=0.25)
+    parser.add_argument('--use_ngram', type=str, default='False')
+    parser.add_argument('--learn_ngram', type=str, default='False')
+    parser.add_argument('--n_ngram', type=int, default=2)
+    parser.add_argument('--num_examples_ngram', type=int, default=10)
+    parser.add_argument('--p_flip', type=float, default=0.0)
 
     # parse arguments and place them in local scope
     args = parser.parse_args()
@@ -1305,7 +1269,7 @@ if __name__ == '__main__':
 
     for var in ['do_plot', 'plot_all_deltas', 'reset_state_vars', 'test_max_inhibition',
                 'normalize_inputs', 'save_weights', 'save_best_model', 'test_no_inhibition',
-                'save_spikes', 'weights_noise', 'test_adaptive_threshold', 'use_ngram', 'learn_ngram']:
+                'save_spikes', 'test_adaptive_threshold', 'use_ngram', 'learn_ngram']:
         if locals()[var] == 'True':
             locals()[var] = True
         elif locals()[var] == 'False':
@@ -1405,14 +1369,14 @@ if __name__ == '__main__':
     weight, delay = {}, {}
 
     # populations, connections, saved connections, etc.
-    input_population_names = [ 'X' ]
-    population_names = [ 'A' ]
-    input_connection_names = [ 'XA' ]
-    save_conns = [ 'XeAe', 'AeAe' ]
+    input_population_names = ['X']
+    population_names = ['A']
+    input_connection_names = ['XA']
+    save_conns = ['XeAe', 'AeAe']
 
     # weird and bad names for variables, I think
-    input_conn_names = [ 'ee_input' ]
-    recurrent_conn_names = [ 'ei', 'ie', 'ee' ]
+    input_conn_names = ['ee_input']
+    recurrent_conn_names = ['ei', 'ie', 'ee']
     
     # setting weight, delay, and intensity parameters
     weight['ee_input'] = (conv_size ** 2) * 0.099489796
