@@ -14,7 +14,7 @@ do
 						do
 							sbatch csnn_noisy_two_level_inhibition_job.sh 28 0 $conv_features $num_train \
 								                                          $random_seed $proportion_low \
-								                                          $start_inhib $max_inhib $ p_flip
+								                                          $start_inhib $max_inhib $p_flip
 						done
 					done
 				done
