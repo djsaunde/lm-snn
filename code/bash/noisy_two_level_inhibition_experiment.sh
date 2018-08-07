@@ -1,8 +1,8 @@
 for num_train in 60000
 do
-	for random_seed in 0 1 2
+	for random_seed in 0
 	do
-		for conv_features in 100 200 300 400 500
+		for conv_features in 400
 		do
 			for proportion_low in 0.1
 			do

@@ -37,7 +37,7 @@ b.log_level_error()
 # set these appropriate to your directory structure
 top_level_path = os.path.join('..', '..')
 MNIST_data_path = os.path.join(top_level_path, 'data')
-model_name = 'csnn_two_level_inhibition'
+model_name = 'csnn_noisy_two_level_inhibition'
 results_path = os.path.join(top_level_path, 'results', model_name)
 
 performance_dir = os.path.join(top_level_path, 'performance', model_name)
@@ -59,9 +59,11 @@ end_misc_dir = os.path.join(misc_dir, 'end')
 
 ngram_dir = os.path.join(top_level_path, 'ngrams', model_name)
 
-for d in [ performance_dir, activity_dir, weights_dir, deltas_dir, misc_dir, best_misc_dir,
-                assignments_dir, best_assignments_dir, MNIST_data_path, results_path, 
-            best_weights_dir, end_weights_dir, end_misc_dir, end_assignments_dir, spikes_dir, ngram_dir ]:
+directories = [performance_dir, activity_dir, weights_dir, deltas_dir, misc_dir, best_misc_dir,
+               assignments_dir, best_assignments_dir, MNIST_data_path, results_path, best_weights_dir,
+               end_weights_dir, end_misc_dir, end_assignments_dir, spikes_dir, ngram_dir]
+
+for d in directories:
     if not os.path.isdir(d):
         os.makedirs(d)
 
@@ -978,8 +980,8 @@ def calculate_and_save_ngrams(n_ngram):
             spikes = spike_monitors['Ae'].spikes
             
             last_fire = spikes[-1][1]
-            n = int(last_fire/0.5)
-            start_time = 0.5*n # as we need to find the first spike for this particular example, which has to be in this section of 500 ms
+            n = int(last_fire / 0.5)
+            start_time = 0.5 * n
             
             i = 1
             while len(spikes)>=i and spikes[-1*i][1]>start_time:
@@ -989,9 +991,6 @@ def calculate_and_save_ngrams(n_ngram):
             while i>0:
                 fire_order.append(spikes[-1*i][0])
                 i -= 1
-
-            # l = len(fire_order)
-            # print "Len=Total spikes for current example: ", l
 
             # Add to counts for every n-gram
             for i in xrange(1,n_ngram+1): # from 1 to n_ngram
@@ -1096,7 +1095,8 @@ def run_test():
             input_numbers[j] = data['y'][j % data_size][0]
             
             # get the output classifications of the network
-            for scheme, outputs in predict_label(assignments, result_monitor[j % update_interval, :], accumulated_rates, spike_proportions).items():
+            for scheme, outputs in predict_label(assignments, result_monitor[j % update_interval, :],
+                                                 accumulated_rates, spike_proportions).items():
                 if scheme != 'distance':
                     output_numbers[scheme][j, :] = outputs
                 elif scheme == 'distance':
@@ -1109,7 +1109,8 @@ def run_test():
 
             # print progress
             if j % print_progress_interval == 0 and j > 0:
-                print 'runs done:', j, 'of', int(num_examples), '(time taken for past', print_progress_interval, 'runs:', str(timeit.default_timer() - start_time) + ')'
+                print 'runs done:', j, 'of', int(num_examples), '(time taken for past', print_progress_interval,
+                      'runs:', str(timeit.default_timer() - start_time) + ')'
                 start_time = timeit.default_timer()
                         
             # set input firing rates back to zero
@@ -1335,8 +1336,8 @@ if __name__ == '__main__':
             dataset = 'training'
         else:
             f_path = os.path.join(ngram_dir,'ngrams_'+ending+'_n'+str(n_ngram)+'_ne'+str(num_examples_ngram)+'.pickle')
-            assert os.path.exists(f_path) # If error pops up, run with learn_ngram=True
-
+            assert os.path.exists(f_path)
+    
     start = timeit.default_timer()
     data = get_labeled_data(os.path.join(MNIST_data_path, dataset), 
                                                 not test_mode, False, xrange(10), 1000, normalize_inputs)
