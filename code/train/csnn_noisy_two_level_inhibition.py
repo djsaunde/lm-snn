@@ -1109,8 +1109,7 @@ def run_test():
 
             # print progress
             if j % print_progress_interval == 0 and j > 0:
-                print 'runs done:', j, 'of', int(num_examples), '(time taken for past', print_progress_interval,
-                      'runs:', str(timeit.default_timer() - start_time) + ')'
+                print 'runs done:', j, 'of', int(num_examples), '(time taken for past', print_progress_interval, 'runs:', str(timeit.default_timer() - start_time) + ')'
                 start_time = timeit.default_timer()
                         
             # set input firing rates back to zero
@@ -1337,7 +1336,7 @@ if __name__ == '__main__':
         else:
             f_path = os.path.join(ngram_dir,'ngrams_'+ending+'_n'+str(n_ngram)+'_ne'+str(num_examples_ngram)+'.pickle')
             assert os.path.exists(f_path)
-    
+
     start = timeit.default_timer()
     data = get_labeled_data(os.path.join(MNIST_data_path, dataset), 
                                                 not test_mode, False, xrange(10), 1000, normalize_inputs)
