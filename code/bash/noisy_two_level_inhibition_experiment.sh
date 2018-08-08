@@ -6,7 +6,7 @@ do
 		do
 			for proportion_low in 0.1
 			do
-				for start_inhib in 1.0
+				for start_inhib in 1.0 20.0
 				do
 					for max_inhib in 20.0
 					do
