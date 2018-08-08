@@ -1314,7 +1314,7 @@ if __name__ == '__main__':
 
     # set ending of filename saves
     ending = '_'.join([str(conv_size), str(conv_stride), str(conv_features), str(n_e), str(num_train),
-                       str(random_seed), str(proportion_low), str(start_inhib), str(max_inhib)])
+                       str(random_seed), str(proportion_low), str(start_inhib), str(max_inhib), str(p_flip)])
 
 
     # At which iteration do we increase the inhibition to the ETH level?
