@@ -34,6 +34,6 @@ There are various supporting scripts in other subfolders of the project reposito
 
 - Dan Saunders (djsaunde@cs.umass.edu)
 
-- Pegah Taheri (pegahtaheri@gmail.comp)
+- Pegah Taheri (pegahtaheri@gmail.com)
 
 - Hananel Hazan (hananel@hazan.org.il)
